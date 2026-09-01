@@ -46,7 +46,7 @@ Actualmente la búsqueda de un prestador de servicios se apoya en recomendacione
 
 ### Estado del proyecto
 
-En desarrollo. Consulta nuestro github (https://github.com/[usuario]/[repositorio]/projects) para ver el avance por sprint.
+En desarrollo. Consulta nuestro github(https://github.com/nicolasmarin99/proyecto_final_capstone/tree/main) para ver el avance por sprint.
 
 ---
 
