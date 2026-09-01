@@ -21,7 +21,6 @@ Proyecto de Título — Ingeniería en Informática, Duoc UC — 2026
 - [Instrucciones de instalación](#instrucciones-de-instalación)
 - [Metodología de trabajo](#metodología-de-trabajo)
 - [Integrantes y roles](#integrantes-y-roles)
-- [Licencia](#licencia)
 
 ---
 
