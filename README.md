@@ -27,7 +27,7 @@ Proyecto de Título — Ingeniería en Informática, Duoc UC — 2026
 
 ## Descripción
 
-Digiguias es una plataforma que conecta a personas que necesitan un servicio con quienes lo ofrecen, retomando la lógica de la recordada guias amarillas pero especializada en servicios y enriquecida con información verificable del prestador.
+Digiservice es una plataforma que conecta a personas que necesitan un servicio con quienes lo ofrecen, retomando la lógica de la recordada guias amarillas pero especializada en servicios y enriquecida con información verificable del prestador.
 
 A diferencia de un listado de contactos tradicional, cada prestador cuenta con un perfil que reúne su oferta de servicios, documentación que acredita su idoneidad y las valoraciones dejadas por clientes anteriores. El objetivo es reducir la incertidumbre del usuario al momento de contratar.
 
