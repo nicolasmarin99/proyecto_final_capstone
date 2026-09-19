@@ -1,4 +1,4 @@
-# Digiservice
+# LocalCL
 
 > Plataforma web y móvil para la búsqueda de servicios, con perfiles verificados, certificaciones y valoraciones de los prestadores.
 
