@@ -10,8 +10,13 @@ app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/health", (_req, res) => {
-  res.json({ estado: "ok", entorno: env.NODE_ENV, hora: new Date().toISOString() });
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ estado: "ok", baseDatos: "ok", entorno: env.NODE_ENV });
+  } catch {
+    res.status(503).json({ estado: "degradado", baseDatos: "sin conexión" });
+  }
 });
 
 app.use((_req, res) => {
