@@ -1,0 +1,11 @@
+{
+  "name": "localcl",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev:api": "npm run dev --workspace=@localcl/api"
+  }
+}
