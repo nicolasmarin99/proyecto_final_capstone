@@ -26,7 +26,7 @@ Proyecto de Título — Ingeniería en Informática, Duoc UC — 2026
 
 ## Descripción
 
-Digiservice es una plataforma que conecta a personas que necesitan un servicio con quienes lo ofrecen, retomando la lógica de la recordada guias amarillas pero especializada en servicios y enriquecida con información verificable del prestador.
+LoclaCL es una plataforma que conecta a personas que necesitan un servicio con quienes lo ofrecen, retomando la lógica de la recordada guias amarillas pero especializada en servicios y enriquecida con información verificable del prestador.
 
 A diferencia de un listado de contactos tradicional, cada prestador cuenta con un perfil que reúne su oferta de servicios, documentación que acredita su idoneidad y las valoraciones dejadas por clientes anteriores. El objetivo es reducir la incertidumbre del usuario al momento de contratar.
 
@@ -54,7 +54,7 @@ En desarrollo. Consulta nuestro github(https://github.com/nicolasmarin99/proyect
 | Capa | Tecnología | Uso |
 |---|---|---|
 | Lenguaje | TypeScript | Lenguaje único en las tres capas del sistema |
-| Frontend web | React 18 + Vite + Tailwind CSS | Sitio web y panel de administración |
+| Frontend web | React 19 + Vite + Tailwind CSS | Sitio web y panel de administración |
 | Aplicación móvil | React Native (Expo) | Aplicación para Android e iOS |
 | Backend | Node.js + Express | API REST y reglas de negocio |
 | ORM | Prisma | Acceso tipado a datos y migraciones |
