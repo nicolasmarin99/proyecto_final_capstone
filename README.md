@@ -5,7 +5,7 @@
 ![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
-![React](https://img.shields.io/badge/React-18-61DAFB)
+![React](https://img.shields.io/badge/React-19-61DAFB)
 ![Node.js](https://img.shields.io/badge/Node.js-20-339933)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1)
 
