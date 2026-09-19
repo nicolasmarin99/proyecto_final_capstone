@@ -1,0 +1,86 @@
+// LocalCL — Modelo de datos
+// Sprint 1: identidad y acceso. Las entidades de catálogo, credenciales
+// y valoraciones se agregan en sus sprints correspondientes.
+
+generator client {
+  provider = "prisma-client-js"
+   output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Perfiles de usuario del sistema.
+enum Rol {
+  CLIENTE
+  PRESTADOR
+  ADMINISTRADOR
+}
+
+/// Mecanismos de autenticación soportados.
+/// CLAVE_UNICA queda declarado como trabajo futuro: su integración
+/// está restringida a organismos del Estado.
+enum ProveedorAuth {
+  LOCAL
+  GOOGLE
+  CLAVE_UNICA
+}
+
+model Usuario {
+  id               String   @id @default(uuid())
+  correo           String   @unique
+  /// Nulo cuando el usuario solo accede con un proveedor externo.
+  hashContrasena   String?
+  nombre           String
+  /// Se almacena normalizado, sin puntos y con guion: 12345678-9
+  rut              String?  @unique
+  rutVerificado    Boolean  @default(false)
+  rol              Rol      @default(CLIENTE)
+  correoVerificado Boolean  @default(false)
+  activo           Boolean  @default(true)
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  identidades      Identidad[]
+  sesiones         Sesion[]
+
+  @@index([rol])
+  @@map("usuarios")
+}
+
+/// Vincula un usuario con su cuenta en un proveedor de identidad.
+/// Un usuario puede tener varias: contraseña local y Google, por ejemplo.
+model Identidad {
+  id            String        @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  proveedor     ProveedorAuth
+  /// Identificador que entrega el proveedor (el "sub" de OpenID Connect).
+  sujetoExterno String
+  creadoEn      DateTime      @default(now())
+
+  @@unique([proveedor, sujetoExterno])
+  @@index([usuarioId])
+  @@map("identidades")
+}
+
+/// Tokens de refresco emitidos. Permiten cerrar sesiones de forma
+/// remota y detectar la reutilización de un token ya consumido.
+model Sesion {
+  id            String    @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  /// Nunca se guarda el token en claro, solo su hash.
+  hashToken     String    @unique
+  expiraEn      DateTime
+  revocadaEn    DateTime?
+  /// Apunta a la sesión que la reemplazó al rotar el token.
+  reemplazadaPor String?
+  agenteUsuario String?
+  creadaEn      DateTime  @default(now())
+
+  @@index([usuarioId])
+  @@index([expiraEn])
+  @@map("sesiones")
+}

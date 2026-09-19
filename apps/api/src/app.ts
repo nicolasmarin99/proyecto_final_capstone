@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import helmet from "helmet";
 import cors from "cors";
 import { env } from "./env.js";
+import { prisma } from "./db.js";
 
 export const app = express();
 
