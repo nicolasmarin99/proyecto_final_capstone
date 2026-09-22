@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import App from "./App";
+import PaginaEstado from "./Estado";
 
 function respuestaJson(cuerpo: unknown, ok: boolean, status: number): Response {
   return {
@@ -8,6 +9,14 @@ function respuestaJson(cuerpo: unknown, ok: boolean, status: number): Response {
     status,
     json: async () => cuerpo,
   } as Response;
+}
+
+function renderizar() {
+  return render(
+    <MemoryRouter>
+      <PaginaEstado />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => {
@@ -19,11 +28,22 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("App", () => {
+describe("Página de estado", () => {
+  it("consulta la API por una ruta relativa que resuelve el proxy", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      respuestaJson({ estado: "ok", baseDatos: "ok", entorno: "development" }, true, 200),
+    );
+
+    renderizar();
+    await screen.findByText(/todo ok/i);
+
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe("/api/health");
+  });
+
   it("muestra un estado de carga mientras espera la respuesta de la API", () => {
     vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
 
-    render(<App />);
+    renderizar();
 
     expect(screen.getByText(/cargando/i)).toBeInTheDocument();
   });
@@ -33,7 +53,7 @@ describe("App", () => {
       respuestaJson({ estado: "ok", baseDatos: "ok", entorno: "development" }, true, 200),
     );
 
-    render(<App />);
+    renderizar();
 
     expect(await screen.findByText(/todo ok/i)).toBeInTheDocument();
     expect(screen.getByText(/development/i)).toBeInTheDocument();
@@ -44,7 +64,7 @@ describe("App", () => {
       respuestaJson({ estado: "degradado", baseDatos: "sin conexión" }, false, 503),
     );
 
-    render(<App />);
+    renderizar();
 
     expect(await screen.findByText(/servicio degradado/i)).toBeInTheDocument();
   });
@@ -52,7 +72,7 @@ describe("App", () => {
   it("muestra sin conexión cuando falla la red", async () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
 
-    render(<App />);
+    renderizar();
 
     expect(await screen.findByText(/sin conexión/i)).toBeInTheDocument();
   });
@@ -61,7 +81,7 @@ describe("App", () => {
     vi.useFakeTimers();
     vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
 
-    render(<App />);
+    renderizar();
 
     expect(screen.queryByText(/despertando/i)).not.toBeInTheDocument();
 
@@ -84,7 +104,7 @@ describe("App", () => {
         }),
     );
 
-    render(<App />);
+    renderizar();
 
     await act(async () => {
       vi.advanceTimersByTime(70000);
@@ -96,7 +116,7 @@ describe("App", () => {
   it("permite reintentar tras un error", async () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
 
-    render(<App />);
+    renderizar();
     await screen.findByText(/sin conexión/i);
 
     vi.mocked(fetch).mockResolvedValue(
