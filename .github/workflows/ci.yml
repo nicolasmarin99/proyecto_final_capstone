@@ -53,3 +53,29 @@ jobs:
 
       - name: Ejecutar pruebas
         run: npm run test --workspace=@localcl/api
+
+  web:
+    name: Web — tipos, pruebas y build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos
+        run: npm run typecheck --workspace=@localcl/web
+
+      - name: Ejecutar pruebas
+        run: npm run test --workspace=@localcl/web
+
+      - name: Compilar
+        run: npm run build --workspace=@localcl/web
