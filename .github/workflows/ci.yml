@@ -28,6 +28,9 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/localcl
       CORS_ORIGIN: http://localhost:5173
+      # Valor de usar y tirar: el contenedor y los tokens mueren con el job.
+      # Un secreto real iría en los Secrets del repositorio, nunca aquí.
+      JWT_SECRET: secreto-de-integracion-continua-no-usar-en-produccion
 
     steps:
       - name: Descargar código
