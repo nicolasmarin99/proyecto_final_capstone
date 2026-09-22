@@ -6,6 +6,7 @@
   "scripts": {
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "dev:api": "npm run dev --workspace=@localcl/api"
+    "dev:api": "npm run dev --workspace=@localcl/api",
+    "dev:web": "npm run dev --workspace=@localcl/web"
   }
 }
