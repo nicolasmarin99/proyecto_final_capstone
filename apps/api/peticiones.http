@@ -1,0 +1,192 @@
+# LocalCL — Pruebas manuales de la API con la extensión REST Client.
+#
+# Requiere la API levantada con `npm run dev:api`, que usa la base de
+# DESARROLLO (localcl), no la de pruebas. Los registros que se creen aquí
+# quedan guardados. Para limpiarlos:
+#   docker exec localcl-db psql -U postgres -d localcl -c "DELETE FROM usuarios WHERE correo LIKE '%@ejemplo.cl';"
+
+@host = http://localhost:3000
+
+### Estado del servicio → 200
+GET {{host}}/health
+
+### 1. Registro válido → 201, rol CLIENTE y sin hashContrasena
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Ana Pérez",
+  "correo": "ana.perez@ejemplo.cl",
+  "contrasena": "contrasena-segura-123"
+}
+
+### 2. Correo duplicado con otras mayúsculas → 409 REGISTRO_NO_DISPONIBLE
+# Ejecutar después del caso 1. El correo se normaliza a minúsculas antes de
+# guardarse, así que este choca con la restricción única.
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Ana Pérez",
+  "correo": "ANA.PEREZ@Ejemplo.CL",
+  "contrasena": "otra-contrasena-456"
+}
+
+### 3. Contraseña de 9 caracteres → 400 DATOS_INVALIDOS con detalle en contrasena
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Bruno Soto",
+  "correo": "bruno.soto@ejemplo.cl",
+  "contrasena": "123456789"
+}
+
+### 4. Contraseña de 129 caracteres → 400 DATOS_INVALIDOS
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Bruno Soto",
+  "correo": "bruno.soto@ejemplo.cl",
+  "contrasena": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+
+### 5. Campos faltantes → 400 DATOS_INVALIDOS
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "correo": "carla.rojas@ejemplo.cl"
+}
+
+### 6. Correo con formato inválido → 400 DATOS_INVALIDOS
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Carla Rojas",
+  "correo": "esto-no-es-un-correo",
+  "contrasena": "contrasena-segura-123"
+}
+
+### 7. JSON mal formado → 400 JSON_INVALIDO
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{"nombre": "Carla",
+
+### 8. Rol enviado por el cliente → 201, pero se crea como CLIENTE
+# El esquema no declara "rol", así que Zod descarta la clave y el servidor
+# impone CLIENTE. La respuesta debe mostrar "rol": "CLIENTE".
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Diego Alarcón",
+  "correo": "diego.alarcon@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rol": "ADMINISTRADOR"
+}
+
+### 9. Ruta inexistente → 404 NO_ENCONTRADO
+GET {{host}}/auth/no-existe
+
+# =====================================================================
+# INICIO DE SESIÓN
+#
+# REST Client guarda las cookies entre peticiones, así que lc_refresh
+# viaja sola en refrescar y logout. El accessToken hay que copiarlo a
+# mano en @token después del login, porque va en la cabecera.
+# =====================================================================
+
+@token = pega-aqui-el-accessToken-del-login
+
+### 10. Login correcto → 200 { accessToken, usuario } + cookie lc_refresh
+# Revisa en la respuesta que Set-Cookie traiga HttpOnly, SameSite=Strict y Path=/.
+# Requiere haber ejecutado antes el caso 1.
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "correo": "ana.perez@ejemplo.cl",
+  "contrasena": "contrasena-segura-123"
+}
+
+### 11. Login con el correo en mayúsculas → 200 (se normaliza igual que el registro)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "correo": "  ANA.PEREZ@Ejemplo.CL  ",
+  "contrasena": "contrasena-segura-123"
+}
+
+### 12. Contraseña incorrecta → 401 CREDENCIALES_INVALIDAS
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "correo": "ana.perez@ejemplo.cl",
+  "contrasena": "contrasena-equivocada"
+}
+
+### 13. Correo inexistente → 401 idéntico al caso 12
+# Compara ambas respuestas: mismo estado, mismo cuerpo. No se puede deducir
+# si la cuenta existe. El tiempo también debería ser parecido.
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "correo": "no-existe@ejemplo.cl",
+  "contrasena": "contrasena-segura-123"
+}
+
+### 14. Perfil autenticado → 200 (pega el accessToken en @token primero)
+GET {{host}}/auth/yo
+Authorization: Bearer {{token}}
+
+### 15. Perfil sin token → 401 TOKEN_INVALIDO
+GET {{host}}/auth/yo
+
+### 16. Perfil con token alterado → 401 TOKEN_INVALIDO
+GET {{host}}/auth/yo
+Authorization: Bearer {{token}}xxx
+
+### 17. Refrescar → 200 con accessToken nuevo y cookie lc_refresh distinta
+# Usa la cookie guardada. La sesión anterior queda revocada y apuntando
+# a la nueva mediante reemplazadaPor.
+POST {{host}}/auth/refrescar
+
+### 18. Refrescar otra vez → 200 (la rotación encadena sesiones)
+POST {{host}}/auth/refrescar
+
+### 19. Logout → 204 y la cookie se limpia
+POST {{host}}/auth/logout
+
+### 20. Refrescar después del logout → 401 SESION_INVALIDA
+POST {{host}}/auth/refrescar
+
+# =====================================================================
+# DETECCIÓN DE ROBO DE TOKEN
+#
+# Este caso no se puede reproducir solo con las cookies automáticas,
+# porque hay que reenviar a propósito una cookie ya rotada. Con curl:
+#
+#   # 1. Login guardando cookies y anotando el token de refresco
+#   curl -s -c cookies.txt -X POST http://localhost:3000/auth/login \
+#     -H "Content-Type: application/json" \
+#     -d '{"correo":"ana.perez@ejemplo.cl","contrasena":"contrasena-segura-123"}'
+#
+#   # 2. Copiar el valor de lc_refresh de cookies.txt y refrescar con él
+#   curl -s -X POST http://localhost:3000/auth/refrescar \
+#     -H "Cookie: lc_refresh=VALOR_ANTIGUO"        # → 200
+#
+#   # 3. Reutilizar ese MISMO valor antiguo
+#   curl -s -i -X POST http://localhost:3000/auth/refrescar \
+#     -H "Cookie: lc_refresh=VALOR_ANTIGUO"        # → 401
+#
+#   # 4. Comprobar que no queda ninguna sesión activa del usuario
+#   docker exec localcl-db psql -U postgres -d localcl \
+#     -c "SELECT id, \"revocadaEn\", \"reemplazadaPor\" FROM sesiones;"
+# =====================================================================
