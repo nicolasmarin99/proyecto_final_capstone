@@ -33,6 +33,11 @@ interface Sesion {
   usuario: Usuario;
 }
 
+export interface ResumenAdmin {
+  totalUsuarios: number;
+  porRol: Record<string, number>;
+}
+
 interface OpcionesPeticion {
   metodo?: string;
   cuerpo?: unknown;
@@ -66,6 +71,28 @@ function leerSesion(valor: unknown): Sesion | null {
   const usuario = leerUsuario(valor.usuario);
 
   return usuario ? { accessToken: valor.accessToken, usuario } : null;
+}
+
+function leerResumen(valor: unknown): ResumenAdmin | null {
+  if (!esObjeto(valor) || !esObjeto(valor.resumen)) {
+    return null;
+  }
+
+  const { totalUsuarios, porRol } = valor.resumen;
+
+  if (typeof totalUsuarios !== "number" || !esObjeto(porRol)) {
+    return null;
+  }
+
+  const contadores: Record<string, number> = {};
+
+  for (const [rol, total] of Object.entries(porRol)) {
+    if (typeof total === "number") {
+      contadores[rol] = total;
+    }
+  }
+
+  return { totalUsuarios, porRol: contadores };
 }
 
 function leerDetalles(valor: unknown): DetalleError[] {
@@ -237,6 +264,16 @@ export function crearClienteApi() {
       }
 
       return usuario;
+    },
+
+    async obtenerResumenAdmin(): Promise<ResumenAdmin> {
+      const resumen = leerResumen(await peticion("/admin/resumen", { autenticada: true }));
+
+      if (!resumen) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return resumen;
     },
 
     async cerrarSesion(): Promise<void> {

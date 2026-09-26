@@ -5,8 +5,13 @@ import type { Rol } from "../generated/prisma/client.js";
 declare global {
   namespace Express {
     interface Request {
-      /** Lo deja el middleware autenticar después de validar el token. */
+      /** Lo que afirma el token. Lo deja autenticar tras validar la firma. */
       usuario?: { id: string; rol: Rol };
+      /**
+       * La fila real del usuario, leída de la base durante la autorización.
+       * Se guarda aquí para que una misma petición no consulte dos veces.
+       */
+      cuenta?: { id: string; rol: Rol; activo: boolean };
     }
   }
 }

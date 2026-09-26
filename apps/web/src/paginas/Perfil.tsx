@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Pagina } from "../componentes/Pagina";
@@ -67,6 +67,22 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
           </dl>
         )}
       </div>
+
+      {/*
+        Ocultar este enlace es comodidad, no seguridad: solo evita ofrecerle a
+        un cliente una pantalla que no le sirve. Cualquiera puede escribir
+        /admin en la barra de direcciones o llamar al endpoint con curl, y por
+        eso la protección de verdad vive en el servidor, donde autorizar()
+        comprueba el rol contra la base en cada petición.
+      */}
+      {perfil?.rol === "ADMINISTRADOR" && (
+        <Link
+          to="/admin"
+          className="mt-6 block rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Panel de administración
+        </Link>
+      )}
 
       <button
         type="button"
