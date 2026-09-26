@@ -190,3 +190,50 @@ POST {{host}}/auth/refrescar
 #   docker exec localcl-db psql -U postgres -d localcl \
 #     -c "SELECT id, \"revocadaEn\", \"reemplazadaPor\" FROM sesiones;"
 # =====================================================================
+
+# =====================================================================
+# AUTORIZACIÓN POR ROL
+#
+# Para probar estos casos hace falta un administrador. El registro solo
+# crea clientes (el rol lo fija el servidor), así que se promueve uno a
+# mano en la base:
+#
+#   docker exec localcl-db psql -U postgres -d localcl -c \
+#     "UPDATE usuarios SET rol='ADMINISTRADOR' WHERE correo='ana.perez@ejemplo.cl';"
+#
+# Después hay que volver a hacer login (caso 10) para obtener un token
+# nuevo y pegarlo en @token.
+# =====================================================================
+
+### 21. Resumen de administración con token de ADMINISTRADOR → 200
+GET {{host}}/admin/resumen
+Authorization: Bearer {{token}}
+
+### 22. Resumen sin token → 401 TOKEN_INVALIDO
+GET {{host}}/admin/resumen
+
+### 23. Resumen con token de CLIENTE → 403 SIN_PERMISOS
+# Inicia sesión con una cuenta cliente, pega su token en @tokenCliente
+# y ejecuta esta petición.
+@tokenCliente = pega-aqui-el-accessToken-de-un-cliente
+
+GET {{host}}/admin/resumen
+Authorization: Bearer {{tokenCliente}}
+
+# =====================================================================
+# EL ROL SE LEE DE LA BASE, NO DEL TOKEN
+#
+# Con el token de administrador del caso 21 todavía en @token, degrada
+# la cuenta SIN volver a iniciar sesión:
+#
+#   docker exec localcl-db psql -U postgres -d localcl -c \
+#     "UPDATE usuarios SET rol='CLIENTE' WHERE correo='ana.perez@ejemplo.cl';"
+#
+# y repite el caso 21: el token sigue diciendo ADMINISTRADOR y su firma
+# sigue siendo válida, pero la respuesta ya es 403. Lo mismo con:
+#
+#   UPDATE usuarios SET activo=false WHERE correo='ana.perez@ejemplo.cl';
+#
+# que devuelve 401 NO_AUTENTICADO, porque el problema deja de ser de
+# permisos y pasa a ser que la sesión ya no representa a nadie válido.
+# =====================================================================

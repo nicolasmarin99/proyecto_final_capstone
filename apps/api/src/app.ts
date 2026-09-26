@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { ZodError } from "zod";
 import { env } from "./env.js";
 import { prisma } from "./db.js";
+import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
 import { ErrorHttp } from "./shared/errores.js";
 
@@ -25,6 +26,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/auth", rutasAuth);
+app.use("/admin", rutasAdmin);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { codigo: "NO_ENCONTRADO", mensaje: "Recurso no encontrado" } });
