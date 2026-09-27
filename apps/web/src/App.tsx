@@ -5,12 +5,14 @@ import PaginaEstado from "./paginas/Estado";
 import PaginaIniciarSesion from "./paginas/IniciarSesion";
 import PaginaPerfil from "./paginas/Perfil";
 import PaginaRegistro from "./paginas/Registro";
+import PaginaRegistroPrestador from "./paginas/RegistroPrestador";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<PaginaEstado />} />
       <Route path="/registro" element={<PaginaRegistro />} />
+      <Route path="/registro-prestador" element={<PaginaRegistroPrestador />} />
       <Route path="/iniciar-sesion" element={<PaginaIniciarSesion />} />
       <Route
         path="/perfil"

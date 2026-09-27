@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Boton } from "../componentes/Boton";
 import { Pagina } from "../componentes/Pagina";
 
 const AVISO_DESPERTANDO_MS = 5000;
@@ -69,10 +70,10 @@ export default function PaginaEstado() {
     <Pagina titulo="Estado del servidor">
       <div className="mt-6" role="status" aria-live="polite">
         {estado.tipo === "cargando" && (
-          <div className="rounded-lg bg-slate-100 p-4 text-slate-700">
+          <div className="rounded-campo bg-piedra-50 p-4 text-piedra-700">
             <p>Cargando…</p>
             {avisoDespertando && (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-piedra-500">
                 El servidor se está despertando, esto puede tardar hasta un minuto.
               </p>
             )}
@@ -80,7 +81,7 @@ export default function PaginaEstado() {
         )}
 
         {estado.tipo === "ok" && (
-          <div className="rounded-lg bg-emerald-50 p-4 text-emerald-800">
+          <div className="rounded-campo border border-exito-700/20 bg-exito-50 p-4 text-exito-700">
             <p className="font-semibold">Todo OK</p>
             <p className="mt-1 text-sm">API: {estado.datos.estado}</p>
             <p className="text-sm">Base de datos: {estado.datos.baseDatos}</p>
@@ -88,8 +89,9 @@ export default function PaginaEstado() {
           </div>
         )}
 
+        {/* Ocre y no el ámbar de marca: ese color ya significa "acción". */}
         {estado.tipo === "degradado" && (
-          <div className="rounded-lg bg-amber-50 p-4 text-amber-800">
+          <div className="rounded-campo border border-alerta-700/20 bg-alerta-50 p-4 text-alerta-700">
             <p className="font-semibold">Servicio degradado</p>
             <p className="mt-1 text-sm">API: {estado.datos.estado}</p>
             <p className="text-sm">Base de datos: {estado.datos.baseDatos}</p>
@@ -97,32 +99,34 @@ export default function PaginaEstado() {
         )}
 
         {estado.tipo === "error" && (
-          <div className="rounded-lg bg-red-50 p-4 text-red-800">
+          <div className="rounded-campo border border-error-700/20 bg-error-50 p-4 text-error-700">
             <p className="font-semibold">Sin conexión con el servidor</p>
             <p className="mt-1 text-sm">No fue posible contactar la API.</p>
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={reintentar}
-        className="mt-6 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-      >
+      <Boton type="button" onClick={reintentar} variante="secundario" className="mt-6">
         Reintentar
-      </button>
+      </Boton>
 
-      <nav className="mt-6 flex justify-center gap-4 border-t border-slate-200 pt-4 text-sm">
-        <Link to="/registro" className="font-medium text-slate-700 underline hover:text-slate-900">
+      <nav className="mt-6 flex justify-center gap-5 border-t border-piedra-100 pt-5 text-sm">
+        <Link
+          to="/registro"
+          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+        >
           Crear cuenta
         </Link>
         <Link
           to="/iniciar-sesion"
-          className="font-medium text-slate-700 underline hover:text-slate-900"
+          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
         >
           Iniciar sesión
         </Link>
-        <Link to="/perfil" className="font-medium text-slate-700 underline hover:text-slate-900">
+        <Link
+          to="/perfil"
+          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+        >
           Mi perfil
         </Link>
       </nav>

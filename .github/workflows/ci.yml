@@ -5,6 +5,32 @@ on:
     branches: ["**"]
 
 jobs:
+  shared:
+    name: Shared — tipos, pruebas y build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos
+        run: npm run typecheck --workspace=@localcl/shared
+
+      - name: Ejecutar pruebas
+        run: npm run test --workspace=@localcl/shared
+
+      - name: Compilar
+        run: npm run build --workspace=@localcl/shared
+
   api:
     name: API — tipos y pruebas
     runs-on: ubuntu-latest
@@ -45,6 +71,12 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # apps/api importa @localcl/shared desde su dist. El script prepare del
+      # paquete ya lo compila durante npm ci, pero se deja explícito para que
+      # este job no dependa de un efecto secundario de la instalación.
+      - name: Compilar paquete compartido
+        run: npm run build --workspace=@localcl/shared
+
       - name: Generar cliente de Prisma
         run: npm run prisma:generate --workspace=@localcl/api
 
@@ -73,6 +105,11 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      # Misma razón que en el job de la API: la web importa @localcl/shared
+      # desde su dist, así que se compila antes de nada.
+      - name: Compilar paquete compartido
+        run: npm run build --workspace=@localcl/shared
 
       - name: Verificar tipos
         run: npm run typecheck --workspace=@localcl/web

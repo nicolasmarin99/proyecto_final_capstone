@@ -36,25 +36,30 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
     <Pagina titulo="Panel de administración">
       <div className="mt-6">
         {error && (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <p
+            role="alert"
+            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+          >
             {error}
           </p>
         )}
 
-        {!error && !resumen && <p className="text-sm text-slate-600">Cargando el resumen…</p>}
+        {!error && !resumen && <p className="text-sm text-piedra-500">Cargando el resumen…</p>}
 
         {resumen && (
           <>
-            <div className="rounded-lg bg-slate-900 p-4 text-white">
-              <p className="text-sm text-slate-300">Usuarios registrados</p>
-              <p className="text-2xl font-bold">{resumen.totalUsuarios}</p>
+            <div className="rounded-campo bg-marca-900 p-5">
+              <p className="text-sm text-marca-200">Usuarios registrados</p>
+              <p className="font-display text-display font-semibold text-white">
+                {resumen.totalUsuarios}
+              </p>
             </div>
 
-            <dl className="mt-4 rounded-lg bg-slate-50 p-4 text-sm">
+            <dl className="mt-4 rounded-campo border border-piedra-100 bg-piedra-50 p-4 text-sm">
               {Object.entries(resumen.porRol).map(([rol, total]) => (
-                <div key={rol} className="flex justify-between gap-4 py-1">
-                  <dt className="text-slate-500">{rol}</dt>
-                  <dd className="font-medium text-slate-900">{total}</dd>
+                <div key={rol} className="flex justify-between gap-4 py-1.5">
+                  <dt className="text-piedra-500">{rol}</dt>
+                  <dd className="font-medium text-marca-900">{total}</dd>
                 </div>
               ))}
             </dl>
@@ -64,7 +69,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
 
       <Link
         to="/perfil"
-        className="mt-6 block rounded-lg bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-slate-700"
+        className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
       >
         Volver a mi perfil
       </Link>

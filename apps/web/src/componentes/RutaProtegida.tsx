@@ -14,7 +14,7 @@ export function RutaProtegida({ children }: { children: ReactNode }) {
   if (cargando) {
     return (
       <Pagina titulo="Cargando">
-        <p className="mt-6 text-sm text-slate-600">Verificando tu sesión…</p>
+        <p className="mt-6 text-sm text-piedra-500">Verificando tu sesión…</p>
       </Pagina>
     );
   }

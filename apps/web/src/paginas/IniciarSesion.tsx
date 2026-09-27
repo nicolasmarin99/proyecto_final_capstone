@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { ErrorApi } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
+import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
-import { Pagina } from "../componentes/Pagina";
+import { PaginaAuth } from "../componentes/PaginaAuth";
 
 /** El aviso de registro exitoso llega en el state de la navegación. */
 function leerMensajeDeExito(state: unknown): string | null {
@@ -65,16 +66,22 @@ export default function PaginaIniciarSesion() {
   }
 
   return (
-    <Pagina titulo="Iniciar sesión">
+    <PaginaAuth sobretitulo="Bienvenido de vuelta" titulo="Iniciar sesión">
       {mensajeExito && (
-        <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p
+          role="status"
+          className="mt-6 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+        >
           {mensajeExito}
         </p>
       )}
 
-      <form onSubmit={alEnviar} noValidate className="mt-4">
+      <form onSubmit={alEnviar} noValidate className="mt-6">
         {errorGeneral && (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <p
+            role="alert"
+            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+          >
             {errorGeneral}
           </p>
         )}
@@ -98,21 +105,31 @@ export default function PaginaIniciarSesion() {
           error={errores.contrasena}
         />
 
-        <button
-          type="submit"
-          disabled={enviando}
-          className="mt-6 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-        >
+        <Boton type="submit" disabled={enviando} className="mt-7">
           {enviando ? "Entrando…" : "Entrar"}
-        </button>
+        </Boton>
       </form>
 
-      <p className="mt-6 border-t border-slate-200 pt-4 text-center text-sm text-slate-600">
-        ¿No tienes cuenta?{" "}
-        <Link to="/registro" className="font-medium text-slate-900 underline">
-          Crear cuenta
-        </Link>
-      </p>
-    </Pagina>
+      <div className="mt-7 space-y-2 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+        <p>
+          ¿No tienes cuenta?{" "}
+          <Link
+            to="/registro"
+            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          >
+            Crear cuenta
+          </Link>
+        </p>
+        <p>
+          ¿Ofreces servicios?{" "}
+          <Link
+            to="/registro-prestador"
+            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          >
+            Registrarme como prestador
+          </Link>
+        </p>
+      </div>
+    </PaginaAuth>
   );
 }

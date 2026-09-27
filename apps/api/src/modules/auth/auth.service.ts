@@ -8,12 +8,13 @@ import {
   buscarSesionPorHash,
   buscarUsuarioPublicoPorId,
   crearCliente,
+  crearPrestador,
   crearSesion,
   revocarSesionPorHash,
   revocarSesionesDeUsuario,
   rotarSesion,
 } from "./auth.repository.js";
-import type { DatosLogin, DatosRegistro } from "./auth.schema.js";
+import type { DatosLogin, DatosRegistro, DatosRegistroPrestador } from "./auth.schema.js";
 import {
   MS_REFRESCO,
   generarTokenRefresco,
@@ -42,20 +43,24 @@ function sesionInvalida() {
   return new ErrorHttp(401, "SESION_INVALIDA", "La sesión no es válida o ya expiró.");
 }
 
-export async function registrarCliente(datos: DatosRegistro) {
-  const hashContrasena = await hash(datos.contrasena, { algorithm: Algorithm.Argon2id });
-
+/**
+ * Ejecuta una creación de cuenta traduciendo cualquier choque de unicidad al
+ * mismo 409 genérico.
+ *
+ * No se consulta si el correo o el RUT ya existen antes de insertar. Hacerlo
+ * abre una ventana de carrera entre la consulta y la escritura, y convierte el
+ * endpoint en un oráculo para enumerar cuentas. Se deja que la restricción
+ * única de la base decida.
+ *
+ * Está centralizado justamente para que la respuesta sea idéntica venga de
+ * donde venga el choque: si cada registro armara su propio error, bastaría una
+ * diferencia de redacción para revelar si lo que colisionó fue el correo o el
+ * RUT.
+ */
+async function crearCuenta<T>(crear: () => Promise<T>): Promise<T> {
   try {
-    return await crearCliente({
-      nombre: datos.nombre,
-      correo: datos.correo,
-      hashContrasena,
-    });
+    return await crear();
   } catch (error) {
-    // No se consulta si el correo ya existe antes de insertar. Hacerlo abre
-    // una ventana de carrera entre la consulta y la escritura, y convierte el
-    // endpoint en un oráculo para enumerar cuentas registradas. Se deja que la
-    // restricción única de la base decida y se responde siempre lo mismo.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === VIOLACION_UNICIDAD) {
       throw new ErrorHttp(
         409,
@@ -66,6 +71,31 @@ export async function registrarCliente(datos: DatosRegistro) {
 
     throw error;
   }
+}
+
+export async function registrarCliente(datos: DatosRegistro) {
+  const hashContrasena = await hash(datos.contrasena, { algorithm: Algorithm.Argon2id });
+
+  return crearCuenta(() =>
+    crearCliente({
+      nombre: datos.nombre,
+      correo: datos.correo,
+      hashContrasena,
+    }),
+  );
+}
+
+export async function registrarPrestador(datos: DatosRegistroPrestador) {
+  const hashContrasena = await hash(datos.contrasena, { algorithm: Algorithm.Argon2id });
+
+  return crearCuenta(() =>
+    crearPrestador({
+      nombre: datos.nombre,
+      correo: datos.correo,
+      hashContrasena,
+      rut: datos.rut,
+    }),
+  );
 }
 
 export async function iniciarSesion(datos: DatosLogin, agenteUsuario: string | null) {

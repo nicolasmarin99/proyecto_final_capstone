@@ -234,6 +234,15 @@ export function crearClienteApi() {
       await peticion("/auth/registro", { metodo: "POST", cuerpo: datos });
     },
 
+    async registrarPrestador(datos: {
+      nombre: string;
+      correo: string;
+      contrasena: string;
+      rut: string;
+    }): Promise<void> {
+      await peticion("/auth/registro-prestador", { metodo: "POST", cuerpo: datos });
+    },
+
     async iniciarSesion(correo: string, contrasena: string): Promise<Usuario> {
       const sesion = leerSesion(
         await peticion("/auth/login", { metodo: "POST", cuerpo: { correo, contrasena } }),

@@ -11,6 +11,8 @@ const camposPublicos = {
   correo: true,
   nombre: true,
   rol: true,
+  rut: true,
+  rutVerificado: true,
   correoVerificado: true,
   activo: true,
   creadoEn: true,
@@ -24,6 +26,29 @@ export async function crearCliente(datos: {
 }) {
   return prisma.usuario.create({
     data: { ...datos, rol: Rol.CLIENTE },
+    select: camposPublicos,
+  });
+}
+
+/** El rol y el estado del RUT los fija el servidor, nunca el cliente. */
+export async function crearPrestador(datos: {
+  nombre: string;
+  correo: string;
+  hashContrasena: string;
+  rut: string;
+}) {
+  return prisma.usuario.create({
+    data: {
+      ...datos,
+      rol: Rol.PRESTADOR,
+      // Se guarda explícitamente en false aunque ese sea el valor por defecto
+      // del esquema, porque aquí la distinción importa: el RUT está bien
+      // formado (pasó el módulo 11), pero nadie ha comprobado todavía que
+      // pertenezca a esta persona. Acreditarlo contra los registros oficiales
+      // es un paso posterior, y hasta que ocurra el prestador no debería
+      // aparecer como validado en la plataforma.
+      rutVerificado: false,
+    },
     select: camposPublicos,
   });
 }

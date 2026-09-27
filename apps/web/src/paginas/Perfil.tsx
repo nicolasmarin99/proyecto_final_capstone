@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
+import { Boton } from "../componentes/Boton";
 import { Pagina } from "../componentes/Pagina";
 
 export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: ClienteApi }) {
@@ -43,26 +44,29 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
     <Pagina titulo="Mi perfil">
       <div className="mt-6">
         {error && (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <p
+            role="alert"
+            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+          >
             {error}
           </p>
         )}
 
-        {!error && !perfil && <p className="text-sm text-slate-600">Cargando tu perfil…</p>}
+        {!error && !perfil && <p className="text-sm text-piedra-500">Cargando tu perfil…</p>}
 
         {perfil && (
-          <dl className="rounded-lg bg-slate-50 p-4 text-sm">
+          <dl className="rounded-campo border border-piedra-100 bg-piedra-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Nombre</dt>
-              <dd className="font-medium text-slate-900">{perfil.nombre}</dd>
+              <dt className="text-piedra-500">Nombre</dt>
+              <dd className="font-medium text-marca-900">{perfil.nombre}</dd>
             </div>
-            <div className="mt-2 flex justify-between gap-4">
-              <dt className="text-slate-500">Correo</dt>
-              <dd className="font-medium text-slate-900">{perfil.correo}</dd>
+            <div className="mt-2.5 flex justify-between gap-4">
+              <dt className="text-piedra-500">Correo</dt>
+              <dd className="font-medium text-marca-900">{perfil.correo}</dd>
             </div>
-            <div className="mt-2 flex justify-between gap-4">
-              <dt className="text-slate-500">Rol</dt>
-              <dd className="font-medium text-slate-900">{perfil.rol}</dd>
+            <div className="mt-2.5 flex justify-between gap-4">
+              <dt className="text-piedra-500">Rol</dt>
+              <dd className="font-medium text-marca-900">{perfil.rol}</dd>
             </div>
           </dl>
         )}
@@ -78,20 +82,15 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
       {perfil?.rol === "ADMINISTRADOR" && (
         <Link
           to="/admin"
-          className="mt-6 block rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
         >
           Panel de administración
         </Link>
       )}
 
-      <button
-        type="button"
-        onClick={alCerrarSesion}
-        disabled={saliendo}
-        className="mt-6 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-      >
+      <Boton type="button" onClick={alCerrarSesion} disabled={saliendo} className="mt-4">
         {saliendo ? "Cerrando sesión…" : "Cerrar sesión"}
-      </button>
+      </Boton>
     </Pagina>
   );
 }
