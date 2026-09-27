@@ -11,7 +11,7 @@ declare global {
        * La fila real del usuario, leída de la base durante la autorización.
        * Se guarda aquí para que una misma petición no consulte dos veces.
        */
-      cuenta?: { id: string; rol: Rol; activo: boolean };
+      cuenta?: { id: string; rol: Rol; activo: boolean; correoVerificado: boolean };
     }
   }
 }

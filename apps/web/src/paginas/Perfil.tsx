@@ -54,6 +54,20 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
 
         {!error && !perfil && <p className="text-sm text-piedra-500">Cargando tu perfil…</p>}
 
+        {/*
+          Solo cuando la API dice explícitamente que NO está verificado. Si el
+          dato no viniera, callar es mejor que acusar a quien sí lo confirmó.
+        */}
+        {perfil?.correoVerificado === false && (
+          <div className="mb-4 rounded-campo border border-alerta-700/20 bg-alerta-50 px-4 py-3 text-sm text-alerta-700">
+            <p className="font-semibold">Tu correo no está confirmado</p>
+            <p className="mt-1">
+              Hasta que lo confirmes no puedes publicar servicios ni dejar valoraciones. Busca el
+              enlace que te enviamos al registrarte.
+            </p>
+          </div>
+        )}
+
         {perfil && (
           <dl className="rounded-campo border border-piedra-100 bg-piedra-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
@@ -79,10 +93,17 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         eso la protección de verdad vive en el servidor, donde autorizar()
         comprueba el rol contra la base en cada petición.
       */}
+      <Link
+        to="/cambiar-contrasena"
+        className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+      >
+        Cambiar contraseña
+      </Link>
+
       {perfil?.rol === "ADMINISTRADOR" && (
         <Link
           to="/admin"
-          className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+          className="mt-3 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
         >
           Panel de administración
         </Link>

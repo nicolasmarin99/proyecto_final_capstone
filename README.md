@@ -109,13 +109,36 @@ cd [repositorio]
 npm install
 ```
 
-### 2. Levantar la base de datos
+### 2. Levantar los servicios locales
 
 ```bash
 docker compose up -d
 ```
 
-Esto inicia PostgreSQL en el puerto `5432`. Verifica que el contenedor esté corriendo con `docker ps`.
+Esto inicia dos contenedores:
+
+| Servicio | Contenedor | Puertos | Para qué |
+|---|---|---|---|
+| PostgreSQL con PostGIS | `localcl-db` | `5432` | Base de datos |
+| Mailpit | `localcl-correo` | `1025` SMTP · `8025` web | Bandeja de correo de desarrollo |
+
+Verifica que ambos estén corriendo con `docker ps`.
+
+#### Revisar los correos que envía la API
+
+En desarrollo la API no manda correos al exterior: los entrega a **Mailpit**, que los
+atrapa y los muestra en una bandeja web.
+
+1. Abre **http://localhost:8025**
+2. Ejecuta la acción que envía el correo (registrarte, pedir recuperación de cuenta)
+3. El mensaje aparece en la bandeja al instante, con su cuerpo y sus enlaces
+
+Esto permite probar los enlaces de verificación y de recuperación sin escribirle a
+ninguna dirección real. Mailpit guarda los últimos 500 mensajes y se vacía al recrear
+el contenedor.
+
+Para que las pruebas automatizadas no dependan de Mailpit, el entorno de test usa
+`CORREO_TRANSPORTE=memoria`, que guarda lo enviado en una lista dentro del proceso.
 
 ### 3. Configurar variables de entorno
 
@@ -126,13 +149,39 @@ cp apps/api/.env.example apps/api/.env
 ```
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/[nombre_bd]"
-JWT_SECRET="cadena_larga_y_aleatoria"
-JWT_EXPIRES_IN="7d"
+NODE_ENV=development
 PORT=3000
-CLOUDINARY_CLOUD_NAME=""
-CLOUDINARY_API_KEY=""
-CLOUDINARY_API_SECRET=""
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/localcl"
+CORS_ORIGIN="http://localhost:5173"
+
+# Mínimo 32 caracteres. Genera el tuyo con:
+#   node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
+JWT_SECRET="cadena_larga_y_aleatoria"
+
+# Base pública de la web, para armar los enlaces que se envían por correo.
+URL_WEB="http://localhost:5173"
+
+# Correo saliente. En desarrollo apunta al Mailpit de docker-compose.
+CORREO_TRANSPORTE="smtp"
+CORREO_SMTP_HOST="localhost"
+CORREO_SMTP_PUERTO=1025
+CORREO_REMITENTE="LocalCL <no-responder@localcl.cl>"
+
+# Consulta si la contraseña elegida aparece en filtraciones conocidas, contra
+# la API de rangos de Have I Been Pwned. Usa k-anonimato: solo viajan los cinco
+# primeros caracteres del hash, nunca la contraseña. Si el servicio no responde,
+# el registro continúa igual.
+REVISAR_CONTRASENAS_FILTRADAS="true"
+```
+
+`env.ts` valida todo esto con Zod al arrancar: si falta una variable obligatoria o
+`JWT_SECRET` es más corta de lo permitido, la API no levanta y dice cuál es el problema.
+
+Para las pruebas de integración hace falta además una base separada:
+
+```bash
+docker exec localcl-db psql -U postgres -c "CREATE DATABASE localcl_test;"
+cp apps/api/.env.test.example apps/api/.env.test
 ```
 
 > El archivo `.env` está excluido del repositorio mediante `.gitignore`. Nunca subas credenciales reales a GitHub.

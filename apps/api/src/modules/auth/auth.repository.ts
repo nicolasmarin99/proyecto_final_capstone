@@ -1,5 +1,5 @@
 import { prisma } from "../../db.js";
-import { Rol } from "../../generated/prisma/client.js";
+import { Rol, type TipoToken } from "../../generated/prisma/client.js";
 
 /**
  * Campos de un usuario que la API puede exponer.
@@ -68,6 +68,18 @@ export async function buscarUsuarioPublicoPorId(id: string) {
   return prisma.usuario.findUnique({ where: { id }, select: camposPublicos });
 }
 
+/** Trae el hash para comprobar la contraseña actual en un cambio con sesión. */
+export async function buscarCredencialesPorId(id: string) {
+  return prisma.usuario.findUnique({
+    where: { id },
+    select: { ...camposPublicos, hashContrasena: true },
+  });
+}
+
+export async function actualizarHashContrasena(usuarioId: string, hashContrasena: string) {
+  await prisma.usuario.update({ where: { id: usuarioId }, data: { hashContrasena } });
+}
+
 export async function crearSesion(datos: {
   usuarioId: string;
   hashToken: string;
@@ -96,6 +108,81 @@ export async function revocarSesionesDeUsuario(usuarioId: string) {
   await prisma.sesion.updateMany({
     where: { usuarioId, revocadaEn: null },
     data: { revocadaEn: new Date() },
+  });
+}
+
+/**
+ * Cierra las demás sesiones y deja viva la que hizo la petición.
+ *
+ * Si hashTokenActual es null (una petición sin cookie de refresco), no hay
+ * nada que preservar y se cierran todas: es el resultado seguro por defecto.
+ */
+export async function revocarSesionesSalvo(usuarioId: string, hashTokenActual: string | null) {
+  await prisma.sesion.updateMany({
+    where: {
+      usuarioId,
+      revocadaEn: null,
+      ...(hashTokenActual ? { hashToken: { not: hashTokenActual } } : {}),
+    },
+    data: { revocadaEn: new Date() },
+  });
+}
+
+export async function marcarCorreoVerificado(usuarioId: string) {
+  await prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { correoVerificado: true },
+  });
+}
+
+export async function crearTokenCuenta(datos: {
+  usuarioId: string;
+  tipo: TipoToken;
+  hashToken: string;
+  expiraEn: Date;
+}) {
+  return prisma.tokenCuenta.create({ data: datos, select: { id: true } });
+}
+
+/**
+ * Busca filtrando además por tipo: así un token de verificación presentado en
+ * el endpoint de restablecer contraseña simplemente no se encuentra, en vez de
+ * encontrarse y depender de una comprobación posterior que alguien pueda
+ * olvidar. Es lo que hace segura la decisión de usar una sola tabla.
+ */
+export async function buscarTokenCuenta(hashToken: string, tipo: TipoToken) {
+  return prisma.tokenCuenta.findFirst({
+    where: { hashToken, tipo },
+    select: { id: true, usuarioId: true, expiraEn: true, usadoEn: true },
+  });
+}
+
+/** updateMany: no falla si otra petición alcanzó a consumirlo primero. */
+export async function marcarTokenUsado(id: string) {
+  const resultado = await prisma.tokenCuenta.updateMany({
+    where: { id, usadoEn: null },
+    data: { usadoEn: new Date() },
+  });
+
+  // Cuántas filas cambiaron decide quién gana la carrera entre dos canjes
+  // simultáneos del mismo enlace: solo una ve count 1.
+  return resultado.count === 1;
+}
+
+/** Al emitir un token nuevo se queman los anteriores del mismo propósito. */
+export async function invalidarTokensPendientes(usuarioId: string, tipo: TipoToken) {
+  await prisma.tokenCuenta.updateMany({
+    where: { usuarioId, tipo, usadoEn: null },
+    data: { usadoEn: new Date() },
+  });
+}
+
+/** Momento en que se emitió el último token de ese tipo, para frenar reenvíos. */
+export async function ultimoTokenEmitido(usuarioId: string, tipo: TipoToken) {
+  return prisma.tokenCuenta.findFirst({
+    where: { usuarioId, tipo },
+    orderBy: { creadoEn: "desc" },
+    select: { creadoEn: true },
   });
 }
 

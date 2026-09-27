@@ -1,27 +1,19 @@
-import { createHash, randomBytes } from "node:crypto";
 import type { CookieOptions } from "express";
 import { env } from "../../env.js";
+import { generarToken, hashearToken } from "../../shared/tokens.js";
 
 export const NOMBRE_COOKIE_REFRESCO = "lc_refresh";
 
 const DIAS_REFRESCO = 7;
 export const MS_REFRESCO = DIAS_REFRESCO * 24 * 60 * 60 * 1000;
 
-/** 32 bytes del generador criptográfico: 256 bits, no se adivina por fuerza bruta. */
+/** Ver shared/tokens.ts: misma regla que para los tokens que van por correo. */
 export function generarTokenRefresco(): string {
-  return randomBytes(32).toString("base64url");
+  return generarToken();
 }
 
-/**
- * En la base solo se guarda el SHA-256 del token, nunca el token mismo: quien
- * lograra leer la tabla de sesiones no obtendría nada utilizable.
- *
- * Alcanza con SHA-256 y no hace falta Argon2 porque el valor ya es aleatorio
- * de 256 bits (no hay diccionario que probar) y porque la búsqueda por hash
- * tiene que ser determinista para poder indexarla.
- */
 export function hashearTokenRefresco(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+  return hashearToken(token);
 }
 
 const atributosBase = {

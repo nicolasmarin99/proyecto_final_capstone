@@ -1,6 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
-import { esRutValido, normalizarRut } from "@localcl/shared";
+import {
+  esRutValido,
+  mensajeDeProblema,
+  normalizarRut,
+  revisarContrasena,
+} from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -34,15 +39,20 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
       return;
     }
 
+    // Mismas reglas que aplica la API, desde el paquete compartido.
+    const problema = revisarContrasena(contrasena, { correo, nombre });
+
+    if (problema) {
+      setErrores({ contrasena: mensajeDeProblema(problema) });
+      return;
+    }
+
     setEnviando(true);
 
     try {
       await cliente.registrarPrestador({ nombre, correo, contrasena, rut: rutNormalizado });
 
-      navegar("/iniciar-sesion", {
-        replace: true,
-        state: { mensaje: "Tu cuenta de prestador fue creada. Ya puedes iniciar sesión." },
-      });
+      navegar("/revisa-tu-correo", { replace: true, state: { correo } });
     } catch (error) {
       if (error instanceof ErrorApi && error.codigo === "DATOS_INVALIDOS") {
         setErrores(

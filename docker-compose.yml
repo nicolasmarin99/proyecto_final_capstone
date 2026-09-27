@@ -12,5 +12,19 @@ services:
       - db_data:/var/lib/postgresql/data
       - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
+  # Servidor SMTP de desarrollo. No entrega nada al exterior: atrapa todos los
+  # correos que envía la API y los muestra en una bandeja web, así se puede
+  # revisar el contenido y los enlaces sin mandarle nada a una persona real.
+  correo:
+    image: axllent/mailpit:v1.21
+    container_name: localcl-correo
+    ports:
+      - "1025:1025" # SMTP, al que apunta la API
+      - "8025:8025" # bandeja web, http://localhost:8025
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
 volumes:
   db_data:
