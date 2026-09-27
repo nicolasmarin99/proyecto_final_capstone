@@ -1,3 +1,4 @@
+import { esRutValido, normalizarRut } from "@localcl/shared";
 import { z } from "zod";
 
 /**
@@ -28,6 +29,26 @@ export const esquemaRegistro = z.object({
 });
 
 export type DatosRegistro = z.infer<typeof esquemaRegistro>;
+
+/**
+ * Datos que acepta POST /auth/registro-prestador.
+ *
+ * Reutiliza el esquema de clientes y le suma el RUT, de modo que las reglas de
+ * nombre, correo y contraseña no puedan divergir entre ambos registros.
+ *
+ * Tampoco declara "rol": el servidor fija PRESTADOR igual que fija CLIENTE.
+ */
+export const esquemaRegistroPrestador = esquemaRegistro.extend({
+  rut: z
+    .string({ error: "El RUT es obligatorio." })
+    // Se valida sobre lo que escribió la persona (esRutValido normaliza por
+    // dentro) y recién después se guarda la forma canónica, para que la base
+    // tenga una sola escritura posible de cada RUT.
+    .refine(esRutValido, "El RUT no es válido.")
+    .transform(normalizarRut),
+});
+
+export type DatosRegistroPrestador = z.infer<typeof esquemaRegistroPrestador>;
 
 /**
  * Datos que acepta POST /auth/login.

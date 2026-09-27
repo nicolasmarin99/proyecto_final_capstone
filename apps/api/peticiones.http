@@ -93,6 +93,74 @@ Content-Type: application/json
 GET {{host}}/auth/no-existe
 
 # =====================================================================
+# REGISTRO DE PRESTADORES
+#
+# El RUT se valida con el módulo 11 y se guarda normalizado
+# ("12345678-5"), así que da lo mismo cómo se escriba al enviarlo.
+# rutVerificado queda en false: el RUT está bien formado, pero nadie
+# ha acreditado todavía que pertenezca a esa persona.
+# =====================================================================
+
+### 9a. Registro de prestador válido → 201, rol PRESTADOR, rutVerificado false
+POST {{host}}/auth/registro-prestador
+Content-Type: application/json
+
+{
+  "nombre": "Pedro Soto",
+  "correo": "pedro.soto@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rut": "12.345.678-5"
+}
+
+### 9b. El mismo RUT sin puntos → 409 REGISTRO_NO_DISPONIBLE
+# Demuestra la normalización: para la base es el mismo RUT que el 9a.
+POST {{host}}/auth/registro-prestador
+Content-Type: application/json
+
+{
+  "nombre": "Otro Nombre",
+  "correo": "otro.prestador@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rut": "123456785"
+}
+
+### 9c. Correo duplicado → 409 con el MISMO cuerpo que el 9b
+# Compara ambas respuestas: no se puede deducir si chocó el correo o el RUT.
+POST {{host}}/auth/registro-prestador
+Content-Type: application/json
+
+{
+  "nombre": "Pedro Soto",
+  "correo": "pedro.soto@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rut": "7.654.321-6"
+}
+
+### 9d. Dígito verificador incorrecto → 400 con detalle en el campo rut
+# Para este cuerpo el dígito correcto es 5, no 9.
+POST {{host}}/auth/registro-prestador
+Content-Type: application/json
+
+{
+  "nombre": "Pedro Soto",
+  "correo": "nuevo.prestador@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rut": "12.345.678-9"
+}
+
+### 9e. Rol enviado por el cliente → 201, pero se crea como PRESTADOR
+POST {{host}}/auth/registro-prestador
+Content-Type: application/json
+
+{
+  "nombre": "Ambiciosa Prestadora",
+  "correo": "ambiciosa@ejemplo.cl",
+  "contrasena": "contrasena-segura-123",
+  "rut": "18.765.432-7",
+  "rol": "ADMINISTRADOR"
+}
+
+# =====================================================================
 # INICIO DE SESIÓN
 #
 # REST Client guarda las cookies entre peticiones, así que lc_refresh

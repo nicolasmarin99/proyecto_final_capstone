@@ -1,12 +1,13 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaLogin, esquemaRegistro } from "./auth.schema.js";
+import { esquemaLogin, esquemaRegistro, esquemaRegistroPrestador } from "./auth.schema.js";
 import {
   cerrarSesion,
   iniciarSesion,
   obtenerUsuarioActivo,
   refrescarSesion,
   registrarCliente,
+  registrarPrestador as registrarPrestadorServicio,
 } from "./auth.service.js";
 import {
   NOMBRE_COOKIE_REFRESCO,
@@ -22,6 +23,13 @@ import {
 export async function registrar(req: Request, res: Response) {
   const datos = esquemaRegistro.parse(req.body);
   const usuario = await registrarCliente(datos);
+
+  res.status(201).json({ usuario });
+}
+
+export async function registrarPrestador(req: Request, res: Response) {
+  const datos = esquemaRegistroPrestador.parse(req.body);
+  const usuario = await registrarPrestadorServicio(datos);
 
   res.status(201).json({ usuario });
 }

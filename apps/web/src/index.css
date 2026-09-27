@@ -1,1 +1,69 @@
 @import "tailwindcss";
+
+/*
+  Sistema visual de LocalCL.
+
+  Tailwind v4 se configura desde CSS: cada variable declarada acá genera su
+  utilidad (--color-marca-900 produce bg-marca-900, text-marca-900, etc.), así
+  que no hace falta tailwind.config.js ni ninguna dependencia nueva.
+
+  La idea que ordena la paleta: el azul es la base de confianza y el ámbar es
+  el guiño a las guías amarillas, deliberadamente escaso. Si el ámbar apareciera
+  en todas partes dejaría de significar algo.
+*/
+@theme {
+  /* Azul de marca. El 900 es el ancla: paneles y titulares. */
+  --color-marca-50: #f2f6fa;
+  --color-marca-200: #b9c9dc;
+  --color-marca-500: #3a6a9e;
+  --color-marca-700: #1c4670;
+  --color-marca-900: #0e2a47;
+  --color-marca-950: #0a1f35;
+
+  /*
+    Ámbar. Reservado a la acción principal y al sello de verificación.
+    El 400 es fondo, nunca texto sobre blanco: no llega a 4.5:1. Para texto
+    ámbar sobre claro existe el 600.
+  */
+  --color-acento-100: #faefd4;
+  --color-acento-400: #e8b43c;
+  --color-acento-600: #8a5a00;
+
+  /* Neutros entibiados hacia el azul, para que no choquen con el navy. */
+  --color-piedra-50: #f7f9fb;
+  --color-piedra-100: #e4eaf0;
+  --color-piedra-300: #cbd6e0;
+  --color-piedra-500: #4a5e70;
+  --color-piedra-700: #29404f;
+  --color-piedra-900: #16293d;
+
+  /*
+    Estados. La advertencia usa ocre y no el ámbar de marca: el mismo color no
+    puede significar "haz clic acá" y "algo anda mal". El ocre además se separa
+    del ámbar en luminosidad y no solo en tono, que es lo que permite
+    distinguirlos sin depender de la visión del color.
+  */
+  --color-exito-50: #ecfdf3;
+  --color-exito-700: #0f7043;
+  --color-alerta-50: #fdf3e7;
+  --color-alerta-700: #b45309;
+  --color-error-50: #fdf0f0;
+  --color-error-700: #b42318;
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-cuerpo: "IBM Plex Sans", system-ui, sans-serif;
+
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.1;
+  --text-titulo: 1.5rem;
+  --text-titulo--line-height: 1.25;
+
+  --radius-campo: 9px;
+  --radius-tarjeta: 12px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-cuerpo);
+  }
+}

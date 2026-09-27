@@ -1,41 +1,54 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
+import { esRutValido, normalizarRut } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
 
-export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: ClienteApi }) {
+export default function PaginaRegistroPrestador({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const navegar = useNavigate();
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [rut, setRut] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Se usa el mismo paquete que valida la API, así que la regla es una sola.
+  const rutNormalizado = normalizarRut(rut);
+  const rutReconocido = esRutValido(rut);
+
   async function alEnviar(evento: FormEvent) {
     evento.preventDefault();
     setErrores({});
     setErrorGeneral(null);
+
+    // Comprobar aquí es comodidad: ahorra un viaje al servidor y avisa antes
+    // de enviar. No es la protección. Cualquiera puede saltarse este código
+    // desde la consola del navegador o llamar al endpoint con curl, y por eso
+    // la API vuelve a validar el RUT con esta misma función antes de guardar.
+    if (!rutReconocido) {
+      setErrores({ rut: "El RUT no es válido." });
+      return;
+    }
+
     setEnviando(true);
 
     try {
-      await cliente.registrar({ nombre, correo, contrasena });
+      await cliente.registrarPrestador({ nombre, correo, contrasena, rut: rutNormalizado });
 
       navegar("/iniciar-sesion", {
         replace: true,
-        state: { mensaje: "Tu cuenta fue creada. Ya puedes iniciar sesión." },
+        state: { mensaje: "Tu cuenta de prestador fue creada. Ya puedes iniciar sesión." },
       });
     } catch (error) {
       if (error instanceof ErrorApi && error.codigo === "DATOS_INVALIDOS") {
-        // La API indica el campo exacto en detalles; se muestra junto a él.
         setErrores(
           Object.fromEntries(error.detalles.map((detalle) => [detalle.campo, detalle.mensaje])),
         );
       } else if (error instanceof ErrorApi) {
-        // Incluye el 409 de correo ya registrado: el mensaje de la API es
-        // deliberadamente genérico para no confirmar qué correos existen.
         setErrorGeneral(error.message);
       } else {
         setErrorGeneral("No fue posible conectar con el servidor. Intenta de nuevo.");
@@ -47,9 +60,9 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
 
   return (
     <PaginaAuth
-      sobretitulo="Crear cuenta"
-      titulo="Busca y contrata"
-      intro="Encuentra prestadores con sus credenciales acreditadas en la Región Metropolitana."
+      sobretitulo="Crear cuenta de prestador"
+      titulo="Ofrece tus servicios"
+      intro="Necesitamos tu RUT para poder acreditar tus credenciales más adelante."
     >
       <form onSubmit={alEnviar} noValidate className="mt-6">
         {errorGeneral && (
@@ -79,6 +92,35 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
           error={errores.correo}
         />
         <CampoTexto
+          id="rut"
+          etiqueta="RUT"
+          autoComplete="off"
+          valor={rut}
+          alCambiar={setRut}
+          error={errores.rut}
+        />
+
+        {rutReconocido && (
+          <p className="mt-2 flex items-center gap-2 text-sm font-medium text-exito-700">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+            Se guardará como {rutNormalizado}
+          </p>
+        )}
+
+        <CampoTexto
           id="contrasena"
           etiqueta="Contraseña"
           tipo="password"
@@ -90,27 +132,18 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
         />
 
         <Boton type="submit" disabled={enviando} className="mt-7">
-          {enviando ? "Creando cuenta…" : "Crear cuenta"}
+          {enviando ? "Creando cuenta…" : "Crear cuenta de prestador"}
         </Boton>
       </form>
 
-      <div className="mt-7 space-y-2 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <div className="mt-7 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
         <p>
-          ¿Ya tienes cuenta?{" "}
+          ¿Buscas servicios en vez de ofrecerlos?{" "}
           <Link
-            to="/iniciar-sesion"
+            to="/registro"
             className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
           >
-            Iniciar sesión
-          </Link>
-        </p>
-        <p>
-          ¿Ofreces servicios?{" "}
-          <Link
-            to="/registro-prestador"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
-          >
-            Registrarme como prestador
+            Crear cuenta de cliente
           </Link>
         </p>
       </div>
