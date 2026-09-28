@@ -1,34 +1,74 @@
+import { env } from "../../env.js";
+import type { CorreoSaliente, EnviadorCorreo } from "./correo.tipos.js";
+
 /**
- * HUECO: transporte de producción. Todavía no implementado, a propósito.
+ * Transporte de producción: API HTTP de Brevo.
  *
- * Este archivo no exporta una clase que falle al usarse. Un transporte que
- * lanza en tiempo de ejecución es peor que no tenerlo: la aplicación arranca,
- * parece sana y recién falla cuando alguien intenta recuperar su cuenta. Por
- * eso "produccion" ni siquiera es un valor aceptado por CORREO_TRANSPORTE en
- * env.ts, y la API no levanta si se configura así.
+ * Se eligió una API HTTP y no SMTP por dos razones. La primera es que varios
+ * servicios de hosting bloquean los puertos SMTP salientes para frenar spam, y
+ * un adaptador correcto igual no entregaría nada. La segunda es que una
+ * respuesta HTTP trae un código y un mensaje concretos cuando algo falla,
+ * mientras que un fallo de SMTP suele ser un tiempo de espera agotado sin
+ * explicación.
  *
- * Lo que tiene que cumplir la implementación cuando llegue el momento:
+ * Tampoco hizo falta una dependencia nueva: basta el fetch nativo de Node.
  *
- * 1. Implementar EnviadorCorreo de correo.tipos.ts. Nada fuera de este módulo
- *    debería cambiar: ese es el punto del adaptador.
- * 2. Tomar la credencial del proveedor desde env.ts, nunca del código, y que
- *    env.ts la exija sin valor por defecto, igual que JWT_SECRET.
- * 3. Mantener un tope de espera, como hace EnviadorSmtp. Un proveedor lento no
- *    puede dejar colgada la petición HTTP que originó el correo.
- * 4. Dominio remitente con SPF, DKIM y DMARC configurados. Sin eso los correos
- *    de verificación terminan en spam y la funcionalidad no sirve de nada,
- *    aunque el código esté correcto.
- * 5. Reintentos y cola. Con un proveedor real conviene sacar el envío del
- *    camino de la petición: hoy se espera el envío dentro del request porque
- *    Mailpit responde en milisegundos, y eso deja de ser razonable cuando hay
- *    una red de por medio.
- * 6. No registrar el cuerpo de los correos en los logs del proveedor ni en los
- *    propios: llevan enlaces que son credenciales de un solo uso.
- *
- * Candidatos evaluados y por qué se dejó abierto: Resend y Postmark tienen la
- * integración más simple; Amazon SES es más barato a volumen pero exige salir
- * del entorno de pruebas del servicio. La decisión depende de dónde quede
- * alojada la API, así que se toma cuando se defina el despliegue definitivo.
+ * SOBRE LA ENTREGA A GMAIL Y OUTLOOK. Que el código funcione no basta para que
+ * el correo llegue a la bandeja de entrada. Quien recibe comprueba que el
+ * dominio del remitente autorice a quien envía, mediante SPF y DKIM. Mientras
+ * el remitente sea una dirección verificada de forma individual en el
+ * proveedor, el correo sale firmado por el dominio del proveedor y no por el
+ * del remitente, así que puede terminar en spam. La solución definitiva es un
+ * dominio propio con SPF, DKIM y DMARC; hasta entonces esto es un compromiso
+ * consciente, no un descuido.
  */
 
-export {};
+const URL_ENVIO = "https://api.brevo.com/v3/smtp/email";
+
+/** Mismo criterio que en SMTP: quien llama está dentro de una petición HTTP. */
+const MILISEGUNDOS_LIMITE = 5000;
+
+/**
+ * CORREO_REMITENTE viene como "LocalCL <no-responder@ejemplo.cl>" o como una
+ * dirección pelada. La API necesita el nombre y el correo por separado.
+ */
+export function partirRemitente(valor: string): { nombre: string; correo: string } {
+  const conNombre = /^\s*(.*?)\s*<\s*([^>\s]+)\s*>\s*$/.exec(valor);
+
+  if (conNombre?.[2]) {
+    return { nombre: conNombre[1]?.trim() || "LocalCL", correo: conNombre[2] };
+  }
+
+  return { nombre: "LocalCL", correo: valor.trim() };
+}
+
+export class EnviadorProduccion implements EnviadorCorreo {
+  async enviar(correo: CorreoSaliente): Promise<void> {
+    const remitente = partirRemitente(env.CORREO_REMITENTE);
+
+    const respuesta = await fetch(URL_ENVIO, {
+      method: "POST",
+      headers: {
+        "api-key": env.CORREO_API_CLAVE,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: remitente.nombre, email: remitente.correo },
+        to: [{ email: correo.para }],
+        subject: correo.asunto,
+        textContent: correo.cuerpo,
+      }),
+      signal: AbortSignal.timeout(MILISEGUNDOS_LIMITE),
+    });
+
+    if (!respuesta.ok) {
+      // Se incluye la respuesta del proveedor porque es lo que permite
+      // distinguir una clave inválida de un remitente sin verificar. Nunca
+      // se registra el cuerpo del correo: lleva enlaces de un solo uso.
+      throw new Error(
+        `Brevo rechazó el envío (${respuesta.status}): ${await respuesta.text()}`,
+      );
+    }
+  }
+}

@@ -177,6 +177,39 @@ REVISAR_CONTRASENAS_FILTRADAS="true"
 `env.ts` valida todo esto con Zod al arrancar: si falta una variable obligatoria o
 `JWT_SECRET` es más corta de lo permitido, la API no levanta y dice cuál es el problema.
 
+#### Enviar correo de verdad (producción)
+
+En local Mailpit atrapa todo. Para que los enlaces de verificación y de
+recuperación **lleguen a Gmail, Outlook u otro proveedor real**, hay que
+configurar el transporte de producción:
+
+1. Crear una cuenta en [Brevo](https://www.brevo.com) (plan gratuito).
+2. **Verificar un remitente**: en *Senders & IP*, agregar la dirección desde la
+   que saldrán los correos y confirmar el mensaje que llega a esa casilla. Sin
+   dominio propio, este paso es lo que permite escribirle a cualquier
+   destinatario.
+3. Generar una clave en *SMTP & API* → *API Keys*.
+4. Configurar en el servicio donde corre la API:
+
+```env
+CORREO_TRANSPORTE="produccion"
+CORREO_REMITENTE="LocalCL <la-direccion-que-verificaste>"
+CORREO_API_CLAVE="la-clave-generada"
+URL_WEB="https://<el-dominio-real-de-la-web>"
+```
+
+> `URL_WEB` es crítica: los enlaces del correo se arman con ella. Si apunta a
+> `localhost`, quien reciba el correo tendrá un enlace que no lleva a ninguna
+> parte.
+
+La API **se niega a arrancar** si se configura `produccion` sin la clave, en
+vez de fallar recién al enviar el primer correo.
+
+**Sobre la entrega**: que el código funcione no garantiza la bandeja de
+entrada. Con un remitente verificado individualmente, el correo sale firmado
+por el dominio del proveedor y no por el del remitente, así que puede caer en
+spam. La solución definitiva es un dominio propio con SPF, DKIM y DMARC.
+
 Para las pruebas de integración hace falta además una base separada:
 
 ```bash
