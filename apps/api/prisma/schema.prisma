@@ -18,6 +18,14 @@ enum Rol {
   ADMINISTRADOR
 }
 
+/// Propósitos de los tokens de un solo uso que se envían por correo.
+/// El tipo se comprueba al canjear, de modo que un token de verificación no
+/// sirva para restablecer una contraseña ni al revés.
+enum TipoToken {
+  VERIFICACION_CORREO
+  RECUPERACION_CONTRASENA
+}
+
 /// Mecanismos de autenticación soportados.
 /// CLAVE_UNICA queda declarado como trabajo futuro: su integración
 /// está restringida a organismos del Estado.
@@ -44,9 +52,30 @@ model Usuario {
 
   identidades      Identidad[]
   sesiones         Sesion[]
+  tokens           TokenCuenta[]
 
   @@index([rol])
   @@map("usuarios")
+}
+
+/// Tokens de un solo uso que viajan por correo: verificación y recuperación.
+/// Igual que en las sesiones, nunca se guarda el token en claro, solo su hash.
+model TokenCuenta {
+  id        String    @id @default(uuid())
+  usuarioId String
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo      TipoToken
+  /// SHA-256 del token que viaja en el enlace del correo.
+  hashToken String    @unique
+  expiraEn  DateTime
+  /// Nulo mientras no se canjea. La fila no se borra al usarse: deja rastro
+  /// para distinguir internamente "ya se usó" de "nunca existió".
+  usadoEn   DateTime?
+  creadoEn  DateTime  @default(now())
+
+  @@index([usuarioId, tipo])
+  @@index([expiraEn])
+  @@map("tokens_cuenta")
 }
 
 /// Vincula un usuario con su cuenta en un proveedor de identidad.

@@ -305,3 +305,105 @@ Authorization: Bearer {{tokenCliente}}
 # que devuelve 401 NO_AUTENTICADO, porque el problema deja de ser de
 # permisos y pasa a ser que la sesión ya no representa a nadie válido.
 # =====================================================================
+
+# =====================================================================
+# CORREO, VERIFICACIÓN Y RECUPERACIÓN
+#
+# Los enlaces no llegan a ninguna dirección real: los atrapa Mailpit.
+# Ábrelo en http://localhost:8025, copia el token del enlace y pégalo
+# en @tokenEnlace más abajo.
+#
+# OJO con el cambio de contrato: el registro ya NO devuelve 409 ante un
+# correo duplicado. Responde 202 con el mismo cuerpo siempre, y al dueño
+# del correo le llega un aviso. Los casos 1, 2, 9b y 9c de arriba siguen
+# sirviendo, pero ahora todos responden 202.
+# =====================================================================
+
+@tokenEnlace = pega-aqui-el-token-del-enlace-que-ves-en-mailpit
+
+### 21. Verificar el correo con el enlace recibido → 200
+POST {{host}}/auth/verificar-correo
+Content-Type: application/json
+
+{ "token": "{{tokenEnlace}}" }
+
+### 22. Reusar el mismo enlace → 400 ENLACE_INVALIDO
+POST {{host}}/auth/verificar-correo
+Content-Type: application/json
+
+{ "token": "{{tokenEnlace}}" }
+
+### 23. Token inventado → 400, respuesta idéntica al caso 22
+POST {{host}}/auth/verificar-correo
+Content-Type: application/json
+
+{ "token": "este-token-nunca-existio" }
+
+### 24. Reenviar la verificación → 202 (hay espera mínima de 2 minutos)
+POST {{host}}/auth/reenviar-verificacion
+Content-Type: application/json
+
+{ "correo": "ana.perez@ejemplo.cl" }
+
+### 25. Endpoint protegido por correo verificado, SIN verificar → 403
+# Inicia sesión con una cuenta recién creada y pega su token en @token.
+POST {{host}}/servicios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "titulo": "Instalación eléctrica domiciliaria" }
+
+### 26. El mismo endpoint tras verificar → 201
+# Con el MISMO token de acceso: el estado se lee de la base, así que no
+# hay que volver a iniciar sesión.
+POST {{host}}/servicios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "titulo": "Instalación eléctrica domiciliaria" }
+
+### 27. Pedir recuperación → 202 (idéntico exista o no la cuenta)
+POST {{host}}/auth/recuperar
+Content-Type: application/json
+
+{ "correo": "ana.perez@ejemplo.cl" }
+
+### 28. Pedir recuperación de un correo inexistente → 202, cuerpo IDÉNTICO
+POST {{host}}/auth/recuperar
+Content-Type: application/json
+
+{ "correo": "no-existe@ejemplo.cl" }
+
+### 29. Restablecer con el enlace de recuperación → 200
+# Copia el token del correo "Recupera el acceso" y pégalo en @tokenEnlace.
+# Después de esto TODAS las sesiones quedan revocadas, incluida la tuya.
+POST {{host}}/auth/restablecer
+Content-Type: application/json
+
+{
+  "token": "{{tokenEnlace}}",
+  "contrasena": "contrasena-nueva-456789"
+}
+
+### 30. Cambiar contraseña con sesión iniciada, con la actual MAL → 400
+POST {{host}}/auth/cambiar-contrasena
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contrasenaActual": "equivocada",
+  "contrasenaNueva": "otra-contrasena-987654"
+}
+
+### 31. Cambiar contraseña con la actual correcta → 200
+# Cierra las demás sesiones y mantiene esta. Comprueba con:
+#   docker exec localcl-db psql -U postgres -d localcl \
+#     -c "SELECT left(id,8), \"revocadaEn\" IS NULL AS activa FROM sesiones;"
+POST {{host}}/auth/cambiar-contrasena
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contrasenaActual": "contrasena-segura-123",
+  "contrasenaNueva": "otra-contrasena-987654"
+}

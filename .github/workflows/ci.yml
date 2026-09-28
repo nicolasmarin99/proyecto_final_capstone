@@ -50,6 +50,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    # Estas variables cumplen acá el papel que en local cumple apps/api/.env.test,
+    # que no se versiona. Lo que se agregue allá y las pruebas necesiten, hay que
+    # agregarlo también aquí: apps/api/.env.test.example es la referencia de qué
+    # espera env.ts.
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/localcl
@@ -57,6 +61,25 @@ jobs:
       # Valor de usar y tirar: el contenedor y los tokens mueren con el job.
       # Un secreto real iría en los Secrets del repositorio, nunca aquí.
       JWT_SECRET: secreto-de-integracion-continua-no-usar-en-produccion
+
+      # Sin esto env.ts toma el valor por defecto "smtp", el guardarraíl de
+      # tests/bandeja.ts corta la ejecución y el job falla. No se levanta
+      # Mailpit en CI a propósito: el transporte en memoria hace que las
+      # pruebas no dependan de ningún servicio externo.
+      CORREO_TRANSPORTE: memoria
+
+      # El valor por defecto es "true", así que sin esta línea cada registro
+      # de las pruebas saldría a consultar Have I Been Pwned desde el runner.
+      # No rompería el job, porque el módulo deja pasar cuando el servicio
+      # falla, pero ataría el CI a la disponibilidad de un tercero y a su
+      # latencia. El comportamiento de esa consulta se prueba aparte, con
+      # fetch simulado, en auth.filtradas.test.ts.
+      REVISAR_CONTRASENAS_FILTRADAS: "false"
+
+      # Base de los enlaces que arman las plantillas de correo. Hoy el valor
+      # por defecto coincide, pero fijarlo evita que un cambio de ese default
+      # altere en silencio lo que las pruebas ven en los correos.
+      URL_WEB: http://localhost:5173
 
     steps:
       - name: Descargar código

@@ -153,6 +153,38 @@ describe("cliente de la API", () => {
     expect(refrescos).toHaveLength(2);
   });
 
+  it("canjea un enlace de verificación UNA sola vez aunque se pida dos veces", async () => {
+    // Es lo que pasa con StrictMode en desarrollo: el efecto corre dos veces.
+    // Sin compartir la promesa, el segundo intento recibiría "ya usado" y la
+    // persona vería un error pese a que su correo sí quedó confirmado.
+    const cliente = crearClienteApi();
+
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "ok" }));
+
+    await Promise.all([cliente.verificarCorreo("abc123"), cliente.verificarCorreo("abc123")]);
+
+    const canjes = vi
+      .mocked(fetch)
+      .mock.calls.filter((llamada) => rutaDe(llamada) === "/api/auth/verificar-correo");
+
+    expect(canjes).toHaveLength(1);
+  });
+
+  it("un token distinto sí produce otra petición", async () => {
+    const cliente = crearClienteApi();
+
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "ok" }));
+
+    await cliente.verificarCorreo("abc123");
+    await cliente.verificarCorreo("otro456");
+
+    const canjes = vi
+      .mocked(fetch)
+      .mock.calls.filter((llamada) => rutaDe(llamada) === "/api/auth/verificar-correo");
+
+    expect(canjes).toHaveLength(2);
+  });
+
   it("devuelve null al restaurar si la cookie ya no sirve", async () => {
     const cliente = crearClienteApi();
 

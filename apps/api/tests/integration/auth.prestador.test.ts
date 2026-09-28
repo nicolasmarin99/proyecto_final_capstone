@@ -28,11 +28,18 @@ describe("POST /auth/registro-prestador", () => {
   it("crea un prestador con el RUT normalizado y sin acreditar", async () => {
     const respuesta = await registrarPrestador(registroValido);
 
-    expect(respuesta.status).toBe(201);
-    expect(respuesta.body.usuario.rol).toBe("PRESTADOR");
-    expect(respuesta.body.usuario.rut).toBe("12345678-5");
-    expect(respuesta.body.usuario.rutVerificado).toBe(false);
-    expect(respuesta.body.usuario).not.toHaveProperty("hashContrasena");
+    expect(respuesta.status).toBe(202);
+    expect(respuesta.body).not.toHaveProperty("usuario");
+
+    const usuario = await prisma.usuario.findUniqueOrThrow({
+      where: { correo: registroValido.correo },
+      select: { rol: true, rut: true, rutVerificado: true, correoVerificado: true },
+    });
+
+    expect(usuario.rol).toBe("PRESTADOR");
+    expect(usuario.rut).toBe("12345678-5");
+    expect(usuario.rutVerificado).toBe(false);
+    expect(usuario.correoVerificado).toBe(false);
   });
 
   it("guarda el RUT normalizado en la base aunque venga con puntos", async () => {
@@ -49,8 +56,8 @@ describe("POST /auth/registro-prestador", () => {
     expect(usuario?.hashContrasena).toMatch(/^\$argon2id\$/);
   });
 
-  it("responde 409 cuando el mismo RUT se envía con otro formato", async () => {
-    await registrarPrestador(registroValido);
+  it("no crea una segunda cuenta cuando el mismo RUT se envía con otro formato", async () => {
+    const primera = await registrarPrestador(registroValido);
 
     const respuesta = await registrarPrestador({
       ...registroValido,
@@ -58,13 +65,13 @@ describe("POST /auth/registro-prestador", () => {
       rut: "123456785",
     });
 
-    expect(respuesta.status).toBe(409);
-    expect(respuesta.body.error.codigo).toBe("REGISTRO_NO_DISPONIBLE");
+    expect(respuesta.status).toBe(primera.status);
+    expect(respuesta.body).toEqual(primera.body);
     expect(await prisma.usuario.count()).toBe(1);
   });
 
-  it("responde 409 con el mismo cuerpo ante correo duplicado que ante RUT duplicado", async () => {
-    await registrarPrestador(registroValido);
+  it("responde lo mismo ante correo duplicado, RUT duplicado y registro nuevo", async () => {
+    const registroNuevo = await registrarPrestador(registroValido);
 
     const rutDuplicado = await registrarPrestador({
       ...registroValido,
@@ -72,18 +79,18 @@ describe("POST /auth/registro-prestador", () => {
       rut: "12.345.678-5",
     });
 
-    await prisma.usuario.deleteMany();
-    await registrarPrestador(registroValido);
-
     const correoDuplicado = await registrarPrestador({
       ...registroValido,
       rut: "7.654.321-6",
     });
 
-    expect(rutDuplicado.status).toBe(409);
-    expect(correoDuplicado.status).toBe(409);
-    // Idénticos: la respuesta no permite deducir cuál de los dos campos chocó.
-    expect(rutDuplicado.body).toEqual(correoDuplicado.body);
+    // Los tres caminos son indistinguibles desde fuera: no se puede deducir si
+    // chocó el correo, si chocó el RUT, ni si se creó la cuenta.
+    expect(rutDuplicado.status).toBe(registroNuevo.status);
+    expect(correoDuplicado.status).toBe(registroNuevo.status);
+    expect(rutDuplicado.body).toEqual(registroNuevo.body);
+    expect(correoDuplicado.body).toEqual(registroNuevo.body);
+    expect(await prisma.usuario.count()).toBe(1);
   });
 
   it("responde 400 con detalle en rut cuando el dígito verificador es incorrecto", async () => {
@@ -128,8 +135,7 @@ describe("POST /auth/registro-prestador", () => {
   it("ignora el rol enviado por el cliente y crea siempre un PRESTADOR", async () => {
     const respuesta = await registrarPrestador({ ...registroValido, rol: "ADMINISTRADOR" });
 
-    expect(respuesta.status).toBe(201);
-    expect(respuesta.body.usuario.rol).toBe("PRESTADOR");
+    expect(respuesta.status).toBe(202);
 
     const usuario = await prisma.usuario.findUnique({
       where: { correo: registroValido.correo },
@@ -139,16 +145,23 @@ describe("POST /auth/registro-prestador", () => {
     expect(usuario?.rol).toBe("PRESTADOR");
   });
 
-  it("no permite que un prestador choque con el correo de un cliente", async () => {
+  it("no permite que un prestador pise el correo de un cliente ya registrado", async () => {
     await request(app).post("/auth/registro").send({
       nombre: "Ana Cliente",
       correo: registroValido.correo,
       contrasena: "contrasena-segura-123",
     });
 
-    const respuesta = await registrarPrestador(registroValido);
+    await registrarPrestador(registroValido);
 
-    expect(respuesta.status).toBe(409);
-    expect(respuesta.body.error.codigo).toBe("REGISTRO_NO_DISPONIBLE");
+    // La cuenta original queda intacta: sigue siendo la del cliente.
+    const usuario = await prisma.usuario.findUniqueOrThrow({
+      where: { correo: registroValido.correo },
+      select: { rol: true, nombre: true },
+    });
+
+    expect(usuario.rol).toBe("CLIENTE");
+    expect(usuario.nombre).toBe("Ana Cliente");
+    expect(await prisma.usuario.count()).toBe(1);
   });
 });

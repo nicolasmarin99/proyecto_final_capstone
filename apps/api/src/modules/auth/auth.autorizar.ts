@@ -1,30 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { Rol } from "../../generated/prisma/client.js";
 import { ErrorHttp } from "../../shared/errores.js";
-import { buscarUsuarioPublicoPorId } from "./auth.repository.js";
-
-/**
- * Devuelve la cuenta real del usuario de la petición, consultándola una sola
- * vez: si otro middleware ya la dejó en req.cuenta, se reutiliza. Así encadenar
- * varios autorizar() o leerla luego en un controlador no multiplica consultas.
- */
-async function cargarCuenta(req: Request) {
-  if (req.cuenta) {
-    return req.cuenta;
-  }
-
-  if (!req.usuario) {
-    return null;
-  }
-
-  const usuario = await buscarUsuarioPublicoPorId(req.usuario.id);
-
-  if (usuario) {
-    req.cuenta = usuario;
-  }
-
-  return req.cuenta ?? null;
-}
+import { cargarCuenta } from "./auth.cuenta.js";
 
 /**
  * Restringe una ruta a los roles indicados. Se monta siempre DESPUÉS de

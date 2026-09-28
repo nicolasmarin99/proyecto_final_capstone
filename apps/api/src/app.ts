@@ -7,6 +7,7 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
+import { rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { ErrorHttp } from "./shared/errores.js";
 
 export const app = express();
@@ -27,6 +28,7 @@ app.get("/health", async (_req, res) => {
 
 app.use("/auth", rutasAuth);
 app.use("/admin", rutasAdmin);
+app.use("/servicios", rutasServicios);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { codigo: "NO_ENCONTRADO", mensaje: "Recurso no encontrado" } });
@@ -62,7 +64,15 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof ErrorHttp) {
-    res.status(err.estado).json({ error: { codigo: err.codigo, mensaje: err.message } });
+    res.status(err.estado).json({
+      error: {
+        codigo: err.codigo,
+        mensaje: err.message,
+        // Solo se incluye cuando hay algo que decir de un campo concreto, para
+        // que las respuestas sin detalle no cambien de forma.
+        ...(err.detalles.length > 0 ? { detalles: err.detalles } : {}),
+      },
+    });
     return;
   }
 

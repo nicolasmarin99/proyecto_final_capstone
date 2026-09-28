@@ -28,6 +28,7 @@ function renderizar(cliente = crearClienteApi()) {
         <Routes>
           <Route path="/registro-prestador" element={<PaginaRegistroPrestador cliente={cliente} />} />
           <Route path="/iniciar-sesion" element={<PaginaIniciarSesion />} />
+          <Route path="/revisa-tu-correo" element={<p>Revisa tu correo</p>} />
         </Routes>
       </ProveedorAuth>
     </MemoryRouter>,
@@ -54,17 +55,17 @@ afterEach(() => {
 });
 
 describe("Registro de prestador", () => {
-  it("crea la cuenta y lleva a iniciar sesión con el aviso de éxito", async () => {
+  it("crea la cuenta y lleva a la pantalla de revisar el correo", async () => {
     sinSesion();
     const cliente = crearClienteApi();
     renderizar(cliente);
 
-    vi.mocked(fetch).mockResolvedValue(json({ usuario: {} }, 201));
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo." }, 202));
 
     completarFormulario(RUT_VALIDO);
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
-    expect(await screen.findByText(/cuenta de prestador fue creada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument();
   });
 
   it("envía el RUT ya normalizado al servidor", async () => {
@@ -72,7 +73,7 @@ describe("Registro de prestador", () => {
     const cliente = crearClienteApi();
     renderizar(cliente);
 
-    vi.mocked(fetch).mockResolvedValue(json({ usuario: {} }, 201));
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo." }, 202));
 
     completarFormulario("12.345.678-5");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));

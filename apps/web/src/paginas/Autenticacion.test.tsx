@@ -32,6 +32,7 @@ function renderizarApp(rutaInicial: string, cliente = crearClienteApi()) {
           <Route path="/" element={<p>Página de estado</p>} />
           <Route path="/registro" element={<PaginaRegistro cliente={cliente} />} />
           <Route path="/iniciar-sesion" element={<PaginaIniciarSesion />} />
+          <Route path="/revisa-tu-correo" element={<p>Revisa tu correo</p>} />
           <Route
             path="/perfil"
             element={
@@ -59,20 +60,19 @@ afterEach(() => {
 });
 
 describe("Formulario de registro", () => {
-  it("crea la cuenta y lleva a iniciar sesión con un aviso de éxito", async () => {
+  it("crea la cuenta y lleva a la pantalla de revisar el correo", async () => {
     sinSesion();
     const cliente = crearClienteApi();
     renderizarApp("/registro", cliente);
 
-    vi.mocked(fetch).mockResolvedValue(json({ usuario }, 201));
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo." }, 202));
 
     escribir(/nombre/i, "Ana Pérez");
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/contraseña/i, "contrasena-segura-123");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
-    expect(await screen.findByText(/ya puedes iniciar sesión/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /entrar/i })).toBeInTheDocument();
+    expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument();
   });
 
   it("muestra los errores de validación junto al campo que los provocó", async () => {
@@ -98,7 +98,9 @@ describe("Formulario de registro", () => {
 
     escribir(/nombre/i, "Ana Pérez");
     escribir(/correo/i, "no-es-correo");
-    escribir(/contraseña/i, "corta");
+    // Contraseña que pasa la revisión del cliente, para que la petición llegue
+    // a la API y se pueda comprobar que sus detalles se muestran por campo.
+    escribir(/contraseña/i, "caballo-bateria-grapa");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument();
@@ -106,6 +108,29 @@ describe("Formulario de registro", () => {
 
     // El mensaje queda enlazado al campo mediante aria-describedby.
     expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("aplica las reglas compartidas antes de llamar al servidor", async () => {
+    sinSesion();
+    const cliente = crearClienteApi();
+    renderizarApp("/registro", cliente);
+
+    vi.mocked(fetch).mockClear();
+
+    escribir(/nombre/i, "Ana Pérez");
+    escribir(/correo/i, "ana.perez@ejemplo.cl");
+    // Contiene la parte local del correo: lo rechaza @localcl/shared, la misma
+    // función que usa la API.
+    escribir(/contraseña/i, "ana.perez-2026-clave");
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    expect(await screen.findByText(/no puede contener tu correo/i)).toBeInTheDocument();
+
+    const enviados = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url) === "/api/auth/registro");
+
+    expect(enviados).toHaveLength(0);
   });
 
   it("deshabilita el botón mientras la petición está en curso", async () => {

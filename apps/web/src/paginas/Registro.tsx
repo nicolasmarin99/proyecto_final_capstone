@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
+import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -18,15 +19,25 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
     evento.preventDefault();
     setErrores({});
     setErrorGeneral(null);
+
+    // Misma función que usa la API, así que la regla es una sola. Comprobar
+    // acá es comodidad: avisa antes de enviar y ahorra un viaje. La que manda
+    // es la del servidor, que además consulta si la contraseña está filtrada.
+    const problema = revisarContrasena(contrasena, { correo, nombre });
+
+    if (problema) {
+      setErrores({ contrasena: mensajeDeProblema(problema) });
+      return;
+    }
+
     setEnviando(true);
 
     try {
       await cliente.registrar({ nombre, correo, contrasena });
 
-      navegar("/iniciar-sesion", {
-        replace: true,
-        state: { mensaje: "Tu cuenta fue creada. Ya puedes iniciar sesión." },
-      });
+      // El correo viaja en el state para poder ofrecer el reenvío del enlace
+      // sin volver a pedírselo a la persona.
+      navegar("/revisa-tu-correo", { replace: true, state: { correo } });
     } catch (error) {
       if (error instanceof ErrorApi && error.codigo === "DATOS_INVALIDOS") {
         // La API indica el campo exacto en detalles; se muestra junto a él.

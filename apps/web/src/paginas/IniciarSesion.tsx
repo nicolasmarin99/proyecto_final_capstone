@@ -105,7 +105,16 @@ export default function PaginaIniciarSesion() {
           error={errores.contrasena}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <p className="mt-3 text-right text-sm">
+          <Link
+            to="/recuperar-cuenta"
+            className="font-medium text-piedra-500 underline underline-offset-2 hover:text-acento-600"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+
+        <Boton type="submit" disabled={enviando} className="mt-5">
           {enviando ? "Entrando…" : "Entrar"}
         </Boton>
       </form>

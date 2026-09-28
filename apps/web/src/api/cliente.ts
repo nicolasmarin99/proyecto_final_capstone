@@ -26,6 +26,11 @@ export interface Usuario {
   correo: string;
   nombre: string;
   rol: string;
+  /**
+   * Opcional a propósito: si la API dejara de enviarlo, es preferible no
+   * mostrar nada a acusar de "sin verificar" a quien sí lo está.
+   */
+  correoVerificado?: boolean;
 }
 
 interface Sesion {
@@ -60,7 +65,14 @@ function leerUsuario(valor: unknown): Usuario | null {
     return null;
   }
 
-  return { id: valor.id, correo: valor.correo, nombre: valor.nombre, rol: valor.rol };
+  return {
+    id: valor.id,
+    correo: valor.correo,
+    nombre: valor.nombre,
+    rol: valor.rol,
+    correoVerificado:
+      typeof valor.correoVerificado === "boolean" ? valor.correoVerificado : undefined,
+  };
 }
 
 function leerSesion(valor: unknown): Sesion | null {
@@ -133,6 +145,17 @@ export function crearClienteApi() {
   // Promesa del refresco que esté en curso, compartida por todos los que la
   // necesiten. Ver el comentario de refrescar().
   let refrescoEnCurso: Promise<Sesion | null> | null = null;
+
+  /**
+   * Canjes de enlace ya iniciados, por token.
+   *
+   * Un token de verificación sirve una sola vez. StrictMode ejecuta los
+   * efectos dos veces en desarrollo, así que sin esto la primera llamada
+   * consume el enlace y la segunda recibe "ya usado": la persona termina
+   * viendo un error aunque su correo sí quedó confirmado. Compartir la
+   * promesa por token hace que las dos ejecuciones vean el mismo resultado.
+   */
+  const canjesEnCurso = new Map<string, Promise<void>>();
 
   async function enviar(ruta: string, opciones: OpcionesPeticion, token: string | null) {
     const cabeceras: Record<string, string> = {};
@@ -241,6 +264,43 @@ export function crearClienteApi() {
       rut: string;
     }): Promise<void> {
       await peticion("/auth/registro-prestador", { metodo: "POST", cuerpo: datos });
+    },
+
+    async verificarCorreo(token: string): Promise<void> {
+      let enCurso = canjesEnCurso.get(token);
+
+      if (!enCurso) {
+        // No se limpia al terminar, a diferencia del refresco: el token quedó
+        // gastado, así que repetir la petición solo produciría un error.
+        enCurso = peticion("/auth/verificar-correo", {
+          metodo: "POST",
+          cuerpo: { token },
+        }).then(() => undefined);
+
+        canjesEnCurso.set(token, enCurso);
+      }
+
+      return enCurso;
+    },
+
+    async reenviarVerificacion(correo: string): Promise<void> {
+      await peticion("/auth/reenviar-verificacion", { metodo: "POST", cuerpo: { correo } });
+    },
+
+    async solicitarRecuperacion(correo: string): Promise<void> {
+      await peticion("/auth/recuperar", { metodo: "POST", cuerpo: { correo } });
+    },
+
+    async restablecerContrasena(token: string, contrasena: string): Promise<void> {
+      await peticion("/auth/restablecer", { metodo: "POST", cuerpo: { token, contrasena } });
+    },
+
+    async cambiarContrasena(contrasenaActual: string, contrasenaNueva: string): Promise<void> {
+      await peticion("/auth/cambiar-contrasena", {
+        metodo: "POST",
+        cuerpo: { contrasenaActual, contrasenaNueva },
+        autenticada: true,
+      });
     },
 
     async iniciarSesion(correo: string, contrasena: string): Promise<Usuario> {
