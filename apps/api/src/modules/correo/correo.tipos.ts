@@ -13,9 +13,10 @@ export interface CorreoSaliente {
  * nada, que el desarrollo use Mailpit, y que mañana se pueda cambiar de
  * proveedor tocando un solo archivo.
  *
- * enviar() no debe lanzar por fallos del proveedor: quien llama decide qué
- * hacer, y en esta aplicación un correo que no sale nunca puede tumbar la
- * operación que lo originó.
+ * enviar() SÍ puede lanzar si el proveedor falla: es la única forma de que el
+ * motivo llegue al log del servidor. Lo que no puede pasar es que ese fallo
+ * tumbe la operación que originó el correo, y de eso se encarga quien llama,
+ * usando enviarSinInterrumpir() en vez de enviar() directamente.
  */
 export interface EnviadorCorreo {
   enviar(correo: CorreoSaliente): Promise<void>;
