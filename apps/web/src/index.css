@@ -60,10 +60,106 @@
 
   --radius-campo: 9px;
   --radius-tarjeta: 12px;
+
+  /*
+    Marca nueva (landing). Convive con la de arriba mientras el resto de la
+    aplicación se migra en su propia rama; cuando termine, la anterior se va.
+
+    Los nombres vienen del handoff de diseño (diseno/localcl-diseno). Los
+    radios no se llaman sm/md/lg porque esos nombres ya son de Tailwind y
+    redefinirlos cambiaría rounded-lg en pantallas que no son la landing.
+  */
+  --color-noche: #0b2a5b; /* títulos, texto, pie de página */
+  --color-primario: #1d4ed8; /* botones, logo, enlaces */
+  --color-cielo: #3b82f6; /* acentos: nunca debajo de texto */
+  --color-hielo: #dbeafe; /* fondos de íconos, etiquetas */
+  --color-niebla: #f4f7fc; /* fondos de sección */
+  --color-blanco: #ffffff;
+  --color-texto-suave: #3d5478; /* 7.1:1 sobre niebla */
+  --color-texto-tenue: #5b6f90; /* 5.1:1 sobre blanco: solo avisos cortos */
+  --color-borde: #e3eaf6;
+  --color-borde-fuerte: #c9d7ef; /* chips, botón secundario, puntos inactivos */
+
+  /* Tonos que solo aparecen sobre el fondo noche (llamado final y pie). */
+  --color-noche-texto: #c7d6f2; /* 9.6:1 sobre noche */
+  --color-noche-borde: #23457d;
+  --color-noche-contorno: #5f82c4;
+
+  /* Decoración del hero y del logo. */
+  --color-malla: #bfd3f5;
+  --color-hielo-suave: #e3ecfb;
+  --color-estrella: #93c5fd;
+
+  --font-titulos: "Sora", system-ui, sans-serif;
+  --font-texto: "DM Sans", system-ui, sans-serif;
+
+  --radius-chico: 10px;
+  --radius-medio: 16px;
+  --radius-grande: 24px;
+
+  /* Las sombras se tiñen de noche en vez de negro, para que no ensucien. */
+  --shadow-flotante: 0 10px 24px rgb(11 42 91 / 0.1);
+  --shadow-tarjeta: 0 16px 40px rgb(11 42 91 / 0.08);
+  --shadow-buscador: 0 12px 32px rgb(11 42 91 / 0.08);
+  --shadow-video: 0 24px 56px rgb(11 42 91 / 0.12);
+
+  /*
+    Animaciones del fondo del hero. Cada --animate-x genera la clase
+    animate-x; en los componentes se usan siempre con motion-safe:, así quien
+    pidió menos movimiento en su sistema no las ve.
+  */
+  --animate-malla: ds-pan 22s linear infinite;
+  --animate-flotar: ds-float 6s ease-in-out infinite;
+  --animate-latido: ds-pulse 2.8s ease-out infinite;
+  --animate-deriva: ds-drift 14s ease-in-out infinite;
+
+  @keyframes ds-pan {
+    from {
+      background-position: 0 0;
+    }
+    to {
+      background-position: 280px 140px;
+    }
+  }
+  @keyframes ds-float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-3deg);
+    }
+    50% {
+      transform: translateY(-22px) rotate(3deg);
+    }
+  }
+  @keyframes ds-pulse {
+    0% {
+      transform: scale(0.4);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
+  }
+  @keyframes ds-drift {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(60px, -40px);
+    }
+  }
 }
 
 @layer base {
   html {
     font-family: var(--font-cuerpo);
+  }
+
+  /* Los enlaces #servicios, #como-funciona... se deslizan en vez de saltar. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 }
