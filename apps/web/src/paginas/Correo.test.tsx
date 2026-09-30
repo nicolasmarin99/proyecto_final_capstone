@@ -165,7 +165,8 @@ describe("Restablecer contraseña", () => {
 
     vi.mocked(fetch).mockResolvedValue(json({ mensaje: "ok" }));
 
-    escribir(/contraseña nueva/i, "caballo-bateria-grapa");
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria-grapa");
     fireEvent.click(screen.getByRole("button", { name: /guardar contraseña/i }));
 
     // Texto exclusivo de la pantalla de éxito: "cerramos todas las sesiones"
@@ -184,10 +185,38 @@ describe("Restablecer contraseña", () => {
 
     vi.mocked(fetch).mockClear();
 
-    escribir(/contraseña nueva/i, "corta");
+    escribir(/^contraseña nueva$/i, "corta");
+    escribir(/^repetir contraseña nueva$/i, "corta");
     fireEvent.click(screen.getByRole("button", { name: /guardar contraseña/i }));
 
     expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument();
+
+    const envios = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url) === "/api/auth/restablecer");
+
+    expect(envios).toHaveLength(0);
+  });
+});
+
+describe("Restablecer contraseña: repetición", () => {
+  it("no gasta el enlace si las contraseñas no coinciden", async () => {
+    const api = crearClienteApi();
+    sinSesion();
+    renderizar(
+      "/restablecer-contrasena?token=abc123",
+      <PaginaRestablecerContrasena cliente={api} />,
+      api,
+    );
+
+    vi.mocked(fetch).mockClear();
+
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria-grapo");
+    fireEvent.click(screen.getByRole("button", { name: /guardar contraseña/i }));
+
+    expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/^repetir contraseña nueva$/i)).toHaveAttribute("aria-invalid", "true");
 
     const envios = vi
       .mocked(fetch)
@@ -239,7 +268,8 @@ describe("Cambiar contraseña", () => {
     await screen.findByLabelText(/contraseña actual/i);
 
     escribir(/contraseña actual/i, "equivocada");
-    escribir(/contraseña nueva/i, "caballo-bateria-grapa");
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria-grapa");
     fireEvent.click(screen.getByRole("button", { name: /cambiar contraseña/i }));
 
     expect(await screen.findByText(/la contraseña actual no es correcta/i)).toBeInTheDocument();
@@ -259,7 +289,8 @@ describe("Cambiar contraseña", () => {
     await screen.findByLabelText(/contraseña actual/i);
 
     escribir(/contraseña actual/i, "contrasena-segura-123");
-    escribir(/contraseña nueva/i, "caballo-bateria-grapa");
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria-grapa");
     fireEvent.click(screen.getByRole("button", { name: /cambiar contraseña/i }));
 
     expect(await screen.findByText(/esta sigue abierta/i)).toBeInTheDocument();
@@ -281,10 +312,37 @@ describe("Cambiar contraseña", () => {
     // Contiene el correo completo. La parte local "ana" sola no bastaría: son
     // tres letras, y la regla ignora fragmentos tan cortos para no prohibir
     // palabras comunes.
-    escribir(/contraseña nueva/i, "xx-ana@ejemplo.cl-yy");
+    escribir(/^contraseña nueva$/i, "xx-ana@ejemplo.cl-yy");
+    escribir(/^repetir contraseña nueva$/i, "xx-ana@ejemplo.cl-yy");
     fireEvent.click(screen.getByRole("button", { name: /cambiar contraseña/i }));
 
     expect(await screen.findByText(/no puede contener tu correo/i)).toBeInTheDocument();
+
+    const envios = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url) === "/api/auth/cambiar-contrasena");
+
+    expect(envios).toHaveLength(0);
+  });
+
+  it("no cambia la contraseña si la repetición no coincide", async () => {
+    const api = crearClienteApi();
+
+    vi.mocked(fetch).mockImplementation(async (url) =>
+      String(url) === "/api/auth/refrescar"
+        ? json({ accessToken: "t", usuario })
+        : json({ mensaje: "ok" }),
+    );
+
+    renderizarProtegida(api);
+    await screen.findByLabelText(/contraseña actual/i);
+
+    escribir(/contraseña actual/i, "contrasena-segura-123");
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria");
+    fireEvent.click(screen.getByRole("button", { name: /cambiar contraseña/i }));
+
+    expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
 
     const envios = vi
       .mocked(fetch)

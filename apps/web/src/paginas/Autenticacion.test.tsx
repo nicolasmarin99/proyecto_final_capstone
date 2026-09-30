@@ -47,6 +47,11 @@ function renderizarApp(rutaInicial: string, cliente = crearClienteApi()) {
   );
 }
 
+/** Peticiones de registro que llegaron a salir hacia la API. */
+function registrosEnviados() {
+  return vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === "/api/auth/registro");
+}
+
 function escribir(etiqueta: RegExp, valor: string) {
   fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: valor } });
 }
@@ -69,7 +74,8 @@ describe("Formulario de registro", () => {
 
     escribir(/nombre/i, "Ana Pérez");
     escribir(/correo/i, "ana@ejemplo.cl");
-    escribir(/contraseña/i, "contrasena-segura-123");
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    escribir(/^repetir contraseña$/i, "contrasena-segura-123");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument();
@@ -100,14 +106,15 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "no-es-correo");
     // Contraseña que pasa la revisión del cliente, para que la petición llegue
     // a la API y se pueda comprobar que sus detalles se muestran por campo.
-    escribir(/contraseña/i, "caballo-bateria-grapa");
+    escribir(/^contraseña$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña$/i, "caballo-bateria-grapa");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument();
     expect(screen.getByText(/correo electrónico válido/i)).toBeInTheDocument();
 
     // El mensaje queda enlazado al campo mediante aria-describedby.
-    expect(screen.getByLabelText(/contraseña/i)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^contraseña$/i)).toHaveAttribute("aria-invalid", "true");
   });
 
   it("aplica las reglas compartidas antes de llamar al servidor", async () => {
@@ -121,7 +128,8 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "ana.perez@ejemplo.cl");
     // Contiene la parte local del correo: lo rechaza @localcl/shared, la misma
     // función que usa la API.
-    escribir(/contraseña/i, "ana.perez-2026-clave");
+    escribir(/^contraseña$/i, "ana.perez-2026-clave");
+    escribir(/^repetir contraseña$/i, "ana.perez-2026-clave");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/no puede contener tu correo/i)).toBeInTheDocument();
@@ -142,11 +150,68 @@ describe("Formulario de registro", () => {
 
     escribir(/nombre/i, "Ana Pérez");
     escribir(/correo/i, "ana@ejemplo.cl");
-    escribir(/contraseña/i, "contrasena-segura-123");
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    escribir(/^repetir contraseña$/i, "contrasena-segura-123");
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /creando cuenta/i })).toBeDisabled();
+    });
+  });
+
+  it("no crea la cuenta si las contraseñas no coinciden", async () => {
+    sinSesion();
+    const cliente = crearClienteApi();
+    renderizarApp("/registro", cliente);
+
+    vi.mocked(fetch).mockClear();
+
+    escribir(/nombre/i, "Ana Pérez");
+    escribir(/correo/i, "ana@ejemplo.cl");
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    escribir(/^repetir contraseña$/i, "contrasena-segura-124");
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/^repetir contraseña$/i)).toHaveAttribute("aria-invalid", "true");
+    expect(registrosEnviados()).toHaveLength(0);
+  });
+
+  it("pide repetir la contraseña si ese campo queda vacío", async () => {
+    sinSesion();
+    const cliente = crearClienteApi();
+    renderizarApp("/registro", cliente);
+
+    vi.mocked(fetch).mockClear();
+
+    escribir(/nombre/i, "Ana Pérez");
+    escribir(/correo/i, "ana@ejemplo.cl");
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    expect(await screen.findByText("Repite tu contraseña.")).toBeInTheDocument();
+    expect(registrosEnviados()).toHaveLength(0);
+  });
+
+  it("no envía la repetición al servidor: solo sirve en el formulario", async () => {
+    sinSesion();
+    const cliente = crearClienteApi();
+    renderizarApp("/registro", cliente);
+
+    vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Te enviamos un enlace." }, 202));
+
+    escribir(/nombre/i, "Ana Pérez");
+    escribir(/correo/i, "ana@ejemplo.cl");
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    escribir(/^repetir contraseña$/i, "contrasena-segura-123");
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    await screen.findByText(/revisa tu correo/i);
+    const [, opciones] = registrosEnviados()[0]!;
+    expect(JSON.parse(String(opciones?.body))).toEqual({
+      nombre: "Ana Pérez",
+      correo: "ana@ejemplo.cl",
+      contrasena: "contrasena-segura-123",
     });
   });
 });
