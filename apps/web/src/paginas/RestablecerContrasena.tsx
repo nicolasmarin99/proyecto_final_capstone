@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton, clasesBoton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
@@ -16,6 +17,7 @@ export default function PaginaRestablecerContrasena({
   const token = parametros.get("token");
 
   const [contrasena, setContrasena] = useState("");
+  const [repeticion, setRepeticion] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -38,6 +40,15 @@ export default function PaginaRestablecerContrasena({
 
     if (problema) {
       setErrores({ contrasena: mensajeDeProblema(problema) });
+      return;
+    }
+
+    // La repetición se compara después de las reglas: si la contraseña no
+    // las cumple, igual hay que escribirla de nuevo.
+    const errorRepeticion = revisarRepeticion(contrasena, repeticion);
+
+    if (errorRepeticion) {
+      setErrores({ repeticion: errorRepeticion });
       return;
     }
 
@@ -107,6 +118,16 @@ export default function PaginaRestablecerContrasena({
           alCambiar={setContrasena}
           error={errores.contrasena}
           ayuda="Mínimo 10 caracteres. No puede contener tu nombre ni tu correo."
+        />
+
+        <CampoTexto
+          id="repeticion"
+          etiqueta="Repetir contraseña nueva"
+          tipo="password"
+          autoComplete="new-password"
+          valor={repeticion}
+          alCambiar={setRepeticion}
+          error={errores.repeticion}
         />
 
         <Boton type="submit" disabled={enviando} className="mt-7">

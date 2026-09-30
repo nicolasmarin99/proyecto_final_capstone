@@ -7,6 +7,7 @@ import {
   revisarContrasena,
 } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
@@ -17,6 +18,7 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
   const [correo, setCorreo] = useState("");
   const [rut, setRut] = useState("");
   const [contrasena, setContrasena] = useState("");
+  const [repeticion, setRepeticion] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -44,6 +46,15 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
 
     if (problema) {
       setErrores({ contrasena: mensajeDeProblema(problema) });
+      return;
+    }
+
+    // Solo se compara después de que la contraseña cumple las reglas: si no
+    // las cumple, la persona igual tiene que escribirla de nuevo.
+    const errorRepeticion = revisarRepeticion(contrasena, repeticion);
+
+    if (errorRepeticion) {
+      setErrores({ repeticion: errorRepeticion });
       return;
     }
 
@@ -139,6 +150,16 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
           alCambiar={setContrasena}
           error={errores.contrasena}
           ayuda="Mínimo 10 caracteres."
+        />
+
+        <CampoTexto
+          id="repeticion"
+          etiqueta="Repetir contraseña"
+          tipo="password"
+          autoComplete="new-password"
+          valor={repeticion}
+          alCambiar={setRepeticion}
+          error={errores.repeticion}
         />
 
         <Boton type="submit" disabled={enviando} className="mt-7">

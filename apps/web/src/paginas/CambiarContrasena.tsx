@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -16,6 +17,7 @@ export default function PaginaCambiarContrasena({
 
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
+  const [repeticion, setRepeticion] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -36,6 +38,15 @@ export default function PaginaCambiarContrasena({
       return;
     }
 
+    // La repetición se compara después de las reglas: si la contraseña no
+    // las cumple, igual hay que escribirla de nuevo.
+    const errorRepeticion = revisarRepeticion(nueva, repeticion);
+
+    if (errorRepeticion) {
+      setErrores({ repeticion: errorRepeticion });
+      return;
+    }
+
     setEnviando(true);
 
     try {
@@ -43,6 +54,7 @@ export default function PaginaCambiarContrasena({
       setListo(true);
       setActual("");
       setNueva("");
+      setRepeticion("");
     } catch (error) {
       if (error instanceof ErrorApi && error.codigo === "CONTRASENA_ACTUAL_INCORRECTA") {
         // El servidor responde 400 y no 401 justamente para que el mensaje
@@ -106,6 +118,16 @@ export default function PaginaCambiarContrasena({
           alCambiar={setNueva}
           error={errores.contrasenaNueva}
           ayuda="Mínimo 10 caracteres. No puede contener tu nombre ni tu correo."
+        />
+
+        <CampoTexto
+          id="repeticion"
+          etiqueta="Repetir contraseña nueva"
+          tipo="password"
+          autoComplete="new-password"
+          valor={repeticion}
+          alCambiar={setRepeticion}
+          error={errores.repeticion}
         />
 
         <Boton type="submit" disabled={enviando} className="mt-7">

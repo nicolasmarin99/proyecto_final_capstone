@@ -44,6 +44,7 @@ function completarFormulario(rut: string) {
   escribir(/^correo$/i, "pedro.soto@ejemplo.cl");
   escribir(/^rut$/i, rut);
   escribir(/^contraseña$/i, "contrasena-segura-123");
+  escribir(/^repetir contraseña$/i, "contrasena-segura-123");
 }
 
 beforeEach(() => {
@@ -55,6 +56,24 @@ afterEach(() => {
 });
 
 describe("Registro de prestador", () => {
+  it("no crea la cuenta si las contraseñas no coinciden", async () => {
+    sinSesion();
+    const cliente = crearClienteApi();
+    renderizar(cliente);
+
+    vi.mocked(fetch).mockClear();
+
+    completarFormulario(RUT_VALIDO);
+    escribir(/^repetir contraseña$/i, "otra-contrasena-distinta");
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
+
+    expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
+    const enviados = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url).startsWith("/api/auth/registro"));
+    expect(enviados).toHaveLength(0);
+  });
+
   it("crea la cuenta y lleva a la pantalla de revisar el correo", async () => {
     sinSesion();
     const cliente = crearClienteApi();
