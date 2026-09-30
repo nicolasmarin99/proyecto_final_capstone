@@ -46,7 +46,7 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         {error && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {error}
           </p>
@@ -109,7 +109,7 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         </Link>
       )}
 
-      <Boton type="button" onClick={alCerrarSesion} disabled={saliendo} className="mt-4">
+      <Boton type="button" onClick={alCerrarSesion} cargando={saliendo} className="mt-4">
         {saliendo ? "Cerrando sesión…" : "Cerrar sesión"}
       </Boton>
     </Pagina>

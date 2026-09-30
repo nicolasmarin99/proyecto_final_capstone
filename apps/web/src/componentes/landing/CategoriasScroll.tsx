@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from "react";
 import { Link } from "react-router";
 import { LogoLocalCL } from "../LogoLocalCL";
+import { Revelar } from "../Revelar";
 import { CategoriaCard } from "./CategoriaCard";
 import { Contenedor, Sobretitulo } from "./Contenedor";
 import { CATEGORIAS, GRUPOS_CATEGORIAS } from "./datos";
@@ -74,10 +75,11 @@ function ListaMovil() {
     <Contenedor className="flex flex-col gap-10 py-16 md:py-20 lg:hidden">
       <Encabezado />
       <ul className="grid gap-5 md:grid-cols-2">
-        {CATEGORIAS.map((categoria) => (
-          <li key={categoria.nombre} className="grid">
+        {CATEGORIAS.map((categoria, i) => (
+          // En tablet hay dos columnas: la de la derecha llega un poco después.
+          <Revelar como="li" key={categoria.nombre} retraso={(i % 2) * 100} className="grid">
             <CategoriaCard categoria={categoria} />
-          </li>
+          </Revelar>
         ))}
       </ul>
     </Contenedor>

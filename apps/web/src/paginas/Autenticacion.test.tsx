@@ -193,6 +193,34 @@ describe("Formulario de registro", () => {
     expect(registrosEnviados()).toHaveLength(0);
   });
 
+  it("confirma en vivo cuando la contraseña cumple las reglas y cuando coincide", async () => {
+    sinSesion();
+    renderizarApp("/registro");
+
+    escribir(/nombre/i, "Ana Pérez");
+    escribir(/correo/i, "ana@ejemplo.cl");
+    expect(screen.queryByText("Cumple los requisitos.")).not.toBeInTheDocument();
+
+    escribir(/^contraseña$/i, "contrasena-segura-123");
+    expect(await screen.findByText("Cumple los requisitos.")).toBeInTheDocument();
+
+    // A medio escribir la repetición todavía no coincide: no se confirma nada.
+    escribir(/^repetir contraseña$/i, "contrasena");
+    expect(screen.queryByText("Las contraseñas coinciden.")).not.toBeInTheDocument();
+
+    escribir(/^repetir contraseña$/i, "contrasena-segura-123");
+    expect(screen.getByText("Las contraseñas coinciden.")).toBeInTheDocument();
+  });
+
+  it("no confirma una contraseña que contiene el correo", async () => {
+    sinSesion();
+    renderizarApp("/registro");
+
+    escribir(/correo/i, "ana.perez@ejemplo.cl");
+    escribir(/^contraseña$/i, "ana.perez-2026-clave");
+    expect(screen.queryByText("Cumple los requisitos.")).not.toBeInTheDocument();
+  });
+
   it("no envía la repetición al servidor: solo sirve en el formulario", async () => {
     sinSesion();
     const cliente = crearClienteApi();

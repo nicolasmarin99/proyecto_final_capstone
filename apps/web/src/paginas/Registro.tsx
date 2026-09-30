@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -77,7 +78,7 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -108,6 +109,7 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
           valor={contrasena}
           alCambiar={setContrasena}
           error={errores.contrasena}
+          valido={confirmarReglas(contrasena, { correo, nombre })}
           ayuda="Mínimo 10 caracteres."
         />
 
@@ -119,9 +121,10 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
           valor={repeticion}
           alCambiar={setRepeticion}
           error={errores.repeticion}
+          valido={confirmarRepeticion(contrasena, repeticion)}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <Boton type="submit" cargando={enviando} className="mt-7">
           {enviando ? "Creando cuenta…" : "Crear cuenta"}
         </Boton>
       </form>

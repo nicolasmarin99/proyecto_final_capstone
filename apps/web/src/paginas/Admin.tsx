@@ -39,7 +39,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
         {error && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {error}
           </p>

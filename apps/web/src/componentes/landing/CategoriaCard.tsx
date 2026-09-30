@@ -10,7 +10,7 @@ export function CategoriaCard({ categoria }: { categoria: Categoria }) {
   return (
     <Link
       to={rutaBusqueda(categoria.nombre)}
-      className="group flex flex-col gap-6 rounded-[28px] border border-borde bg-blanco p-7 text-noche shadow-tarjeta transition-colors hover:border-borde-fuerte focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario xl:gap-7 xl:p-10"
+      className="group flex flex-col gap-6 rounded-[28px] border border-borde bg-blanco p-7 text-noche shadow-tarjeta transition-[border-color,box-shadow,transform] duration-300 hover:border-borde-fuerte hover:shadow-tarjeta-alta motion-safe:hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario xl:gap-7 xl:p-10"
     >
       <span className="flex size-16 items-center justify-center rounded-[20px] bg-hielo text-primario xl:size-20">
         <Icono nombre={categoria.icono} tamano={36} className="xl:size-10" />

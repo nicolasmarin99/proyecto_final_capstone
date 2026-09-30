@@ -70,7 +70,7 @@ export default function PaginaIniciarSesion() {
       {mensajeExito && (
         <p
           role="status"
-          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           {mensajeExito}
         </p>
@@ -80,7 +80,7 @@ export default function PaginaIniciarSesion() {
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -114,7 +114,7 @@ export default function PaginaIniciarSesion() {
           </Link>
         </p>
 
-        <Boton type="submit" disabled={enviando} className="mt-5">
+        <Boton type="submit" cargando={enviando} className="mt-5">
           {enviando ? "Entrando…" : "Entrar"}
         </Boton>
       </form>

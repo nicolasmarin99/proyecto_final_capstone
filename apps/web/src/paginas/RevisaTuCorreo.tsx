@@ -64,7 +64,7 @@ export default function PaginaRevisaTuCorreo({ cliente = clienteApi }: { cliente
       {aviso && (
         <p
           role="status"
-          className="mt-4 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           {aviso}
         </p>
@@ -75,7 +75,7 @@ export default function PaginaRevisaTuCorreo({ cliente = clienteApi }: { cliente
           type="button"
           variante="secundario"
           onClick={reenviar}
-          disabled={reenviando}
+          cargando={reenviando}
           className="mt-6"
         >
           {reenviando ? "Enviando…" : "Reenviar el enlace"}

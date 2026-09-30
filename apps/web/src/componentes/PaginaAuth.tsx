@@ -41,7 +41,10 @@ export function PaginaAuth({ sobretitulo, titulo, intro, children }: Props) {
           <LogoLocalCL variante="invertido" claseTexto="text-2xl font-bold tracking-[-0.5px] text-blanco" />
         </Link>
 
-        <div className="relative">
+        <div
+          className="relative motion-safe:animate-aparecer"
+          style={{ animationDelay: "150ms" }}
+        >
           <h2 className="font-titulos text-[2.6rem] leading-[1.12] font-bold tracking-[-1px] text-blanco">
             Contrata con respaldo,
             <br />
@@ -67,7 +70,7 @@ export function PaginaAuth({ sobretitulo, titulo, intro, children }: Props) {
       </aside>
 
       <main className="flex items-center justify-center px-4 py-12 sm:px-10">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md motion-safe:animate-aparecer">
           {/* En móvil no hay panel, así que la marca entra acá. */}
           <Link
             to="/"

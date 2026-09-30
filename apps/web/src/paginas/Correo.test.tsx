@@ -200,6 +200,20 @@ describe("Restablecer contraseña", () => {
 });
 
 describe("Restablecer contraseña: repetición", () => {
+  it("confirma en vivo cuando la repetición coincide", () => {
+    const api = crearClienteApi();
+    sinSesion();
+    renderizar(
+      "/restablecer-contrasena?token=abc123",
+      <PaginaRestablecerContrasena cliente={api} />,
+      api,
+    );
+
+    escribir(/^contraseña nueva$/i, "caballo-bateria-grapa");
+    escribir(/^repetir contraseña nueva$/i, "caballo-bateria-grapa");
+    expect(screen.getByText("Las contraseñas coinciden.")).toBeInTheDocument();
+  });
+
   it("no gasta el enlace si las contraseñas no coinciden", async () => {
     const api = crearClienteApi();
     sinSesion();

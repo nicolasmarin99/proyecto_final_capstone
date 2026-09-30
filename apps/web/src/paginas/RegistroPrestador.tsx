@@ -7,6 +7,7 @@ import {
   revisarContrasena,
 } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -89,7 +90,7 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -149,6 +150,7 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
           valor={contrasena}
           alCambiar={setContrasena}
           error={errores.contrasena}
+          valido={confirmarReglas(contrasena, { correo, nombre })}
           ayuda="Mínimo 10 caracteres."
         />
 
@@ -160,9 +162,10 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
           valor={repeticion}
           alCambiar={setRepeticion}
           error={errores.repeticion}
+          valido={confirmarRepeticion(contrasena, repeticion)}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <Boton type="submit" cargando={enviando} className="mt-7">
           {enviando ? "Creando cuenta…" : "Crear cuenta de prestador"}
         </Boton>
       </form>

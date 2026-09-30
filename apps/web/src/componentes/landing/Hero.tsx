@@ -6,6 +6,17 @@ import { FondoHero } from "./FondoHero";
 import { Icono } from "../iconos";
 import { usePrefiereMenosMovimiento } from "./usePrefiereMenosMovimiento";
 
+/*
+  Entrada escalonada al cargar: cada bloque llega 80ms después del anterior,
+  así el ojo recorre la portada en orden (etiqueta, titular, texto,
+  buscador). Pasa una sola vez; después el hero queda quieto salvo el fondo.
+
+  El retraso va en style y no como clase [animation-delay:...]: la clase
+  animate-aparecer usa la propiedad abreviada `animation`, que fija el retraso
+  en 0, y según el orden del CSS generado podía pisar a la clase del retraso.
+  El estilo en línea siempre gana.
+*/
+
 /**
  * Portada: titular, buscador y video.
  *
@@ -29,16 +40,22 @@ export function Hero() {
 
       <Contenedor className="relative grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)] lg:gap-[72px] lg:pt-24 lg:pb-28">
         <div className="flex flex-col gap-7">
-          <p className="flex items-center gap-2 self-start rounded-full bg-hielo px-3.5 py-2 text-sm font-bold text-primario">
+          <p className="motion-safe:animate-aparecer flex items-center gap-2 self-start rounded-full bg-hielo px-3.5 py-2 text-sm font-bold text-primario">
             <Icono nombre="ubicacion" tamano={16} grosor={2} />
             Servicios cerca de ti
           </p>
 
-          <h1 className="font-titulos text-[40px] leading-[1.05] font-extrabold tracking-[-1.5px] text-noche md:text-[52px] xl:text-[64px] xl:tracking-[-2px]">
+          <h1
+            className="motion-safe:animate-aparecer font-titulos text-[40px] leading-[1.05] font-extrabold tracking-[-1.5px] text-noche md:text-[52px] xl:text-[64px] xl:tracking-[-2px]"
+            style={{ animationDelay: "80ms" }}
+          >
             Encuentra al experto que tu hogar necesita.
           </h1>
 
-          <p className="max-w-[560px] text-lg leading-[1.55] text-texto-suave md:text-xl">
+          <p
+            className="motion-safe:animate-aparecer max-w-[560px] text-lg leading-[1.55] text-texto-suave md:text-xl"
+            style={{ animationDelay: "160ms" }}
+          >
             Gasfíteres, electricistas, carpinteros, banqueteras y más. Revisa sus certificados y lo que
             opinan sus clientes antes de contactarlos.
           </p>
@@ -47,7 +64,8 @@ export function Hero() {
             id="buscar"
             role="search"
             onSubmit={buscar}
-            className="mt-2 flex scroll-mt-6 flex-col gap-2 rounded-medio border border-borde-fuerte bg-blanco p-2 shadow-buscador sm:flex-row sm:items-center"
+            className="motion-safe:animate-aparecer mt-2 flex scroll-mt-6 flex-col gap-2 rounded-medio border border-borde-fuerte bg-blanco p-2 shadow-buscador sm:flex-row sm:items-center"
+            style={{ animationDelay: "240ms" }}
           >
             <label className="flex h-14 rounded-chico focus-within:outline-2 focus-within:outline-primario flex-1 items-center gap-2.5 border-b border-borde px-3.5 sm:border-r sm:border-b-0">
               <Icono nombre="lupa" tamano={22} grosor={2} className="shrink-0 text-primario" />
@@ -72,13 +90,16 @@ export function Hero() {
             </label>
             <button
               type="submit"
-              className="h-14 cursor-pointer rounded-boton bg-primario px-7 text-[17px] font-bold text-blanco transition-colors hover:bg-noche focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
+              className="h-14 cursor-pointer rounded-boton bg-primario px-7 text-[17px] font-bold text-blanco transition-[background-color,transform] duration-200 hover:bg-noche motion-safe:active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
             >
               Buscar
             </button>
           </form>
 
-          <div className="flex flex-wrap items-center gap-2.5 text-[15px] text-texto-suave">
+          <div
+            className="motion-safe:animate-aparecer flex flex-wrap items-center gap-2.5 text-[15px] text-texto-suave"
+            style={{ animationDelay: "320ms" }}
+          >
             <span>Populares:</span>
             {POPULARES.map((servicio) => (
               <Link
@@ -132,7 +153,8 @@ function VideoHero() {
       aria-hidden="true"
       width={540}
       height={402}
-      className="aspect-[540/402] w-full max-w-[540px] justify-self-center rounded-grande border border-borde bg-hielo object-cover shadow-video"
+      className="motion-safe:animate-aparecer aspect-[540/402] w-full max-w-[540px] justify-self-center rounded-grande border border-borde bg-hielo object-cover shadow-video"
+      style={{ animationDelay: "200ms" }}
     />
   );
 }

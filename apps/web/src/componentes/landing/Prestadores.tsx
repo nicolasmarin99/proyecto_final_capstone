@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { Revelar } from "../Revelar";
 import { Contenedor, Sobretitulo } from "./Contenedor";
 import { BENEFICIOS_PRESTADOR } from "./datos";
 import { Icono } from "../iconos";
@@ -10,7 +11,7 @@ export function Prestadores() {
   return (
     <section id="prestadores" className="bg-blanco">
       <Contenedor className="grid items-center gap-12 py-20 md:py-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,580px)] lg:gap-20">
-        <div className="flex flex-col gap-6">
+        <Revelar className="flex flex-col gap-6">
           <Sobretitulo>Para prestadores</Sobretitulo>
           <h2 className="font-titulos text-[32px] leading-[1.12] font-bold tracking-[-1px] text-noche md:text-[44px]">
             ¿Ofreces un servicio? Haz que te encuentren.
@@ -33,12 +34,14 @@ export function Prestadores() {
               Saber más
             </a>
           </div>
-        </div>
+        </Revelar>
 
         <ul className="flex flex-col gap-4">
-          {BENEFICIOS_PRESTADOR.map((beneficio) => (
-            <li
+          {BENEFICIOS_PRESTADOR.map((beneficio, i) => (
+            <Revelar
+              como="li"
               key={beneficio.titulo}
+              retraso={150 + i * 120}
               className="flex items-start gap-5 rounded-[20px] border border-borde px-6 py-6 md:px-7"
             >
               <span className="flex size-12 shrink-0 items-center justify-center rounded-[12px] bg-hielo text-primario">
@@ -48,7 +51,7 @@ export function Prestadores() {
                 <span className="font-titulos text-[19px] font-bold text-noche">{beneficio.titulo}</span>
                 <span className="leading-normal text-texto-suave">{beneficio.texto}</span>
               </span>
-            </li>
+            </Revelar>
           ))}
         </ul>
       </Contenedor>

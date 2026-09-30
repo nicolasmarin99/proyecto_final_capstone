@@ -79,7 +79,7 @@ export function Navbar() {
       </Contenedor>
 
       {abierto && (
-        <div id={idMenu} className="border-t border-borde lg:hidden">
+        <div id={idMenu} className="border-t border-borde motion-safe:animate-aparecer-corto lg:hidden">
           <Contenedor className="flex flex-col gap-1 py-4">
             <nav aria-label="Principal" className="flex flex-col">
               {SECCIONES.map((s) => (
