@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { clasesBoton } from "../componentes/Boton";
 import { clienteApi, type ClienteApi } from "../api/cliente";
 import { PaginaAuth } from "../componentes/PaginaAuth";
 
@@ -49,13 +50,13 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
     >
       <div className="mt-6">
         {estado === "verificando" && (
-          <p className="text-[15px] text-piedra-500">Estamos confirmando tu correo…</p>
+          <p className="text-[15px] text-texto-suave">Estamos confirmando tu correo…</p>
         )}
 
         {estado === "listo" && (
           <div
             role="status"
-            className="rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+            className="rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
           >
             Tu correo quedó confirmado. Ya puedes publicar servicios y dejar valoraciones.
           </div>
@@ -64,7 +65,7 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
         {estado === "invalido" && (
           <div
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm text-error-700"
           >
             Este enlace no es válido o ya expiró. Pide uno nuevo desde tu perfil o al iniciar
             sesión.
@@ -75,7 +76,7 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
       {estado !== "verificando" && (
         <Link
           to="/iniciar-sesion"
-          className="mt-7 flex min-h-12 items-center justify-center rounded-campo bg-acento-400 px-4 text-[15px] font-semibold text-marca-950 transition hover:bg-[#d9a52f]"
+          className={`mt-7 ${clasesBoton("principal")}`}
         >
           Ir a iniciar sesión
         </Link>

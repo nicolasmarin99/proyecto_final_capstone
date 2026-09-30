@@ -66,7 +66,7 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -105,12 +105,12 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
         </Boton>
       </form>
 
-      <div className="mt-7 space-y-2 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <div className="mt-7 space-y-2 border-t border-borde pt-5 text-sm text-texto-suave">
         <p>
           ¿Ya tienes cuenta?{" "}
           <Link
             to="/iniciar-sesion"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+            className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
           >
             Iniciar sesión
           </Link>
@@ -119,7 +119,7 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
           ¿Ofreces servicios?{" "}
           <Link
             to="/registro-prestador"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+            className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
           >
             Registrarme como prestador
           </Link>

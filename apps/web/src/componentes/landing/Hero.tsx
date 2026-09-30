@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Contenedor } from "./Contenedor";
 import { POPULARES, rutaBusqueda } from "./datos";
 import { FondoHero } from "./FondoHero";
-import { Icono } from "./iconos";
+import { Icono } from "../iconos";
 import { usePrefiereMenosMovimiento } from "./usePrefiereMenosMovimiento";
 
 /**
@@ -72,7 +72,7 @@ export function Hero() {
             </label>
             <button
               type="submit"
-              className="h-14 cursor-pointer rounded-[12px] bg-primario px-7 text-[17px] font-bold text-blanco transition-colors hover:bg-noche focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
+              className="h-14 cursor-pointer rounded-boton bg-primario px-7 text-[17px] font-bold text-blanco transition-colors hover:bg-noche focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
             >
               Buscar
             </button>

@@ -21,13 +21,13 @@ export function CtaFinal() {
         <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
           <a
             href="/#buscar"
-            className={`flex h-[54px] items-center justify-center rounded-[12px] bg-blanco px-[30px] text-[17px] font-bold text-noche transition-colors hover:bg-hielo ${foco}`}
+            className={`flex h-[54px] items-center justify-center rounded-boton bg-blanco px-[30px] text-[17px] font-bold text-noche transition-colors hover:bg-hielo ${foco}`}
           >
             Buscar un servicio
           </a>
           <Link
             to="/registro-prestador"
-            className={`flex h-[54px] items-center justify-center rounded-[12px] border border-noche-contorno px-[30px] text-[17px] font-bold text-blanco transition-colors hover:bg-noche-borde ${foco}`}
+            className={`flex h-[54px] items-center justify-center rounded-boton border border-noche-contorno px-[30px] text-[17px] font-bold text-blanco transition-colors hover:bg-noche-borde ${foco}`}
           >
             Publicar mi servicio
           </Link>

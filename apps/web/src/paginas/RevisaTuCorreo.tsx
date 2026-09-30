@@ -56,7 +56,7 @@ export default function PaginaRevisaTuCorreo({ cliente = clienteApi }: { cliente
           : "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo."
       }
     >
-      <div className="mt-6 rounded-campo border border-piedra-100 bg-piedra-50 px-4 py-3 text-sm text-piedra-500">
+      <div className="mt-6 rounded-chico border border-borde bg-niebla px-4 py-3 text-sm text-texto-suave">
         El enlace sirve una sola vez y vence en 24 horas. Si no lo ves, revisa la carpeta de
         correo no deseado.
       </div>
@@ -64,7 +64,7 @@ export default function PaginaRevisaTuCorreo({ cliente = clienteApi }: { cliente
       {aviso && (
         <p
           role="status"
-          className="mt-4 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="mt-4 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           {aviso}
         </p>
@@ -82,11 +82,11 @@ export default function PaginaRevisaTuCorreo({ cliente = clienteApi }: { cliente
         </Boton>
       )}
 
-      <p className="mt-7 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <p className="mt-7 border-t border-borde pt-5 text-sm text-texto-suave">
         ¿Ya lo confirmaste?{" "}
         <Link
           to="/iniciar-sesion"
-          className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Iniciar sesión
         </Link>

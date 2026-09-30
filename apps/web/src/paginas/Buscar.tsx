@@ -47,13 +47,13 @@ export default function PaginaBuscar() {
           <div className="mt-2 flex flex-wrap gap-3">
             <Link
               to="/registro-prestador"
-              className="flex h-[52px] items-center rounded-[12px] bg-primario px-7 font-bold text-blanco transition-colors hover:bg-noche focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
+              className="flex h-[52px] items-center rounded-boton bg-primario px-7 font-bold text-blanco transition-colors hover:bg-noche focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
             >
               Publicar mi servicio
             </Link>
             <Link
               to="/"
-              className="flex h-[52px] items-center rounded-[12px] border border-borde-fuerte bg-blanco px-6 font-bold text-primario transition-colors hover:bg-hielo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
+              className="flex h-[52px] items-center rounded-boton border border-borde-fuerte bg-blanco px-6 font-bold text-primario transition-colors hover:bg-hielo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
             >
               Volver al inicio
             </Link>

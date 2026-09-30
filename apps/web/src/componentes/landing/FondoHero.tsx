@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Icono, type NombreIcono } from "./iconos";
+import { Icono, type NombreIcono } from "../iconos";
 
 /*
   Posiciones del diseño (pensado a 1440×800) pasadas a porcentajes, para que

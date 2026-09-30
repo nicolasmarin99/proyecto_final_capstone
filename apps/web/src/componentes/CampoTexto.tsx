@@ -35,7 +35,7 @@ export function CampoTexto({
 
   return (
     <div className="mt-5">
-      <label htmlFor={id} className="block text-sm font-medium text-piedra-700">
+      <label htmlFor={id} className="block text-sm font-bold text-noche">
         {etiqueta}
       </label>
       <input
@@ -47,14 +47,14 @@ export function CampoTexto({
         onChange={(evento) => alCambiar(evento.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={descripcion || undefined}
-        className={`mt-1.5 h-12 w-full rounded-campo border bg-piedra-50 px-4 text-[15px] text-marca-900 transition outline-none placeholder:text-piedra-300 focus:bg-white focus:ring-2 ${
+        className={`mt-1.5 h-12 w-full rounded-chico border bg-niebla px-4 text-base text-noche transition outline-none placeholder:text-texto-tenue focus:bg-blanco focus:ring-4 ${
           error
-            ? "border-error-700 focus:border-error-700 focus:ring-error-700/20"
-            : "border-piedra-300 focus:border-marca-500 focus:ring-marca-500/25"
+            ? "border-error-700 focus:border-error-700 focus:ring-error-700/15"
+            : "border-borde-fuerte focus:border-primario focus:ring-primario/15"
         }`}
       />
       {ayuda && !error && (
-        <p id={idAyuda} className="mt-1.5 text-sm text-piedra-500">
+        <p id={idAyuda} className="mt-1.5 text-sm text-texto-suave">
           {ayuda}
         </p>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import { LogoLocalCL } from "../LogoLocalCL";
 import { Contenedor } from "./Contenedor";
-import { Icono } from "./iconos";
+import { Icono } from "../iconos";
 
 const SECCIONES = [
   { href: "/#servicios", texto: "Servicios" },

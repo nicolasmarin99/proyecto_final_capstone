@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Íconos de trazo de la landing. Todos comparten la misma grilla de 24×24 y
+ * Íconos de trazo de LocalCL. Todos comparten la misma grilla de 24×24 y
  * el mismo grosor, y toman el color del texto (currentColor): así el
  * componente que los usa decide el color con una clase, sin tocar el SVG.
  *

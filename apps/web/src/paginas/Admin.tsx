@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { clasesBoton } from "../componentes/Boton";
 import { clienteApi, ErrorApi, type ClienteApi, type ResumenAdmin } from "../api/cliente";
 import { Pagina } from "../componentes/Pagina";
 
@@ -38,28 +39,28 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
         {error && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {error}
           </p>
         )}
 
-        {!error && !resumen && <p className="text-sm text-piedra-500">Cargando el resumen…</p>}
+        {!error && !resumen && <p className="text-sm text-texto-suave">Cargando el resumen…</p>}
 
         {resumen && (
           <>
-            <div className="rounded-campo bg-marca-900 p-5">
-              <p className="text-sm text-marca-200">Usuarios registrados</p>
-              <p className="font-display text-display font-semibold text-white">
+            <div className="rounded-chico bg-noche p-5">
+              <p className="text-sm text-noche-texto">Usuarios registrados</p>
+              <p className="font-titulos text-display font-bold text-blanco">
                 {resumen.totalUsuarios}
               </p>
             </div>
 
-            <dl className="mt-4 rounded-campo border border-piedra-100 bg-piedra-50 p-4 text-sm">
+            <dl className="mt-4 rounded-chico border border-borde bg-niebla p-4 text-sm">
               {Object.entries(resumen.porRol).map(([rol, total]) => (
                 <div key={rol} className="flex justify-between gap-4 py-1.5">
-                  <dt className="text-piedra-500">{rol}</dt>
-                  <dd className="font-medium text-marca-900">{total}</dd>
+                  <dt className="text-texto-suave">{rol}</dt>
+                  <dd className="font-medium text-noche">{total}</dd>
                 </div>
               ))}
             </dl>
@@ -69,7 +70,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
 
       <Link
         to="/perfil"
-        className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+        className={`mt-6 ${clasesBoton("secundario")}`}
       >
         Volver a mi perfil
       </Link>

@@ -78,7 +78,7 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -146,12 +146,12 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
         </Boton>
       </form>
 
-      <div className="mt-7 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <div className="mt-7 border-t border-borde pt-5 text-sm text-texto-suave">
         <p>
           ¿Buscas servicios en vez de ofrecerlos?{" "}
           <Link
             to="/registro"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+            className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
           >
             Crear cuenta de cliente
           </Link>

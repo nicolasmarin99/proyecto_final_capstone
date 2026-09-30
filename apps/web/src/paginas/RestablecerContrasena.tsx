@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
-import { Boton } from "../componentes/Boton";
+import { Boton, clasesBoton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
 
@@ -66,7 +66,7 @@ export default function PaginaRestablecerContrasena({
       <PaginaAuth sobretitulo="Recuperar cuenta" titulo="Contraseña actualizada">
         <div
           role="status"
-          className="mt-6 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Tu contraseña fue actualizada. Cerramos todas las sesiones abiertas, así que tendrás que
           entrar de nuevo.
@@ -74,7 +74,7 @@ export default function PaginaRestablecerContrasena({
 
         <Link
           to="/iniciar-sesion"
-          className="mt-7 flex min-h-12 items-center justify-center rounded-campo bg-acento-400 px-4 text-[15px] font-semibold text-marca-950 transition hover:bg-[#d9a52f]"
+          className={`mt-7 ${clasesBoton("principal")}`}
         >
           Iniciar sesión
         </Link>
@@ -92,7 +92,7 @@ export default function PaginaRestablecerContrasena({
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -114,11 +114,11 @@ export default function PaginaRestablecerContrasena({
         </Boton>
       </form>
 
-      <p className="mt-7 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <p className="mt-7 border-t border-borde pt-5 text-sm text-texto-suave">
         ¿El enlace ya no sirve?{" "}
         <Link
           to="/recuperar-cuenta"
-          className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Pedir uno nuevo
         </Link>

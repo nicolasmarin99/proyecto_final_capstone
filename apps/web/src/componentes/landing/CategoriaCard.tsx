@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { rutaBusqueda, type Categoria } from "./datos";
-import { Icono } from "./iconos";
+import { Icono } from "../iconos";
 
 /**
  * Tarjeta de una categoría. Toda la tarjeta es un enlace: el objetivo táctil

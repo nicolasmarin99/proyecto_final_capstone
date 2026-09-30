@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { Contenedor, Sobretitulo } from "./Contenedor";
 import { BENEFICIOS_PRESTADOR } from "./datos";
-import { Icono } from "./iconos";
+import { Icono } from "../iconos";
 
 const foco = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario";
 
@@ -22,13 +22,13 @@ export function Prestadores() {
           <div className="mt-2 flex flex-wrap gap-3">
             <Link
               to="/registro-prestador"
-              className={`flex h-[52px] items-center rounded-[12px] bg-primario px-7 text-[17px] font-bold text-blanco transition-colors hover:bg-noche ${foco}`}
+              className={`flex h-[52px] items-center rounded-boton bg-primario px-7 text-[17px] font-bold text-blanco transition-colors hover:bg-noche ${foco}`}
             >
               Publicar mi servicio
             </Link>
             <a
               href="#como-funciona"
-              className={`flex h-[52px] items-center rounded-[12px] border border-borde-fuerte px-6 text-[17px] font-bold text-primario transition-colors hover:bg-hielo ${foco}`}
+              className={`flex h-[52px] items-center rounded-boton border border-borde-fuerte px-6 text-[17px] font-bold text-primario transition-colors hover:bg-hielo ${foco}`}
             >
               Saber más
             </a>
