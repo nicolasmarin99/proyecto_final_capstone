@@ -4,44 +4,19 @@
   Sistema visual de LocalCL.
 
   Tailwind v4 se configura desde CSS: cada variable declarada acá genera su
-  utilidad (--color-marca-900 produce bg-marca-900, text-marca-900, etc.), así
-  que no hace falta tailwind.config.js ni ninguna dependencia nueva.
+  utilidad (--color-noche produce bg-noche, text-noche, etc.), así que no hace
+  falta tailwind.config.js ni ninguna dependencia nueva.
 
-  La idea que ordena la paleta: el azul es la base de confianza y el ámbar es
-  el guiño a las guías amarillas, deliberadamente escaso. Si el ámbar apareciera
-  en todas partes dejaría de significar algo.
+  Los nombres vienen del handoff de diseño (diseno/localcl-diseno). La paleta
+  es de azules: noche para el texto, primario para la acción, y los claros
+  para fondos. Los radios no se llaman sm/md/lg porque esos nombres ya son de
+  Tailwind, y redefinirlos cambiaría en silencio cualquier rounded-lg.
 */
 @theme {
-  /* Azul de marca. El 900 es el ancla: paneles y titulares. */
-  --color-marca-50: #f2f6fa;
-  --color-marca-200: #b9c9dc;
-  --color-marca-500: #3a6a9e;
-  --color-marca-700: #1c4670;
-  --color-marca-900: #0e2a47;
-  --color-marca-950: #0a1f35;
-
   /*
-    Ámbar. Reservado a la acción principal y al sello de verificación.
-    El 400 es fondo, nunca texto sobre blanco: no llega a 4.5:1. Para texto
-    ámbar sobre claro existe el 600.
-  */
-  --color-acento-100: #faefd4;
-  --color-acento-400: #e8b43c;
-  --color-acento-600: #8a5a00;
-
-  /* Neutros entibiados hacia el azul, para que no choquen con el navy. */
-  --color-piedra-50: #f7f9fb;
-  --color-piedra-100: #e4eaf0;
-  --color-piedra-300: #cbd6e0;
-  --color-piedra-500: #4a5e70;
-  --color-piedra-700: #29404f;
-  --color-piedra-900: #16293d;
-
-  /*
-    Estados. La advertencia usa ocre y no el ámbar de marca: el mismo color no
-    puede significar "haz clic acá" y "algo anda mal". El ocre además se separa
-    del ámbar en luminosidad y no solo en tono, que es lo que permite
-    distinguirlos sin depender de la visión del color.
+    Estados. La advertencia usa ocre y no un azul de marca: el mismo color no
+    puede significar "haz clic acá" y "algo anda mal". Cada estado va además
+    con texto que lo nombra, así no depende de ver el color.
   */
   --color-exito-50: #ecfdf3;
   --color-exito-700: #0f7043;
@@ -50,25 +25,11 @@
   --color-error-50: #fdf0f0;
   --color-error-700: #b42318;
 
-  --font-display: "Fraunces", Georgia, serif;
-  --font-cuerpo: "IBM Plex Sans", system-ui, sans-serif;
-
   --text-display: 2.25rem;
   --text-display--line-height: 1.1;
   --text-titulo: 1.5rem;
   --text-titulo--line-height: 1.25;
 
-  --radius-campo: 9px;
-  --radius-tarjeta: 12px;
-
-  /*
-    Marca nueva (landing). Convive con la de arriba mientras el resto de la
-    aplicación se migra en su propia rama; cuando termine, la anterior se va.
-
-    Los nombres vienen del handoff de diseño (diseno/localcl-diseno). Los
-    radios no se llaman sm/md/lg porque esos nombres ya son de Tailwind y
-    redefinirlos cambiaría rounded-lg en pantallas que no son la landing.
-  */
   --color-noche: #0b2a5b; /* títulos, texto, pie de página */
   --color-primario: #1d4ed8; /* botones, logo, enlaces */
   --color-cielo: #3b82f6; /* acentos: nunca debajo de texto */
@@ -80,7 +41,7 @@
   --color-borde: #e3eaf6;
   --color-borde-fuerte: #c9d7ef; /* chips, botón secundario, puntos inactivos */
 
-  /* Tonos que solo aparecen sobre el fondo noche (llamado final y pie). */
+  /* Tonos que solo aparecen sobre el fondo noche (panel de acceso, llamado final y pie). */
   --color-noche-texto: #c7d6f2; /* 9.6:1 sobre noche */
   --color-noche-borde: #23457d;
   --color-noche-contorno: #5f82c4;
@@ -96,6 +57,7 @@
   --radius-chico: 10px;
   --radius-medio: 16px;
   --radius-grande: 24px;
+  --radius-boton: 12px; /* botones grandes y buscador */
 
   /* Las sombras se tiñen de noche en vez de negro, para que no ensucien. */
   --shadow-flotante: 0 10px 24px rgb(11 42 91 / 0.1);
@@ -153,7 +115,8 @@
 
 @layer base {
   html {
-    font-family: var(--font-cuerpo);
+    font-family: var(--font-texto);
+    color: var(--color-noche);
   }
 
   /* Los enlaces #servicios, #como-funciona... se deslizan en vez de saltar. */

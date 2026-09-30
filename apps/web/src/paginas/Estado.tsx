@@ -70,10 +70,10 @@ export default function PaginaEstado() {
     <Pagina titulo="Estado del servidor">
       <div className="mt-6" role="status" aria-live="polite">
         {estado.tipo === "cargando" && (
-          <div className="rounded-campo bg-piedra-50 p-4 text-piedra-700">
+          <div className="rounded-chico bg-niebla p-4 text-noche">
             <p>Cargando…</p>
             {avisoDespertando && (
-              <p className="mt-2 text-sm text-piedra-500">
+              <p className="mt-2 text-sm text-texto-suave">
                 El servidor se está despertando, esto puede tardar hasta un minuto.
               </p>
             )}
@@ -81,7 +81,7 @@ export default function PaginaEstado() {
         )}
 
         {estado.tipo === "ok" && (
-          <div className="rounded-campo border border-exito-700/20 bg-exito-50 p-4 text-exito-700">
+          <div className="rounded-chico border border-exito-700/20 bg-exito-50 p-4 text-exito-700">
             <p className="font-semibold">Todo OK</p>
             <p className="mt-1 text-sm">API: {estado.datos.estado}</p>
             <p className="text-sm">Base de datos: {estado.datos.baseDatos}</p>
@@ -91,7 +91,7 @@ export default function PaginaEstado() {
 
         {/* Ocre y no el ámbar de marca: ese color ya significa "acción". */}
         {estado.tipo === "degradado" && (
-          <div className="rounded-campo border border-alerta-700/20 bg-alerta-50 p-4 text-alerta-700">
+          <div className="rounded-chico border border-alerta-700/20 bg-alerta-50 p-4 text-alerta-700">
             <p className="font-semibold">Servicio degradado</p>
             <p className="mt-1 text-sm">API: {estado.datos.estado}</p>
             <p className="text-sm">Base de datos: {estado.datos.baseDatos}</p>
@@ -99,7 +99,7 @@ export default function PaginaEstado() {
         )}
 
         {estado.tipo === "error" && (
-          <div className="rounded-campo border border-error-700/20 bg-error-50 p-4 text-error-700">
+          <div className="rounded-chico border border-error-700/20 bg-error-50 p-4 text-error-700">
             <p className="font-semibold">Sin conexión con el servidor</p>
             <p className="mt-1 text-sm">No fue posible contactar la API.</p>
           </div>
@@ -110,22 +110,22 @@ export default function PaginaEstado() {
         Reintentar
       </Boton>
 
-      <nav className="mt-6 flex justify-center gap-5 border-t border-piedra-100 pt-5 text-sm">
+      <nav className="mt-6 flex justify-center gap-5 border-t border-borde pt-5 text-sm">
         <Link
           to="/registro"
-          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-medium text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Crear cuenta
         </Link>
         <Link
           to="/iniciar-sesion"
-          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-medium text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Iniciar sesión
         </Link>
         <Link
           to="/perfil"
-          className="font-medium text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-medium text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Mi perfil
         </Link>

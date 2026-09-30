@@ -4,7 +4,7 @@ import { LogoLocalCL } from "../LogoLocalCL";
 import { CategoriaCard } from "./CategoriaCard";
 import { Contenedor, Sobretitulo } from "./Contenedor";
 import { CATEGORIAS, GRUPOS_CATEGORIAS } from "./datos";
-import { Icono } from "./iconos";
+import { Icono } from "../iconos";
 import { useEtapaScroll, type Etapa } from "./useEtapaScroll";
 
 const ETAPAS: Etapa[] = [0, 1, 2];

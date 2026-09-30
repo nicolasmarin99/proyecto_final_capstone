@@ -9,8 +9,7 @@ interface Props {
 
 /**
  * Logo de la marca nueva: una lupa con un destello, porque lo primero que se
- * hace en LocalCL es buscar. Reemplazará a Marca cuando el resto de la
- * aplicación se migre.
+ * hace en LocalCL es buscar. Es el único logo de la aplicación.
  *
  * El SVG es decorativo (aria-hidden): el nombre "LocalCL" va como texto al
  * lado, y es lo que lee un lector de pantalla.

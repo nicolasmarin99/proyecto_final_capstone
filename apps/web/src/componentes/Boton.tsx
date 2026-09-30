@@ -5,22 +5,29 @@ type Props = ComponentProps<"button"> & {
 };
 
 /**
- * El botón principal va en ámbar sobre texto azul oscuro. Es el único lugar
- * de la interfaz donde el ámbar ocupa un área grande, y por eso el ojo lo
- * encuentra sin buscarlo.
+ * Botón de formulario con los mismos estilos que los botones de la landing:
+ * el principal en azul primario (6.7:1 con el texto blanco) y el secundario
+ * con contorno. Al pasar el mouse el principal se oscurece a noche.
  *
  * Alto mínimo de 48px para que sea un objetivo táctil cómodo.
  */
 export function Boton({ variante = "principal", className = "", ...resto }: Props) {
+  return <button className={`${clasesBoton(variante)} w-full cursor-pointer ${className}`} {...resto} />;
+}
+
+/**
+ * Las mismas clases, para los enlaces que se ven como botón (por ejemplo
+ * "Ir a iniciar sesión"). Un enlace que navega tiene que ser <a>, no
+ * <button>, aunque se vea igual: así se puede abrir en otra pestaña y el
+ * lector de pantalla lo anuncia como enlace.
+ */
+export function clasesBoton(variante: "principal" | "secundario" = "principal"): string {
   const base =
-    "w-full min-h-12 rounded-campo px-4 text-[15px] font-semibold transition " +
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500 " +
+    "flex min-h-12 items-center justify-center rounded-boton px-4 text-[15px] font-bold transition-colors " +
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario " +
     "disabled:cursor-not-allowed disabled:opacity-60";
 
-  const estilos =
-    variante === "principal"
-      ? "bg-acento-400 text-marca-950 hover:bg-[#d9a52f]"
-      : "border border-piedra-300 bg-white text-marca-900 hover:bg-piedra-50";
-
-  return <button className={`${base} ${estilos} ${className}`} {...resto} />;
+  return variante === "principal"
+    ? `${base} bg-primario text-blanco hover:bg-noche disabled:hover:bg-primario`
+    : `${base} border border-borde-fuerte bg-blanco text-primario hover:bg-hielo`;
 }

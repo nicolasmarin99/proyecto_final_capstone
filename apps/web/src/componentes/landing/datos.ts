@@ -1,4 +1,4 @@
-import type { NombreIcono } from "./iconos";
+import type { NombreIcono } from "../iconos";
 
 /**
  * Contenido de la landing separado del marcado. Agregar una categoría o

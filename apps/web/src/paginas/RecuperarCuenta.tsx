@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
-import { Boton } from "../componentes/Boton";
+import { Boton, clasesBoton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
 
@@ -37,18 +37,18 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
       <PaginaAuth sobretitulo="Recuperar cuenta" titulo="Revisa tu correo">
         <div
           role="status"
-          className="mt-6 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Si el correo tiene una cuenta, te enviamos un enlace para recuperarla.
         </div>
 
-        <p className="mt-4 text-sm text-piedra-500">
+        <p className="mt-4 text-sm text-texto-suave">
           El enlace sirve una sola vez y vence en 30 minutos.
         </p>
 
         <Link
           to="/iniciar-sesion"
-          className="mt-7 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+          className={`mt-7 ${clasesBoton("secundario")}`}
         >
           Volver a iniciar sesión
         </Link>
@@ -66,7 +66,7 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -86,11 +86,11 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
         </Boton>
       </form>
 
-      <p className="mt-7 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <p className="mt-7 border-t border-borde pt-5 text-sm text-texto-suave">
         ¿Te acordaste?{" "}
         <Link
           to="/iniciar-sesion"
-          className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Iniciar sesión
         </Link>

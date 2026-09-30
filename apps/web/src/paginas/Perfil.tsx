@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
-import { Boton } from "../componentes/Boton";
+import { Boton, clasesBoton } from "../componentes/Boton";
 import { Pagina } from "../componentes/Pagina";
 
 export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: ClienteApi }) {
@@ -46,20 +46,20 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         {error && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {error}
           </p>
         )}
 
-        {!error && !perfil && <p className="text-sm text-piedra-500">Cargando tu perfil…</p>}
+        {!error && !perfil && <p className="text-sm text-texto-suave">Cargando tu perfil…</p>}
 
         {/*
           Solo cuando la API dice explícitamente que NO está verificado. Si el
           dato no viniera, callar es mejor que acusar a quien sí lo confirmó.
         */}
         {perfil?.correoVerificado === false && (
-          <div className="mb-4 rounded-campo border border-alerta-700/20 bg-alerta-50 px-4 py-3 text-sm text-alerta-700">
+          <div className="mb-4 rounded-chico border border-alerta-700/20 bg-alerta-50 px-4 py-3 text-sm text-alerta-700">
             <p className="font-semibold">Tu correo no está confirmado</p>
             <p className="mt-1">
               Hasta que lo confirmes no puedes publicar servicios ni dejar valoraciones. Busca el
@@ -69,18 +69,18 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         )}
 
         {perfil && (
-          <dl className="rounded-campo border border-piedra-100 bg-piedra-50 p-4 text-sm">
+          <dl className="rounded-chico border border-borde bg-niebla p-4 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-piedra-500">Nombre</dt>
-              <dd className="font-medium text-marca-900">{perfil.nombre}</dd>
+              <dt className="text-texto-suave">Nombre</dt>
+              <dd className="font-medium text-noche">{perfil.nombre}</dd>
             </div>
             <div className="mt-2.5 flex justify-between gap-4">
-              <dt className="text-piedra-500">Correo</dt>
-              <dd className="font-medium text-marca-900">{perfil.correo}</dd>
+              <dt className="text-texto-suave">Correo</dt>
+              <dd className="font-medium text-noche">{perfil.correo}</dd>
             </div>
             <div className="mt-2.5 flex justify-between gap-4">
-              <dt className="text-piedra-500">Rol</dt>
-              <dd className="font-medium text-marca-900">{perfil.rol}</dd>
+              <dt className="text-texto-suave">Rol</dt>
+              <dd className="font-medium text-noche">{perfil.rol}</dd>
             </div>
           </dl>
         )}
@@ -95,7 +95,7 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
       */}
       <Link
         to="/cambiar-contrasena"
-        className="mt-6 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+        className={`mt-6 ${clasesBoton("secundario")}`}
       >
         Cambiar contraseña
       </Link>
@@ -103,7 +103,7 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
       {perfil?.rol === "ADMINISTRADOR" && (
         <Link
           to="/admin"
-          className="mt-3 flex min-h-12 items-center justify-center rounded-campo border border-piedra-300 px-4 text-sm font-semibold text-marca-900 transition hover:bg-piedra-50"
+          className={`mt-3 ${clasesBoton("secundario")}`}
         >
           Panel de administración
         </Link>

@@ -72,7 +72,7 @@ export default function PaginaCambiarContrasena({
       {listo && (
         <p
           role="status"
-          className="mt-6 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Tu contraseña fue actualizada. Cerramos las demás sesiones y esta sigue abierta.
         </p>
@@ -82,7 +82,7 @@ export default function PaginaCambiarContrasena({
         {errorGeneral && (
           <p
             role="alert"
-            className="mt-4 rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="mt-4 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -113,10 +113,10 @@ export default function PaginaCambiarContrasena({
         </Boton>
       </form>
 
-      <p className="mt-6 border-t border-piedra-100 pt-5 text-center text-sm text-piedra-500">
+      <p className="mt-6 border-t border-borde pt-5 text-center text-sm text-texto-suave">
         <Link
           to="/perfil"
-          className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+          className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
         >
           Volver a mi perfil
         </Link>

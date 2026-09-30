@@ -70,7 +70,7 @@ export default function PaginaIniciarSesion() {
       {mensajeExito && (
         <p
           role="status"
-          className="mt-6 rounded-campo border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           {mensajeExito}
         </p>
@@ -80,7 +80,7 @@ export default function PaginaIniciarSesion() {
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-campo border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -108,7 +108,7 @@ export default function PaginaIniciarSesion() {
         <p className="mt-3 text-right text-sm">
           <Link
             to="/recuperar-cuenta"
-            className="font-medium text-piedra-500 underline underline-offset-2 hover:text-acento-600"
+            className="font-medium text-texto-suave underline underline-offset-2 hover:text-primario"
           >
             ¿Olvidaste tu contraseña?
           </Link>
@@ -119,12 +119,12 @@ export default function PaginaIniciarSesion() {
         </Boton>
       </form>
 
-      <div className="mt-7 space-y-2 border-t border-piedra-100 pt-5 text-sm text-piedra-500">
+      <div className="mt-7 space-y-2 border-t border-borde pt-5 text-sm text-texto-suave">
         <p>
           ¿No tienes cuenta?{" "}
           <Link
             to="/registro"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+            className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
           >
             Crear cuenta
           </Link>
@@ -133,7 +133,7 @@ export default function PaginaIniciarSesion() {
           ¿Ofreces servicios?{" "}
           <Link
             to="/registro-prestador"
-            className="font-semibold text-marca-900 underline decoration-acento-400 decoration-2 underline-offset-2 hover:text-acento-600"
+            className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
           >
             Registrarme como prestador
           </Link>
