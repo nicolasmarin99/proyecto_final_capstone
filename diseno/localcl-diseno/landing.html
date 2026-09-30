@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>LocalCL — Landing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'DM Sans',system-ui,sans-serif;color:#0B2A5B;background:#FFFFFF}
+a{color:#1D4ED8;text-decoration:none}a:hover{color:#0B2A5B}
+@keyframes ds-pan{from{background-position:0 0}to{background-position:280px 140px}}
+@keyframes ds-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-22px) rotate(3deg)}}
+@keyframes ds-pulse{0%{transform:scale(.4);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+@keyframes ds-drift{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,-40px)}}
+.ds-grid{animation:ds-pan 22s linear infinite}
+.ds-float{animation:ds-float 6s ease-in-out infinite}
+.ds-pulse{animation:ds-pulse 2.8s ease-out infinite}
+.ds-drift{animation:ds-drift 14s ease-in-out infinite}
+.cat-stage{transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
+.cat-in{opacity:1;transform:translateY(0);pointer-events:auto}
+.cat-above{opacity:0;transform:translateY(-60px);pointer-events:none}
+.cat-below{opacity:0;transform:translateY(60px);pointer-events:none}
+.cat-dot{background:#C9D7EF;transition:background .3s,transform .3s}
+.cat-dot-on{background:#1D4ED8;transform:scale(1.3)}
+.cat-hint{transition:opacity .4s}.cat-hint-off{opacity:0}
+@media (prefers-reduced-motion: reduce){.cat-stage{transition:opacity .2s;transform:none}}
+@media (prefers-reduced-motion: reduce){.ds-grid,.ds-float,.ds-pulse,.ds-drift{animation:none}}
+</style>
+</head>
+<body>
+<div style="width: 100%; min-width: 1280px; box-sizing: border-box; display: flex; flex-direction: column; background: #FFFFFF; font-family: 'DM Sans', system-ui, sans-serif; color: #0B2A5B">
+
+<!-- NAV -->
+<header style="height: 84px; box-sizing: border-box; padding: 0 96px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E3EAF6; background: #FFFFFF">
+<a href="#" style="display: flex; align-items: center; gap: 12px">
+<svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#1D4ED8"></rect><circle cx="21" cy="21" r="9" fill="none" stroke="#FFFFFF" stroke-width="4"></circle><path d="M28 28l8 8" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"></path><path d="M21 15.5l1.6 3.9 3.9 1.6-3.9 1.6-1.6 3.9-1.6-3.9-3.9-1.6 3.9-1.6z" fill="#93C5FD"></path></svg>
+<span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.5px; color: #0B2A5B">LocalCL</span>
+</a>
+<nav style="display: flex; align-items: center; gap: 36px; font-size: 16px; font-weight: 500">
+<a href="#servicios" style="color: #0B2A5B">Servicios</a>
+<a href="#como-funciona" style="color: #0B2A5B">Cómo funciona</a>
+<a href="#prestadores" style="color: #0B2A5B">Para prestadores</a>
+</nav>
+<div style="display: flex; align-items: center; gap: 12px">
+<a href="#" style="height: 44px; padding: 0 20px; display: flex; align-items: center; border-radius: 10px; font-weight: 600; font-size: 15px; color: #1D4ED8">Iniciar sesión</a>
+<a href="#prestadores" style="height: 44px; padding: 0 22px; display: flex; align-items: center; border-radius: 10px; font-weight: 700; font-size: 15px; background: #1D4ED8; color: #FFFFFF">Publica tu servicio</a>
+</div>
+</header>
+
+<!-- HERO -->
+<section style="position: relative; overflow: hidden; padding: 96px 96px 112px; display: flex; align-items: center; gap: 72px; background: #F4F7FC">
+
+<!-- Fondo animado en loop -->
+<div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none">
+<div class="ds-grid" style="position: absolute; inset: 0; background-image: radial-gradient(#BFD3F5 1.4px, transparent 1.6px); background-size: 28px 28px; opacity: 0.9"></div>
+<div class="ds-drift" style="position: absolute; left: 520px; top: -160px; width: 520px; height: 520px; border-radius: 999px; background: #DBEAFE; opacity: 0.8"></div>
+<div class="ds-drift" style="position: absolute; left: 1060px; top: 480px; width: 420px; height: 420px; border-radius: 999px; background: #E3ECFB; animation-delay: -7s"></div>
+
+<div style="position: absolute; left: 640px; top: 120px; width: 18px; height: 18px"><div class="ds-pulse" style="position: absolute; inset: 0; border-radius: 999px; background: #3B82F6"></div><div style="position: absolute; inset: 5px; border-radius: 999px; background: #1D4ED8"></div></div>
+<div style="position: absolute; left: 860px; top: 690px; width: 18px; height: 18px"><div class="ds-pulse" style="position: absolute; inset: 0; border-radius: 999px; background: #3B82F6; animation-delay: -1s"></div><div style="position: absolute; inset: 5px; border-radius: 999px; background: #1D4ED8"></div></div>
+<div style="position: absolute; left: 1360px; top: 90px; width: 18px; height: 18px"><div class="ds-pulse" style="position: absolute; inset: 0; border-radius: 999px; background: #3B82F6; animation-delay: -1.8s"></div><div style="position: absolute; inset: 5px; border-radius: 999px; background: #1D4ED8"></div></div>
+<div style="position: absolute; left: 60px; top: 760px; width: 18px; height: 18px"><div class="ds-pulse" style="position: absolute; inset: 0; border-radius: 999px; background: #3B82F6; animation-delay: -0.6s"></div><div style="position: absolute; inset: 5px; border-radius: 999px; background: #1D4ED8"></div></div>
+
+<div class="ds-float" style="position: absolute; left: 760px; top: 60px; width: 56px; height: 56px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 10px 24px rgba(11,42,91,0.10); color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"></path></svg></div>
+<div class="ds-float" style="position: absolute; left: 780px; top: 560px; width: 56px; height: 56px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 10px 24px rgba(11,42,91,0.10); color: #1D4ED8; display: flex; align-items: center; justify-content: center; animation-delay: -2s"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5"></path><path d="M12 7l5 5-9 9-5-5z"></path></svg></div>
+<div class="ds-float" style="position: absolute; left: 1300px; top: 640px; width: 56px; height: 56px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 10px 24px rgba(11,42,91,0.10); color: #1D4ED8; display: flex; align-items: center; justify-content: center; animation-delay: -4s"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"></path><path d="M5 18a7 7 0 0 1 14 0"></path><path d="M12 11V8"></path><path d="M10 8h4"></path></svg></div>
+<div class="ds-float" style="position: absolute; left: 1330px; top: 190px; width: 48px; height: 48px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 10px 24px rgba(11,42,91,0.10); color: #1D4ED8; display: flex; align-items: center; justify-content: center; animation-delay: -3s"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"></path></svg></div>
+<div class="ds-float" style="position: absolute; left: 30px; top: 40px; width: 48px; height: 48px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 10px 24px rgba(11,42,91,0.10); color: #1D4ED8; display: flex; align-items: center; justify-content: center; animation-delay: -1s"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l9-9"></path><path d="M17 6l3 3"></path></svg></div>
+</div>
+
+<div style="position: relative; z-index: 1; flex: 1 1 0; display: flex; flex-direction: column; gap: 28px">
+<div style="align-self: flex-start; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #DBEAFE; color: #1D4ED8; font-size: 14px; font-weight: 700">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
+Servicios cerca de ti
+</div>
+<h1 style="margin: 0; font-family: Sora, sans-serif; font-weight: 800; font-size: 64px; line-height: 1.05; letter-spacing: -2px; color: #0B2A5B">Encuentra al experto que tu hogar necesita.</h1>
+<p style="margin: 0; max-width: 560px; font-size: 20px; line-height: 1.55; color: #3D5478">Gasfíteres, electricistas, carpinteros, banqueteras y más. Revisa sus certificados y lo que opinan sus clientes antes de contactarlos.</p>
+
+<form style="margin-top: 8px; display: flex; align-items: center; gap: 8px; padding: 8px; background: #FFFFFF; border: 1px solid #D5E0F2; border-radius: 16px; box-shadow: 0 12px 32px rgba(11,42,91,0.08)">
+<label style="flex: 1 1 0; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 56px; border-right: 1px solid #E3EAF6">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Servicio</span>
+<input type="text" placeholder="¿Qué necesitas? Ej: gasfiter" style="flex: 1 1 0; border: 0; outline: none; font: inherit; font-size: 17px; color: #0B2A5B; background: transparent">
+</label>
+<label style="width: 220px; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 56px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Comuna</span>
+<input type="text" placeholder="Comuna" style="flex: 1 1 0; width: 100%; border: 0; outline: none; font: inherit; font-size: 17px; color: #0B2A5B; background: transparent">
+</label>
+<button type="submit" style="height: 56px; padding: 0 28px; border: 0; border-radius: 12px; background: #1D4ED8; color: #FFFFFF; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer">Buscar</button>
+</form>
+
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; color: #3D5478">
+<span>Populares:</span>
+<a href="#" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #C9D7EF; background: #FFFFFF; color: #0B2A5B">Gasfitería</a>
+<a href="#" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #C9D7EF; background: #FFFFFF; color: #0B2A5B">Electricidad</a>
+<a href="#" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #C9D7EF; background: #FFFFFF; color: #0B2A5B">Banquetería</a>
+<a href="#" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #C9D7EF; background: #FFFFFF; color: #0B2A5B">Carpintería</a>
+</div>
+</div>
+
+<!-- Hero video -->
+<div style="position: relative; z-index: 1; width: 540px; display: flex; flex-direction: column">
+<video src="hero.mp4" autoplay="" muted="" loop="" playsinline="" aria-label="Animación de LocalCL: el logo rodeado de íconos de oficios" style="display: block; width: 540px; height: 402px; object-fit: cover; border-radius: 24px; border: 1px solid #E3EAF6; box-shadow: 0 24px 56px rgba(11,42,91,0.12); background: #DBEAFE"></video>
+</div>
+</section>
+
+<!-- CATEGORIES (scroll-driven: 3 categorías → 3 más → logo) -->
+<section id="servicios" data-scroll-categorias style="position: relative; height: 2400px; background: #FFFFFF">
+<div style="position: sticky; top: 0; height: 100vh; max-height: 860px; min-height: 680px; box-sizing: border-box; padding: 88px 96px 72px; display: flex; flex-direction: column; gap: 48px; overflow: hidden">
+<div style="display: flex; align-items: flex-end; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 14px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #1D4ED8">Categorías</div>
+<h2 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -1px">¿Qué servicio buscas hoy?</h2>
+</div>
+<div style="display: flex; align-items: center; gap: 28px">
+<div aria-hidden="true" style="display: flex; gap: 8px"><div class="cat-dot cat-dot-on" data-punto="0" style="width: 10px; height: 10px; border-radius: 999px"></div><div class="cat-dot" data-punto="1" style="width: 10px; height: 10px; border-radius: 999px"></div><div class="cat-dot" data-punto="2" style="width: 10px; height: 10px; border-radius: 999px"></div></div>
+<a href="#" style="font-weight: 700; font-size: 16px">Ver todas las categorías →</a>
+</div>
+</div>
+<div style="position: relative; flex-grow: 1">
+<div class="cat-stage cat-in" data-etapa="0" style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-content: start">
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Gasfitería</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Filtraciones, calefont, grifería y destapes.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Electricidad</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Instalaciones, enchufes, tableros y luminarias.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18"></path><path d="M5 18a7 7 0 0 1 14 0"></path><path d="M12 11V8"></path><path d="M10 8h4"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Banquetería</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Cócteles, cumpleaños, matrimonios y eventos.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+</div>
+<div class="cat-stage cat-below" data-etapa="1" style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-content: start">
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .5 2 1.5 3 2.5 3 0-3-1-5 0-8z"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Soldadura</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Rejas, portones, estructuras y reparaciones.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4l5 5"></path><path d="M12 7l5 5-9 9-5-5z"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Carpintería</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Muebles a medida, puertas y terminaciones.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+<a href="#" style="padding: 40px; border-radius: 28px; border: 1px solid #E3EAF6; background: #FFFFFF; box-shadow: 0 16px 40px rgba(11,42,91,0.08); display: flex; flex-direction: column; gap: 28px; color: #0B2A5B">
+<div style="width: 80px; height: 80px; border-radius: 20px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l9-9"></path><path d="M17 6l3 3"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 28px">Cerrajería</div><div style="font-size: 17px; line-height: 1.55; color: #3D5478">Aperturas, cambio de chapas y copias.</div></div>
+<div style="font-weight: 700; font-size: 16px; color: #1D4ED8">Ver prestadores →</div>
+</a>
+</div>
+<div class="cat-stage cat-below" data-etapa="2" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px">
+<div style="display: flex; align-items: center; gap: 24px">
+<svg width="120" height="120" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#1D4ED8"></rect><circle cx="21" cy="21" r="9" fill="none" stroke="#FFFFFF" stroke-width="4"></circle><path d="M28 28l8 8" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"></path><path d="M21 15.5l1.6 3.9 3.9 1.6-3.9 1.6-1.6 3.9-1.6-3.9-3.9-1.6 3.9-1.6z" fill="#93C5FD"></path></svg>
+<span style="font-family: Sora, sans-serif; font-weight: 800; font-size: 96px; letter-spacing: -3px; color: #0B2A5B">LocalCL</span>
+</div>
+</div>
+</div>
+<div class="cat-hint" data-hint="" style="align-self: center; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #5B6F90">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M6 13l6 6 6-6"></path></svg>
+Sigue bajando para ver más
+</div>
+</div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="como-funciona" style="padding: 112px 96px; background: #F4F7FC; display: flex; flex-direction: column; gap: 56px">
+<div style="display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center">
+<div style="font-size: 14px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #1D4ED8">Cómo funciona</div>
+<h2 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -1px">Resuelve en tres pasos</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<div style="padding: 36px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 48px; height: 48px; border-radius: 999px; background: #1D4ED8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: Sora, sans-serif; font-weight: 700; font-size: 20px">1</div>
+<h3 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 24px">Busca</h3>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #3D5478">Escribe lo que necesitas y tu comuna. Te mostramos prestadores que atienden en tu zona.</p>
+</div>
+<div style="padding: 36px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 48px; height: 48px; border-radius: 999px; background: #1D4ED8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: Sora, sans-serif; font-weight: 700; font-size: 20px">2</div>
+<h3 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 24px">Compara</h3>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #3D5478">Revisa perfiles, certificados y comentarios de otros clientes para elegir con confianza.</p>
+</div>
+<div style="padding: 36px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 48px; height: 48px; border-radius: 999px; background: #1D4ED8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: Sora, sans-serif; font-weight: 700; font-size: 20px">3</div>
+<h3 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 24px">Contacta</h3>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #3D5478">Escríbele directamente al prestador, coordina el trabajo y deja tu reseña al terminar.</p>
+</div>
+</div>
+</section>
+
+<!-- PROVIDERS -->
+<section id="prestadores" style="padding: 112px 96px; display: flex; align-items: center; gap: 80px">
+<div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 24px">
+<div style="font-size: 14px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #1D4ED8">Para prestadores</div>
+<h2 style="margin: 0; font-family: Sora, sans-serif; font-weight: 700; font-size: 44px; line-height: 1.12; letter-spacing: -1px">¿Ofreces un servicio? Haz que te encuentren.</h2>
+<p style="margin: 0; max-width: 540px; font-size: 19px; line-height: 1.55; color: #3D5478">Crea tu perfil, sube tus certificados y muestra tus trabajos. Los clientes de tu comuna te contactan directamente.</p>
+<div style="display: flex; gap: 12px; margin-top: 8px">
+<a href="#" style="height: 52px; padding: 0 28px; display: flex; align-items: center; border-radius: 12px; background: #1D4ED8; color: #FFFFFF; font-weight: 700; font-size: 17px">Publicar mi servicio</a>
+<a href="#" style="height: 52px; padding: 0 24px; display: flex; align-items: center; border-radius: 12px; border: 1px solid #C9D7EF; color: #1D4ED8; font-weight: 700; font-size: 17px">Saber más</a>
+</div>
+</div>
+<div style="width: 580px; display: flex; flex-direction: column; gap: 16px">
+<div style="padding: 24px 28px; border-radius: 20px; border: 1px solid #E3EAF6; display: flex; gap: 20px; align-items: flex-start">
+<div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px">Perfil profesional</div><div style="font-size: 16px; line-height: 1.5; color: #3D5478">Describe tu oficio, zonas de atención y horarios.</div></div>
+</div>
+<div style="padding: 24px 28px; border-radius: 20px; border: 1px solid #E3EAF6; display: flex; gap: 20px; align-items: flex-start">
+<div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V6z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px">Certificados verificados</div><div style="font-size: 16px; line-height: 1.5; color: #3D5478">Sube tus certificaciones (por ejemplo, SEC) y gana la confianza de los clientes.</div></div>
+</div>
+<div style="padding: 24px 28px; border-radius: 20px; border: 1px solid #E3EAF6; display: flex; gap: 20px; align-items: flex-start">
+<div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px">Reseñas de clientes</div><div style="font-size: 16px; line-height: 1.5; color: #3D5478">Cada trabajo terminado suma comentarios que respaldan tu reputación.</div></div>
+</div>
+</div>
+</section>
+
+<!-- FINAL CTA + FOOTER -->
+<div style="flex-grow: 1; display: flex; flex-direction: column; background: #0B2A5B; color: #FFFFFF">
+<section style="flex-grow: 1; padding: 112px 96px 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center">
+<h2 style="margin: 0; max-width: 820px; font-family: Sora, sans-serif; font-weight: 700; font-size: 48px; line-height: 1.12; letter-spacing: -1px; color: #FFFFFF">El servicio que necesitas, a una búsqueda de distancia.</h2>
+<p style="margin: 0; max-width: 620px; font-size: 19px; line-height: 1.55; color: #C7D6F2">Únete a LocalCL como cliente o como prestador.</p>
+<div style="display: flex; gap: 12px; margin-top: 8px">
+<a href="#" style="height: 54px; padding: 0 30px; display: flex; align-items: center; border-radius: 12px; background: #FFFFFF; color: #0B2A5B; font-weight: 700; font-size: 17px">Buscar un servicio</a>
+<a href="#prestadores" style="height: 54px; padding: 0 30px; display: flex; align-items: center; border-radius: 12px; border: 1px solid #5F82C4; color: #FFFFFF; font-weight: 700; font-size: 17px">Publicar mi servicio</a>
+</div>
+</section>
+<footer style="padding: 40px 96px; border-top: 1px solid #23457D; display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: #C7D6F2">
+<div style="display: flex; align-items: center; gap: 12px">
+<svg width="32" height="32" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#FFFFFF"></rect><circle cx="21" cy="21" r="9" fill="none" stroke="#1D4ED8" stroke-width="4"></circle><path d="M28 28l8 8" stroke="#1D4ED8" stroke-width="4.5" stroke-linecap="round"></path><path d="M21 15.5l1.6 3.9 3.9 1.6-3.9 1.6-1.6 3.9-1.6-3.9-3.9-1.6 3.9-1.6z" fill="#3B82F6"></path></svg>
+<span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 20px; color: #FFFFFF">LocalCL</span>
+</div>
+<nav style="display: flex; gap: 28px">
+<a href="#" style="color: #C7D6F2">Términos</a>
+<a href="#" style="color: #C7D6F2">Privacidad</a>
+<a href="#" style="color: #C7D6F2">Contacto</a>
+</nav>
+<div>© 2026 LocalCL&nbsp;</div>
+</footer>
+</div>
+
+</div>
+<script>
+// Categorías guiadas por scroll: 3 categorías -> 3 más -> logo
+(function () {
+  var sec = document.querySelector('[data-scroll-categorias]');
+  if (!sec) return;
+  var etapas = sec.querySelectorAll('[data-etapa]');
+  var puntos = sec.querySelectorAll('[data-punto]');
+  var hint = sec.querySelector('[data-hint]');
+  var actual = -1;
+  function pintar(e) {
+    etapas.forEach(function (el) {
+      var i = Number(el.dataset.etapa);
+      el.className = 'cat-stage ' + (e === i ? 'cat-in' : (e > i ? 'cat-above' : 'cat-below'));
+    });
+    puntos.forEach(function (el) {
+      el.className = 'cat-dot' + (Number(el.dataset.punto) === e ? ' cat-dot-on' : '');
+    });
+    if (hint) hint.className = 'cat-hint' + (e === 2 ? ' cat-hint-off' : '');
+  }
+  function alScroll() {
+    var r = sec.getBoundingClientRect();
+    var pin = sec.firstElementChild.offsetHeight;
+    var p = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - pin)));
+    var e = p < 0.34 ? 0 : (p < 0.72 ? 1 : 2);
+    if (e !== actual) { actual = e; pintar(e); }
+  }
+  window.addEventListener('scroll', alScroll, { passive: true });
+  window.addEventListener('resize', alScroll);
+  alScroll();
+})();
+</script>
+</body>
+</html>

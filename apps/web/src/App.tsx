@@ -1,9 +1,11 @@
 import { Route, Routes } from "react-router";
 import { RutaProtegida } from "./componentes/RutaProtegida";
 import PaginaAdmin from "./paginas/Admin";
+import PaginaBuscar from "./paginas/Buscar";
 import PaginaCambiarContrasena from "./paginas/CambiarContrasena";
 import PaginaEstado from "./paginas/Estado";
 import PaginaIniciarSesion from "./paginas/IniciarSesion";
+import PaginaInicio from "./paginas/Inicio";
 import PaginaPerfil from "./paginas/Perfil";
 import PaginaRecuperarCuenta from "./paginas/RecuperarCuenta";
 import PaginaRegistro from "./paginas/Registro";
@@ -15,7 +17,9 @@ import PaginaVerificarCorreo from "./paginas/VerificarCorreo";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<PaginaEstado />} />
+      <Route path="/" element={<PaginaInicio />} />
+      <Route path="/buscar" element={<PaginaBuscar />} />
+      <Route path="/estado" element={<PaginaEstado />} />
       <Route path="/registro" element={<PaginaRegistro />} />
       <Route path="/registro-prestador" element={<PaginaRegistroPrestador />} />
       <Route path="/iniciar-sesion" element={<PaginaIniciarSesion />} />
