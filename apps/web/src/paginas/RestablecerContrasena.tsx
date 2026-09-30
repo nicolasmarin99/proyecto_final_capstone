@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton, clasesBoton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -77,7 +78,7 @@ export default function PaginaRestablecerContrasena({
       <PaginaAuth sobretitulo="Recuperar cuenta" titulo="Contraseña actualizada">
         <div
           role="status"
-          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Tu contraseña fue actualizada. Cerramos todas las sesiones abiertas, así que tendrás que
           entrar de nuevo.
@@ -103,7 +104,7 @@ export default function PaginaRestablecerContrasena({
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -117,6 +118,7 @@ export default function PaginaRestablecerContrasena({
           valor={contrasena}
           alCambiar={setContrasena}
           error={errores.contrasena}
+          valido={confirmarReglas(contrasena)}
           ayuda="Mínimo 10 caracteres. No puede contener tu nombre ni tu correo."
         />
 
@@ -128,9 +130,10 @@ export default function PaginaRestablecerContrasena({
           valor={repeticion}
           alCambiar={setRepeticion}
           error={errores.repeticion}
+          valido={confirmarRepeticion(contrasena, repeticion)}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <Boton type="submit" cargando={enviando} className="mt-7">
           {enviando ? "Guardando…" : "Guardar contraseña"}
         </Boton>
       </form>

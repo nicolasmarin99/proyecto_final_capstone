@@ -56,7 +56,7 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
         {estado === "listo" && (
           <div
             role="status"
-            className="rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
           >
             Tu correo quedó confirmado. Ya puedes publicar servicios y dejar valoraciones.
           </div>
@@ -65,7 +65,7 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
         {estado === "invalido" && (
           <div
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm text-error-700"
           >
             Este enlace no es válido o ya expiró. Pide uno nuevo desde tu perfil o al iniciar
             sesión.

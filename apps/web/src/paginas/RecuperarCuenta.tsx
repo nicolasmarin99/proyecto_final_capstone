@@ -37,7 +37,7 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
       <PaginaAuth sobretitulo="Recuperar cuenta" titulo="Revisa tu correo">
         <div
           role="status"
-          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Si el correo tiene una cuenta, te enviamos un enlace para recuperarla.
         </div>
@@ -66,7 +66,7 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
         {errorGeneral && (
           <p
             role="alert"
-            className="rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -81,7 +81,7 @@ export default function PaginaRecuperarCuenta({ cliente = clienteApi }: { client
           alCambiar={setCorreo}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <Boton type="submit" cargando={enviando} className="mt-7">
           {enviando ? "Enviando…" : "Enviarme el enlace"}
         </Boton>
       </form>

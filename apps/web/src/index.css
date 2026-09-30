@@ -64,6 +64,7 @@
   --shadow-tarjeta: 0 16px 40px rgb(11 42 91 / 0.08);
   --shadow-buscador: 0 12px 32px rgb(11 42 91 / 0.08);
   --shadow-video: 0 24px 56px rgb(11 42 91 / 0.12);
+  --shadow-tarjeta-alta: 0 24px 48px rgb(11 42 91 / 0.14);
 
   /*
     Animaciones del fondo del hero. Cada --animate-x genera la clase
@@ -74,6 +75,27 @@
   --animate-flotar: ds-float 6s ease-in-out infinite;
   --animate-latido: ds-pulse 2.8s ease-out infinite;
   --animate-deriva: ds-drift 14s ease-in-out infinite;
+
+  /*
+    Entradas: una sola vez, con ease-out (rápido al inicio, frena al llegar),
+    que es como se mueve algo que se detiene de forma natural. "both" deja el
+    elemento invisible durante el retraso, así los escalonados no parpadean.
+  */
+  --animate-aparecer: aparecer 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-aparecer-corto: aparecer-corto 0.25s ease-out both;
+
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+  @keyframes aparecer-corto {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
 
   @keyframes ds-pan {
     from {
@@ -117,6 +139,24 @@
   html {
     font-family: var(--font-texto);
     color: var(--color-noche);
+  }
+
+  /*
+    Aparición al hacer scroll (ver Revelar.tsx). El estado oculto solo existe
+    si el JavaScript lo pidió (data-revelar="pendiente") y si la persona no
+    pidió reducir el movimiento: sin cualquiera de las dos cosas, el contenido
+    se ve de inmediato. Nunca queda texto escondido por un script que falló.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-revelar] {
+      transition:
+        opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+        transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    [data-revelar="pendiente"] {
+      opacity: 0;
+      transform: translateY(24px);
+    }
   }
 
   /* Los enlaces #servicios, #como-funciona... se deslizan en vez de saltar. */

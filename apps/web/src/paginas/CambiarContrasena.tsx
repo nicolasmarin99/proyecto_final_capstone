@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
@@ -84,7 +85,7 @@ export default function PaginaCambiarContrasena({
       {listo && (
         <p
           role="status"
-          className="mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
+          className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
         >
           Tu contraseña fue actualizada. Cerramos las demás sesiones y esta sigue abierta.
         </p>
@@ -94,7 +95,7 @@ export default function PaginaCambiarContrasena({
         {errorGeneral && (
           <p
             role="alert"
-            className="mt-4 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
+            className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700"
           >
             {errorGeneral}
           </p>
@@ -117,6 +118,7 @@ export default function PaginaCambiarContrasena({
           valor={nueva}
           alCambiar={setNueva}
           error={errores.contrasenaNueva}
+          valido={confirmarReglas(nueva, { correo: usuario?.correo, nombre: usuario?.nombre })}
           ayuda="Mínimo 10 caracteres. No puede contener tu nombre ni tu correo."
         />
 
@@ -128,9 +130,10 @@ export default function PaginaCambiarContrasena({
           valor={repeticion}
           alCambiar={setRepeticion}
           error={errores.repeticion}
+          valido={confirmarRepeticion(nueva, repeticion)}
         />
 
-        <Boton type="submit" disabled={enviando} className="mt-7">
+        <Boton type="submit" cargando={enviando} className="mt-7">
           {enviando ? "Guardando…" : "Cambiar contraseña"}
         </Boton>
       </form>
