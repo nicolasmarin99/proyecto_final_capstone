@@ -8,10 +8,9 @@ import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
  * PROVISIONAL — maniquí hasta el sprint de catálogo.
  *
  * Existe para que exigirCorreoVerificado esté montado sobre un endpoint real y
- * cubierto por pruebas, en vez de ser un middleware sin usar. No persiste nada
- * ni define el modelo de Servicio: esas decisiones son del sprint de catálogo y
- * tomarlas acá, solo para tener dónde colgar el middleware, dejaría una tabla
- * que después habría que deshacer.
+ * cubierto por pruebas, en vez de ser un middleware sin usar. No persiste nada:
+ * la tabla servicios ya existe (migración de catálogo), pero el módulo que la
+ * usa, con su esquema Zod en @localcl/shared y sus capas, es trabajo aparte.
  *
  * Cuando llegue el catálogo, este archivo se reemplaza por el módulo completo
  * con sus capas, y la línea de middlewares de la ruta se mantiene igual.
