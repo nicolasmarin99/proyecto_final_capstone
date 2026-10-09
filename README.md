@@ -217,6 +217,13 @@ docker exec localcl-db psql -U postgres -c "CREATE DATABASE localcl_test;"
 cp apps/api/.env.test.example apps/api/.env.test
 ```
 
+Y aplicarle las migraciones (las pruebas cargan sus propios datos maestros):
+
+```bash
+cd apps/api
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/localcl_test" npx prisma migrate deploy
+```
+
 > El archivo `.env` está excluido del repositorio mediante `.gitignore`. Nunca subas credenciales reales a GitHub.
 
 ### 4. Preparar el esquema y los datos de prueba
@@ -224,7 +231,8 @@ cp apps/api/.env.test.example apps/api/.env.test
 ```bash
 cd apps/api
 npx prisma migrate dev      # Crea las tablas
-npx prisma db seed          # Carga datos de prueba
+npm run seed:maestros       # Regiones, comunas, categorías, tipos de credencial y términos
+npx prisma db seed          # Carga datos de prueba (solo desarrollo)
 npx prisma studio           # (Opcional) Explorador visual de la BD
 ```
 

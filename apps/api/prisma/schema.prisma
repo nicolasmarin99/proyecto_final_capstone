@@ -1,6 +1,13 @@
-// LocalCL — Modelo de datos
-// Sprint 1: identidad y acceso. Las entidades de catálogo, credenciales
-// y valoraciones se agregan en sus sprints correspondientes.
+// LocalCL — Modelo de datos, normalizado hasta 3FN.
+//
+// Módulos, en el orden de sus migraciones: identidad y acceso, territorio,
+// catálogo, credenciales, reputación y cumplimiento.
+//
+// Varias reglas viven solo en SQL dentro de las migraciones, porque Prisma no
+// las expresa: CHECK, el índice único parcial de credenciales, la columna
+// tsvector generada, la configuración de búsqueda "espanol_sin_tildes" y el
+// trigger de solo inserción de la bitácora. Antes de cambiar una tabla,
+// revisa su migración.
 
 generator client {
   provider = "prisma-client"
@@ -16,6 +23,8 @@ enum Rol {
   CLIENTE
   PRESTADOR
   ADMINISTRADOR
+
+  @@map("rol")
 }
 
 /// Propósitos de los tokens de un solo uso que se envían por correo.
@@ -24,6 +33,8 @@ enum Rol {
 enum TipoToken {
   VERIFICACION_CORREO
   RECUPERACION_CONTRASENA
+
+  @@map("tipo_token")
 }
 
 /// Mecanismos de autenticación soportados.
@@ -33,45 +44,201 @@ enum ProveedorAuth {
   LOCAL
   GOOGLE
   CLAVE_UNICA
+
+  @@map("proveedor_auth")
 }
 
 model Usuario {
   id               String   @id @default(uuid())
   correo           String   @unique
   /// Nulo cuando el usuario solo accede con un proveedor externo.
-  hashContrasena   String?
+  hashContrasena   String? @map("hash_contrasena")
   nombre           String
   /// Se almacena normalizado, sin puntos y con guion: 12345678-9
   rut              String?  @unique
-  rutVerificado    Boolean  @default(false)
+  rutVerificado    Boolean  @default(false) @map("rut_verificado")
   rol              Rol      @default(CLIENTE)
-  correoVerificado Boolean  @default(false)
+  correoVerificado Boolean  @default(false) @map("correo_verificado")
   activo           Boolean  @default(true)
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  /// Fecha en que la cuenta se anonimizó a pedido de su dueño. Las cuentas
+  /// con historial (credenciales, contactos, valoraciones) no se borran:
+  /// se vacían sus datos personales y la fila queda como ancla anónima.
+  anonimizadoEn    DateTime? @map("anonimizado_en")
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  actualizadoEn    DateTime @updatedAt @map("actualizado_en")
 
   identidades      Identidad[]
   sesiones         Sesion[]
   tokens           TokenCuenta[]
+  perfilPrestador  PerfilPrestador?
+
+  credencialesVerificadas Credencial[]       @relation("VerificadorCredencial")
+  eventosCredencial       EventoCredencial[]
+  contactosComoCliente    Contacto[]
+  denunciasHechas         Denuncia[]            @relation("Denunciante")
+  denunciasRecibidas      Denuncia[]            @relation("UsuarioDenunciado")
+  denunciasResueltas      Denuncia[]            @relation("ResolutorDenuncia")
+  aceptacionesTerminos    AceptacionTerminos[]
+  eventosSeguridad        EventoSeguridad[]
 
   @@index([rol])
   @@map("usuarios")
+}
+
+// ─── Territorio ──────────────────────────────────────────────────────────
+
+/// Regiones de Chile. La clave es el código oficial (CUT): estable,
+/// público y el mismo que usan los registros con que se contrastan datos.
+model Region {
+  id       Int      @id
+  nombre   String   @unique
+  /// Orden geográfico de norte a sur, que no coincide con el código.
+  orden    Int      @unique
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  comunas Comuna[]
+
+  @@map("regiones")
+}
+
+/// Comunas. La región se obtiene por la relación, nunca se guarda como
+/// texto en un perfil: así no existe la dependencia transitiva
+/// perfil → comuna → región que rompería la 3FN.
+model Comuna {
+  /// Código Único Territorial, p. ej. 13101 para Santiago.
+  id       Int      @id
+  nombre   String
+  regionId Int @map("region_id")
+  region   Region   @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  perfiles PerfilPrestador[]
+
+  @@unique([regionId, nombre])
+  @@map("comunas")
+}
+
+/// Datos públicos del prestador, separados de la cuenta (usuarios), que
+/// queda solo con identidad y acceso. Relación 1:1 con el usuario.
+model PerfilPrestador {
+  id               String   @id @default(uuid())
+  usuarioId        String   @unique @map("usuario_id")
+  usuario          Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  descripcion      String?
+  /// Formato E.164 chileno: +56 y 9 dígitos. Lo garantiza un CHECK.
+  telefono         String?
+  comunaId         Int @map("comuna_id")
+  comuna           Comuna   @relation(fields: [comunaId], references: [id], onDelete: Restrict)
+  /// Punto (longitud, latitud) en WGS 84. Prisma no maneja el tipo
+  /// geography: se declara como no soportado para que las migraciones lo
+  /// conozcan y no intenten borrarlo, y se consulta con $queryRaw.
+  ubicacion        Unsupported("geography(Point,4326)")?
+  /// Distancia máxima a la que atiende, en kilómetros (CHECK 1 a 200).
+  radioAtencionKm  Int      @default(10) @map("radio_atencion_km")
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  actualizadoEn    DateTime @updatedAt @map("actualizado_en")
+
+  servicios    Servicio[]
+  credenciales Credencial[]
+  contactos    Contacto[]
+
+  @@index([comunaId])
+  @@index([ubicacion], type: Gist)
+  @@map("perfiles_prestador")
+}
+
+// ─── Catálogo ────────────────────────────────────────────────────────────
+
+/// Cómo se cobra un servicio. "A convenir" no es una unidad: se expresa
+/// dejando los precios en nulo.
+enum UnidadPrecio {
+  POR_SERVICIO
+  POR_HORA
+  POR_DIA
+  POR_METRO_CUADRADO
+  POR_PERSONA
+
+  @@map("unidad_precio")
+}
+
+/// Ciclo de vida de una publicación. Un servicio no se borra al dejar de
+/// ofrecerse: puede tener contactos y denuncias que lo referencian.
+enum EstadoServicio {
+  BORRADOR
+  PUBLICADO
+  PAUSADO
+  /// Ocultado por moderación, no por el prestador.
+  OCULTO
+
+  @@map("estado_servicio")
+}
+
+model Categoria {
+  id            String   @id @default(uuid())
+  /// Identificador estable para URLs y para el seed (p. ej. "gasfiteria").
+  slug          String   @unique
+  nombre        String   @unique
+  activa        Boolean  @default(true)
+  /// Posición en los listados; el seed la fija.
+  orden         Int      @default(0)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  servicios Servicio[]
+
+  @@map("categorias")
+}
+
+model Servicio {
+  id            String          @id @default(uuid())
+  prestadorId   String @map("prestador_id")
+  prestador     PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+  categoriaId   String @map("categoria_id")
+  categoria     Categoria       @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  titulo        String
+  descripcion   String
+  /// Pesos chilenos, enteros: el peso no tiene decimales y un entero evita
+  /// los errores de redondeo de un número de punto flotante.
+  precioDesde   Int? @map("precio_desde")
+  precioHasta   Int? @map("precio_hasta")
+  unidadPrecio  UnidadPrecio? @map("unidad_precio")
+  estado        EstadoServicio  @default(BORRADOR)
+  /// Columna generada por la base a partir de título y descripción (ver la
+  /// migración del catálogo). Prisma no la escribe nunca: solo existe para
+  /// la búsqueda de texto completo con $queryRaw.
+  ///
+  /// El dbgenerated repite, carácter por carácter, la expresión tal como
+  /// PostgreSQL la guarda. Sin él, Prisma cree que la expresión es un
+  /// default sobrante y la próxima migración intentaría borrarlo.
+  busqueda      Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
+  creadoEn      DateTime        @default(now()) @map("creado_en")
+  actualizadoEn DateTime        @updatedAt @map("actualizado_en")
+
+  contactos Contacto[]
+  denuncias Denuncia[]
+
+  /// Destino de la clave compuesta de contactos (servicio del mismo prestador).
+  @@unique([id, prestadorId])
+  @@index([prestadorId])
+  @@index([categoriaId, estado])
+  @@index([busqueda], type: Gin)
+  @@map("servicios")
 }
 
 /// Tokens de un solo uso que viajan por correo: verificación y recuperación.
 /// Igual que en las sesiones, nunca se guarda el token en claro, solo su hash.
 model TokenCuenta {
   id        String    @id @default(uuid())
-  usuarioId String
+  usuarioId String @map("usuario_id")
   usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tipo      TipoToken
   /// SHA-256 del token que viaja en el enlace del correo.
-  hashToken String    @unique
-  expiraEn  DateTime
+  hashToken String    @unique @map("hash_token")
+  expiraEn  DateTime @map("expira_en")
   /// Nulo mientras no se canjea. La fila no se borra al usarse: deja rastro
   /// para distinguir internamente "ya se usó" de "nunca existió".
-  usadoEn   DateTime?
-  creadoEn  DateTime  @default(now())
+  usadoEn   DateTime? @map("usado_en")
+  creadoEn  DateTime  @default(now()) @map("creado_en")
 
   @@index([usuarioId, tipo])
   @@index([expiraEn])
@@ -82,12 +249,12 @@ model TokenCuenta {
 /// Un usuario puede tener varias: contraseña local y Google, por ejemplo.
 model Identidad {
   id            String        @id @default(uuid())
-  usuarioId     String
+  usuarioId     String @map("usuario_id")
   usuario       Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   proveedor     ProveedorAuth
   /// Identificador que entrega el proveedor (el "sub" de OpenID Connect).
-  sujetoExterno String
-  creadoEn      DateTime      @default(now())
+  sujetoExterno String @map("sujeto_externo")
+  creadoEn      DateTime      @default(now()) @map("creado_en")
 
   @@unique([proveedor, sujetoExterno])
   @@index([usuarioId])
@@ -98,18 +265,337 @@ model Identidad {
 /// remota y detectar la reutilización de un token ya consumido.
 model Sesion {
   id            String    @id @default(uuid())
-  usuarioId     String
+  usuarioId     String @map("usuario_id")
   usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   /// Nunca se guarda el token en claro, solo su hash.
-  hashToken     String    @unique
-  expiraEn      DateTime
-  revocadaEn    DateTime?
+  hashToken     String    @unique @map("hash_token")
+  expiraEn      DateTime @map("expira_en")
+  revocadaEn    DateTime? @map("revocada_en")
   /// Apunta a la sesión que la reemplazó al rotar el token.
-  reemplazadaPor String?
-  agenteUsuario String?
-  creadaEn      DateTime  @default(now())
+  reemplazadaPor String? @map("reemplazada_por")
+  agenteUsuario String? @map("agente_usuario")
+  creadaEn      DateTime  @default(now()) @map("creada_en")
 
   @@index([usuarioId])
   @@index([expiraEn])
   @@map("sesiones")
+}
+// ─── Credenciales ────────────────────────────────────────────────────────
+
+enum MetodoVerificacion {
+  /// Contrastada por el sistema contra el registro oficial.
+  AUTOMATICO
+  /// Revisada por un administrador.
+  MANUAL
+
+  @@map("metodo_verificacion")
+}
+
+/// El estado lo fija siempre el servidor, nunca el cliente (CLAUDE.md).
+enum EstadoCredencial {
+  PENDIENTE
+  VERIFICADA
+  RECHAZADA
+  /// Pasó su fecha de vigencia. Lo marca un proceso del servidor.
+  VENCIDA
+  /// Anulada después de haber sido verificada (p. ej. el registro oficial
+  /// la dio de baja, o fue reemplazada por una más reciente).
+  REVOCADA
+
+  @@map("estado_credencial")
+}
+
+/// Catálogo de credenciales que la plataforma sabe verificar.
+model TipoCredencial {
+  id                 String             @id @default(uuid())
+  /// Clave estable para el código y el seed (p. ej. "SEC_ELECTRICO").
+  codigo             String             @unique
+  nombre             String
+  /// Organismo que emite o registra la credencial (SEC, ChileValora...).
+  fuenteOficial      String @map("fuente_oficial")
+  /// Método previsto para este tipo. Cada credencial guarda además el que
+  /// se usó de verdad: si el registro oficial no responde, una automática
+  /// puede terminar revisándose a mano.
+  metodoVerificacion MetodoVerificacion @map("metodo_verificacion")
+  requiereVigencia   Boolean @map("requiere_vigencia")
+  activo             Boolean            @default(true)
+  creadoEn           DateTime           @default(now()) @map("creado_en")
+  actualizadoEn      DateTime           @updatedAt @map("actualizado_en")
+
+  credenciales Credencial[]
+
+  @@map("tipos_credencial")
+}
+
+/// Una credencial presentada por un prestador.
+///
+/// Las referencias a prestador y verificador son RESTRICT: una credencial
+/// es evidencia de lo que la plataforma afirmó en su momento, y no puede
+/// desaparecer porque se elimine una cuenta. La cuenta se anonimiza.
+model Credencial {
+  id                     String             @id @default(uuid())
+  prestadorId            String @map("prestador_id")
+  prestador              PerfilPrestador    @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
+  tipoId                 String @map("tipo_id")
+  tipo                   TipoCredencial     @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  estado                 EstadoCredencial   @default(PENDIENTE)
+  /// Número de registro, folio o certificado tal como lo emite la fuente.
+  identificadorDocumento String @map("identificador_documento")
+  vigenteHasta           DateTime?          @db.Date @map("vigente_hasta")
+  /// Método con que efectivamente se verificó (nulo mientras está pendiente).
+  metodo                 MetodoVerificacion?
+  /// Fuente consultada al verificar, p. ej. la URL del registro público.
+  fuente                 String?
+  fechaConsulta          DateTime? @map("fecha_consulta")
+  /// Administrador que la revisó; nulo si la verificación fue automática.
+  verificadoPorId        String? @map("verificado_por_id")
+  verificadoPor          Usuario?           @relation("VerificadorCredencial", fields: [verificadoPorId], references: [id], onDelete: Restrict)
+  motivoRechazo          String? @map("motivo_rechazo")
+  /// Credencial anterior que esta reemplaza (renovación). Una credencial
+  /// solo puede ser reemplazada una vez: de ahí el UNIQUE.
+  reemplazaAId           String?            @unique @map("reemplaza_aid")
+  reemplazaA             Credencial?        @relation("ReemplazoCredencial", fields: [reemplazaAId], references: [id], onDelete: Restrict)
+  reemplazadaPor         Credencial?        @relation("ReemplazoCredencial")
+  creadoEn               DateTime           @default(now()) @map("creado_en")
+  actualizadoEn          DateTime           @updatedAt @map("actualizado_en")
+
+  eventos EventoCredencial[]
+
+  @@index([prestadorId, estado])
+  @@index([tipoId])
+  @@index([estado, vigenteHasta])
+  @@map("credenciales")
+}
+
+/// Bitácora de cambios de estado. Solo admite inserciones: un trigger de la
+/// base rechaza cualquier UPDATE o DELETE.
+model EventoCredencial {
+  id             String            @id @default(uuid())
+  credencialId   String @map("credencial_id")
+  credencial     Credencial        @relation(fields: [credencialId], references: [id], onDelete: Restrict)
+  /// Nulo en el evento de creación.
+  estadoAnterior EstadoCredencial? @map("estado_anterior")
+  estadoNuevo    EstadoCredencial @map("estado_nuevo")
+  /// Nulo cuando el cambio lo hizo el sistema (p. ej. el vencimiento).
+  autorId        String? @map("autor_id")
+  autor          Usuario?          @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  motivo         String?
+  creadoEn       DateTime          @default(now()) @map("creado_en")
+
+  @@index([credencialId, creadoEn])
+  @@map("eventos_credencial")
+}
+
+// ─── Reputación ──────────────────────────────────────────────────────────
+
+enum CanalContacto {
+  WHATSAPP
+  TELEFONO
+  CORREO
+  FORMULARIO
+
+  @@map("canal_contacto")
+}
+
+enum EstadoValoracion {
+  PUBLICADA
+  /// Ocultada por moderación. No se borra: puede estar denunciada.
+  OCULTA
+
+  @@map("estado_valoracion")
+}
+
+/// Registro de que un cliente contactó a un prestador desde la plataforma.
+/// Es la prueba de que hubo una relación real: solo quien contactó puede
+/// valorar, y por eso la valoración cuelga del contacto.
+model Contacto {
+  id          String          @id @default(uuid())
+  clienteId   String @map("cliente_id")
+  cliente     Usuario         @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  prestadorId String @map("prestador_id")
+  prestador   PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
+  /// Opcional: el contacto puede ser desde el perfil y no desde un servicio.
+  /// La clave compuesta (servicioId, prestadorId) obliga a que el servicio
+  /// sea de este mismo prestador. Es RESTRICT y no SET NULL: con una clave
+  /// compuesta, SET NULL intentaría anular también prestadorId. Además un
+  /// servicio no se borra al dejar de ofrecerse, cambia de estado.
+  servicioId  String? @map("servicio_id")
+  servicio    Servicio?       @relation(fields: [servicioId, prestadorId], references: [id, prestadorId], onDelete: Restrict)
+  canal       CanalContacto
+  creadoEn    DateTime        @default(now()) @map("creado_en")
+
+  /// En la base hay a lo más una (UNIQUE sobre valoraciones.contactoId).
+  /// Prisma la ve como lista porque su 1:1 exigiría un índice único extra
+  /// sobre los tres campos de la clave compuesta, redundante con ese UNIQUE.
+  valoraciones Valoracion[]
+
+  /// Destino de la clave foránea compuesta de valoraciones (ver abajo).
+  @@unique([id, clienteId, prestadorId])
+  @@index([clienteId])
+  @@index([prestadorId])
+  @@index([servicioId])
+  @@map("contactos")
+}
+
+/// Valoración de un contacto.
+///
+/// clienteId y prestadorId se repiten aquí para poder imponer con un UNIQUE
+/// "una valoración por par cliente-prestador". Esa repetición no rompe la
+/// 3FN porque la clave foránea compuesta (contactoId, clienteId,
+/// prestadorId) → contactos obliga a que coincidan con los del contacto: la
+/// base nunca acepta una combinación inconsistente.
+model Valoracion {
+  id            String           @id @default(uuid())
+  contactoId    String           @unique @map("contacto_id")
+  clienteId     String @map("cliente_id")
+  prestadorId   String @map("prestador_id")
+  contacto      Contacto         @relation(fields: [contactoId, clienteId, prestadorId], references: [id, clienteId, prestadorId], onDelete: Restrict)
+  /// 1 a 5, impuesto con CHECK.
+  calificacion  Int
+  comentario    String?
+  estado        EstadoValoracion @default(PUBLICADA)
+  creadoEn      DateTime         @default(now()) @map("creado_en")
+  actualizadoEn DateTime         @updatedAt @map("actualizado_en")
+
+  respuesta RespuestaValoracion?
+  denuncias Denuncia[]
+
+  @@unique([clienteId, prestadorId])
+  @@index([prestadorId, estado])
+  @@map("valoraciones")
+}
+
+/// Respuesta del prestador a una valoración (1:1). El autor no se guarda:
+/// es el prestador del contacto, y guardarlo aparte sería una dependencia
+/// transitiva.
+model RespuestaValoracion {
+  id            String     @id @default(uuid())
+  valoracionId  String     @unique @map("valoracion_id")
+  valoracion    Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
+  texto         String
+  creadoEn      DateTime   @default(now()) @map("creado_en")
+  actualizadoEn DateTime   @updatedAt @map("actualizado_en")
+
+  @@map("respuestas_valoracion")
+}
+
+// ─── Cumplimiento ────────────────────────────────────────────────────────
+
+enum MotivoDenuncia {
+  CONTENIDO_OFENSIVO
+  INFORMACION_FALSA
+  FRAUDE
+  SPAM
+  OTRO
+
+  @@map("motivo_denuncia")
+}
+
+enum EstadoDenuncia {
+  ABIERTA
+  EN_REVISION
+  RESUELTA
+  DESESTIMADA
+
+  @@map("estado_denuncia")
+}
+
+/// Denuncia sobre exactamente uno de tres objetos: una valoración, un
+/// servicio o un usuario.
+///
+/// Son tres columnas con su propia clave foránea, y no un par genérico
+/// (tipoObjeto, idObjeto): con el par genérico la base no puede comprobar
+/// que el id exista, porque una clave foránea apunta a una sola tabla. Un
+/// CHECK con num_nonnulls exige que haya exactamente una no nula.
+model Denuncia {
+  id                  String         @id @default(uuid())
+  denuncianteId       String @map("denunciante_id")
+  denunciante         Usuario        @relation("Denunciante", fields: [denuncianteId], references: [id], onDelete: Restrict)
+  motivo              MotivoDenuncia
+  detalle             String?
+  estado              EstadoDenuncia @default(ABIERTA)
+
+  valoracionId        String? @map("valoracion_id")
+  valoracion          Valoracion?    @relation(fields: [valoracionId], references: [id], onDelete: Restrict)
+  servicioId          String? @map("servicio_id")
+  servicio            Servicio?      @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  usuarioDenunciadoId String? @map("usuario_denunciado_id")
+  usuarioDenunciado   Usuario?       @relation("UsuarioDenunciado", fields: [usuarioDenunciadoId], references: [id], onDelete: Restrict)
+
+  resolucion          String?
+  resueltaPorId       String? @map("resuelta_por_id")
+  resueltaPor         Usuario?       @relation("ResolutorDenuncia", fields: [resueltaPorId], references: [id], onDelete: Restrict)
+  resueltaEn          DateTime? @map("resuelta_en")
+  creadoEn            DateTime       @default(now()) @map("creado_en")
+  actualizadoEn       DateTime       @updatedAt @map("actualizado_en")
+
+  @@index([estado, creadoEn])
+  @@index([denuncianteId])
+  @@index([valoracionId])
+  @@index([servicioId])
+  @@index([usuarioDenunciadoId])
+  @@map("denuncias")
+}
+
+/// Cada versión publicada de los términos y condiciones. No se editan:
+/// un cambio es una versión nueva, para saber qué aceptó cada quien.
+model VersionTerminos {
+  id           String   @id @default(uuid())
+  /// Identificador legible y único, p. ej. "2026-10".
+  version      String   @unique
+  contenido    String
+  vigenteDesde DateTime @map("vigente_desde")
+  creadoEn     DateTime @default(now()) @map("creado_en")
+
+  aceptaciones AceptacionTerminos[]
+
+  @@map("versiones_terminos")
+}
+
+/// Relación N:M entre usuarios y versiones de términos. Es evidencia de
+/// consentimiento, por eso no cae en cascada al borrar un usuario.
+model AceptacionTerminos {
+  usuarioId  String @map("usuario_id")
+  usuario    Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  versionId  String @map("version_id")
+  version    VersionTerminos @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  aceptadaEn DateTime        @default(now()) @map("aceptada_en")
+
+  @@id([usuarioId, versionId])
+  @@index([versionId])
+  @@map("aceptaciones_terminos")
+}
+
+/// Hechos de seguridad para auditoría. No hay columna de detalle libre a
+/// propósito: sin un lugar donde escribirlos, no se cuelan contraseñas,
+/// tokens ni cuerpos de correo.
+enum TipoEventoSeguridad {
+  INICIO_SESION
+  INICIO_SESION_FALLIDO
+  CIERRE_SESION
+  REUTILIZACION_TOKEN_REFRESCO
+  CORREO_VERIFICADO
+  RECUPERACION_SOLICITADA
+  CONTRASENA_RESTABLECIDA
+  CONTRASENA_CAMBIADA
+  ACCESO_DENEGADO
+  CUENTA_ANONIMIZADA
+
+  @@map("tipo_evento_seguridad")
+}
+
+model EventoSeguridad {
+  id            String              @id @default(uuid())
+  tipo          TipoEventoSeguridad
+  /// Opcional: un inicio de sesión fallido puede no corresponder a ninguna
+  /// cuenta. SET NULL porque la bitácora de seguridad no es evidencia de
+  /// la relación con terceros, y no debe impedir borrar una cuenta vacía.
+  usuarioId     String? @map("usuario_id")
+  usuario       Usuario?            @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  agenteUsuario String? @map("agente_usuario")
+  creadoEn      DateTime            @default(now()) @map("creado_en")
+
+  @@index([usuarioId, creadoEn])
+  @@index([tipo, creadoEn])
+  @@map("eventos_seguridad")
 }
