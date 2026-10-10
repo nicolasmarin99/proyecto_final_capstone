@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton, clasesBoton } from "../componentes/Boton";
+import { EstadoPrestador } from "../componentes/EstadoPrestador";
 import { Pagina } from "../componentes/Pagina";
 
 export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: ClienteApi }) {
@@ -84,6 +85,8 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
             </div>
           </dl>
         )}
+
+        {perfil?.rol === "PRESTADOR" && <EstadoPrestador cliente={cliente} />}
       </div>
 
       {/*

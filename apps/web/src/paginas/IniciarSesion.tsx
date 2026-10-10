@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { ErrorApi } from "../api/cliente";
+import { clienteApi, ErrorApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -16,7 +16,31 @@ function leerMensajeDeExito(state: unknown): string | null {
   return null;
 }
 
-export default function PaginaIniciarSesion() {
+/**
+ * Adónde llevar a alguien que acaba de entrar.
+ *
+ * Un prestador con el correo ya confirmado y sin perfil va directo a
+ * completarlo: es el paso que le falta para que los clientes lo encuentren, y
+ * es justo después de confirmar el correo cuando inicia sesión por primera
+ * vez. Si el correo no está confirmado no se lo manda ahí, porque la API le
+ * rechazaría el guardado; en /perfil ve el aviso de confirmación.
+ *
+ * Si la consulta del perfil falla, se va a /perfil igual: un error de red no
+ * debe dejar a nadie en la pantalla de inicio de sesión.
+ */
+async function destinoTrasIngreso(usuario: Usuario, cliente: ClienteApi): Promise<string> {
+  if (usuario.rol !== "PRESTADOR" || usuario.correoVerificado !== true) {
+    return "/perfil";
+  }
+
+  try {
+    return (await cliente.obtenerMiPerfilPrestador()) ? "/perfil" : "/perfil-prestador";
+  } catch {
+    return "/perfil";
+  }
+}
+
+export default function PaginaIniciarSesion({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const navegar = useNavigate();
   const ubicacion = useLocation();
   const { usuario, iniciarSesion } = useAuth();
@@ -27,10 +51,20 @@ export default function PaginaIniciarSesion() {
   // Si se navegara justo después de await iniciarSesion(), RutaProtegida
   // podría renderizarse con el usuario todavía en null y rebotar de vuelta.
   useEffect(() => {
-    if (usuario) {
-      navegar("/perfil", { replace: true });
+    if (!usuario) {
+      return;
     }
-  }, [usuario, navegar]);
+
+    let cancelado = false;
+
+    void destinoTrasIngreso(usuario, cliente).then((destino) => {
+      if (!cancelado) navegar(destino, { replace: true });
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [usuario, cliente, navegar]);
 
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");

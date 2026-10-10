@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Icono } from "./iconos";
+import { clasesControl, MensajeCampo, mensajeVisible } from "./MensajeCampo";
 
 interface Props {
   id: string;
   etiqueta: string;
-  tipo?: "text" | "email" | "password";
+  tipo?: "text" | "email" | "password" | "tel" | "number";
   autoComplete: string;
   valor: string;
   alCambiar(valor: string): void;
@@ -12,6 +13,8 @@ interface Props {
   ayuda?: string;
   /** Confirmación en vivo ("Las contraseñas coinciden."). Se muestra en verde. */
   valido?: string;
+  /** Teclado en pantalla del móvil: "numeric" para números, "tel" para teléfonos. */
+  inputMode?: "numeric" | "tel";
 }
 
 /**
@@ -23,9 +26,7 @@ interface Props {
  * como decoración, un área con relleno se lee como un lugar donde escribir.
  *
  * Bajo el campo se muestra un solo mensaje, en este orden: el error, la
- * confirmación o la ayuda. Ese espacio es una región aria-live, así que el
- * lector de pantalla anuncia cuando cambia (por ejemplo, cuando la contraseña
- * repetida empieza a coincidir) sin que la persona tenga que ir a buscarlo.
+ * confirmación o la ayuda (ver MensajeCampo), y se anuncia cuando cambia.
  */
 export function CampoTexto({
   id,
@@ -37,18 +38,13 @@ export function CampoTexto({
   error,
   ayuda,
   valido,
+  inputMode,
 }: Props) {
   const [visible, setVisible] = useState(false);
   const esContrasena = tipo === "password";
 
   const idMensaje = `${id}-mensaje`;
-  const mensaje = error
-    ? { tipo: "error" as const, texto: error }
-    : valido
-      ? { tipo: "valido" as const, texto: valido }
-      : ayuda
-        ? { tipo: "ayuda" as const, texto: ayuda }
-        : null;
+  const mensajes = { error, ayuda, valido };
 
   return (
     <div className="mt-5">
@@ -61,19 +57,12 @@ export function CampoTexto({
           name={id}
           type={esContrasena && visible ? "text" : tipo}
           autoComplete={autoComplete}
+          inputMode={inputMode}
           value={valor}
           onChange={(evento) => alCambiar(evento.target.value)}
           aria-invalid={error ? true : undefined}
-          aria-describedby={mensaje ? idMensaje : undefined}
-          className={`h-12 w-full rounded-chico border bg-niebla px-4 text-base text-noche transition-[background-color,border-color,box-shadow] duration-200 outline-none placeholder:text-texto-tenue focus:bg-blanco focus:ring-4 ${
-            esContrasena ? "pr-12" : ""
-          } ${
-            error
-              ? "border-error-700 focus:border-error-700 focus:ring-error-700/15"
-              : valido
-                ? "border-exito-700/60 focus:border-exito-700 focus:ring-exito-700/15"
-                : "border-borde-fuerte focus:border-primario focus:ring-primario/15"
-          }`}
+          aria-describedby={mensajeVisible(mensajes) ? idMensaje : undefined}
+          className={`h-12 ${esContrasena ? "pr-12" : ""} ${clasesControl(mensajes)}`}
         />
         {esContrasena && (
           // El nombre va como texto oculto dentro del botón y no en
@@ -91,26 +80,7 @@ export function CampoTexto({
         )}
       </div>
 
-      <div aria-live="polite">
-        {mensaje && (
-          <p
-            // La key cambia con el tipo de mensaje: React crea un elemento
-            // nuevo y la animación de entrada vuelve a correr.
-            key={mensaje.tipo}
-            id={idMensaje}
-            className={`mt-1.5 flex items-start gap-1.5 text-sm motion-safe:animate-aparecer-corto ${
-              mensaje.tipo === "error"
-                ? "font-medium text-error-700"
-                : mensaje.tipo === "valido"
-                  ? "font-medium text-exito-700"
-                  : "text-texto-suave"
-            }`}
-          >
-            {mensaje.tipo === "valido" && <Icono nombre="visto" tamano={18} grosor={2.2} className="shrink-0" />}
-            {mensaje.texto}
-          </p>
-        )}
-      </div>
+      <MensajeCampo id={idMensaje} mensajes={mensajes} />
     </div>
   );
 }

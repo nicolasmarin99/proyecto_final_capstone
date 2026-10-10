@@ -1,5 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { CATEGORIAS, COMUNAS_RM, REGIONES, TERMINOS_INICIALES, TIPOS_CREDENCIAL } from "./datos.js";
+import { CATEGORIAS, COMUNAS, REGIONES, TERMINOS_INICIALES, TIPOS_CREDENCIAL } from "./datos.js";
 
 export interface ResumenMaestros {
   regiones: number;
@@ -22,6 +22,9 @@ export interface ResumenMaestros {
  *   es lo que alguien aceptó.
  *
  * Todo va en una transacción: si algo falla, no queda una carga a medias.
+ * El límite de tiempo se sube de los 5 s por defecto a 2 min: son unos 370
+ * upserts uno tras otro, y contra una base remota (Neon) cada uno paga un
+ * viaje de red.
  */
 export async function cargarMaestros(prisma: PrismaClient): Promise<ResumenMaestros> {
   return prisma.$transaction(async (tx) => {
@@ -29,7 +32,7 @@ export async function cargarMaestros(prisma: PrismaClient): Promise<ResumenMaest
       await tx.region.upsert({ where: { id }, create: { id, nombre, orden }, update: { nombre, orden } });
     }
 
-    for (const { id, nombre, regionId } of COMUNAS_RM) {
+    for (const { id, nombre, regionId } of COMUNAS) {
       await tx.comuna.upsert({ where: { id }, create: { id, nombre, regionId }, update: { nombre, regionId } });
     }
 
@@ -49,10 +52,10 @@ export async function cargarMaestros(prisma: PrismaClient): Promise<ResumenMaest
 
     return {
       regiones: REGIONES.length,
-      comunas: COMUNAS_RM.length,
+      comunas: COMUNAS.length,
       categorias: CATEGORIAS.length,
       tiposCredencial: TIPOS_CREDENCIAL.length,
       versionesTerminos: 1,
     };
-  });
+  }, { timeout: 120_000, maxWait: 10_000 });
 }

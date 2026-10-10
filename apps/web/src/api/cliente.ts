@@ -38,6 +38,35 @@ interface Sesion {
   usuario: Usuario;
 }
 
+export interface Region {
+  id: number;
+  nombre: string;
+  /** Posición de norte a sur, para ordenar los grupos del selector. */
+  orden: number;
+}
+
+export interface Comuna {
+  id: number;
+  nombre: string;
+  region: Region;
+}
+
+export interface PerfilPrestador {
+  id: string;
+  descripcion: string;
+  /** En E.164: "+56912345678". */
+  telefono: string;
+  radioAtencionKm: number;
+  comuna: Comuna;
+}
+
+export interface DatosPerfilPrestador {
+  descripcion: string;
+  telefono: string;
+  comunaId: number;
+  radioAtencionKm: number;
+}
+
 export interface ResumenAdmin {
   totalUsuarios: number;
   porRol: Record<string, number>;
@@ -105,6 +134,50 @@ function leerResumen(valor: unknown): ResumenAdmin | null {
   }
 
   return { totalUsuarios, porRol: contadores };
+}
+
+function leerComuna(valor: unknown): Comuna | null {
+  if (!esObjeto(valor) || typeof valor.id !== "number" || typeof valor.nombre !== "string") {
+    return null;
+  }
+
+  const region = valor.region;
+
+  if (
+    !esObjeto(region) ||
+    typeof region.id !== "number" ||
+    typeof region.nombre !== "string" ||
+    typeof region.orden !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    id: valor.id,
+    nombre: valor.nombre,
+    region: { id: region.id, nombre: region.nombre, orden: region.orden },
+  };
+}
+
+function leerPerfilPrestador(valor: unknown): PerfilPrestador | null {
+  if (!esObjeto(valor) || !esObjeto(valor.perfil)) {
+    return null;
+  }
+
+  const { id, descripcion, telefono, radioAtencionKm, comuna } = valor.perfil;
+  const comunaLeida = leerComuna(comuna);
+
+  if (
+    typeof id !== "string" ||
+    typeof descripcion !== "string" ||
+    typeof telefono !== "string" ||
+    typeof radioAtencionKm !== "number" ||
+    !comunaLeida
+  ) {
+    return null;
+  }
+
+  return { id, descripcion, telefono, radioAtencionKm, comuna: comunaLeida };
 }
 
 function leerDetalles(valor: unknown): DetalleError[] {
@@ -333,6 +406,55 @@ export function crearClienteApi() {
       }
 
       return usuario;
+    },
+
+    /** Lista pública, para el selector. */
+    async listarComunas(): Promise<Comuna[]> {
+      const cuerpo = await peticion("/comunas");
+
+      if (!esObjeto(cuerpo) || !Array.isArray(cuerpo.comunas)) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return cuerpo.comunas.flatMap((comuna: unknown) => {
+        const leida = leerComuna(comuna);
+        return leida ? [leida] : [];
+      });
+    },
+
+    /**
+     * El perfil del prestador conectado, o null si todavía no lo crea. El 404
+     * no es un error para quien llama: es justamente lo que dice que falta
+     * completarlo.
+     */
+    async obtenerMiPerfilPrestador(): Promise<PerfilPrestador | null> {
+      try {
+        const perfil = leerPerfilPrestador(await peticion("/prestadores/yo", { autenticada: true }));
+
+        if (!perfil) {
+          throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+        }
+
+        return perfil;
+      } catch (error) {
+        if (error instanceof ErrorApi && error.codigo === "PERFIL_NO_ENCONTRADO") {
+          return null;
+        }
+
+        throw error;
+      }
+    },
+
+    async guardarMiPerfilPrestador(datos: DatosPerfilPrestador): Promise<PerfilPrestador> {
+      const perfil = leerPerfilPrestador(
+        await peticion("/prestadores/yo", { metodo: "PUT", cuerpo: datos, autenticada: true }),
+      );
+
+      if (!perfil) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return perfil;
     },
 
     async obtenerResumenAdmin(): Promise<ResumenAdmin> {

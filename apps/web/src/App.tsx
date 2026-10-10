@@ -7,6 +7,7 @@ import PaginaEstado from "./paginas/Estado";
 import PaginaIniciarSesion from "./paginas/IniciarSesion";
 import PaginaInicio from "./paginas/Inicio";
 import PaginaPerfil from "./paginas/Perfil";
+import PaginaPerfilPrestador from "./paginas/PerfilPrestador";
 import PaginaRecuperarCuenta from "./paginas/RecuperarCuenta";
 import PaginaRegistro from "./paginas/Registro";
 import PaginaRegistroPrestador from "./paginas/RegistroPrestador";
@@ -40,6 +41,18 @@ export default function App() {
         element={
           <RutaProtegida>
             <PaginaPerfil />
+          </RutaProtegida>
+        }
+      />
+      {/*
+        roles es comodidad: le evita a un cliente un formulario que no le
+        sirve. Quien rechaza de verdad es autorizar(PRESTADOR) en la API.
+      */}
+      <Route
+        path="/perfil-prestador"
+        element={
+          <RutaProtegida roles={["PRESTADOR"]}>
+            <PaginaPerfilPrestador />
           </RutaProtegida>
         }
       />
