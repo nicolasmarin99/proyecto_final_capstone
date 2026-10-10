@@ -67,6 +67,32 @@ export interface DatosPerfilPrestador {
   radioAtencionKm: number;
 }
 
+export type EstadoVerificacion = "PENDIENTE" | "VERIFICADA" | "RECHAZADA" | "VENCIDA" | "REVOCADA";
+
+export interface EstadoIdentidad {
+  estado: EstadoVerificacion;
+  motivoRechazo: string | null;
+  enviadaEn: string;
+  revisadaEn: string | null;
+}
+
+export interface MiIdentidad {
+  identidad: EstadoIdentidad | null;
+  cargasDisponibles: number;
+}
+
+export interface IdentidadEnCola extends EstadoIdentidad {
+  id: string;
+  prestador: { nombre: string; rut: string | null; comuna: string };
+}
+
+export interface ColaIdentidades {
+  identidades: IdentidadEnCola[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+}
+
 export interface ResumenAdmin {
   totalUsuarios: number;
   porRol: Record<string, number>;
@@ -75,6 +101,8 @@ export interface ResumenAdmin {
 interface OpcionesPeticion {
   metodo?: string;
   cuerpo?: unknown;
+  /** Para subir archivos. Excluye a `cuerpo`. */
+  formulario?: FormData;
   /** Solo las peticiones autenticadas llevan Bearer y reintentan tras un 401. */
   autenticada?: boolean;
 }
@@ -180,6 +208,41 @@ function leerPerfilPrestador(valor: unknown): PerfilPrestador | null {
   return { id, descripcion, telefono, radioAtencionKm, comuna: comunaLeida };
 }
 
+const ESTADOS_VERIFICACION: readonly string[] = ["PENDIENTE", "VERIFICADA", "RECHAZADA", "VENCIDA", "REVOCADA"];
+
+function esEstadoVerificacion(valor: unknown): valor is EstadoVerificacion {
+  return typeof valor === "string" && ESTADOS_VERIFICACION.includes(valor);
+}
+
+function leerEstadoIdentidad(valor: unknown): EstadoIdentidad | null {
+  if (!esObjeto(valor) || !esEstadoVerificacion(valor.estado) || typeof valor.enviadaEn !== "string") {
+    return null;
+  }
+
+  return {
+    estado: valor.estado,
+    motivoRechazo: typeof valor.motivoRechazo === "string" ? valor.motivoRechazo : null,
+    enviadaEn: valor.enviadaEn,
+    revisadaEn: typeof valor.revisadaEn === "string" ? valor.revisadaEn : null,
+  };
+}
+
+function leerIdentidadEnCola(valor: unknown): IdentidadEnCola | null {
+  const estado = leerEstadoIdentidad(valor);
+
+  if (!estado || !esObjeto(valor) || typeof valor.id !== "string" || !esObjeto(valor.prestador)) {
+    return null;
+  }
+
+  const { nombre, rut, comuna } = valor.prestador;
+
+  if (typeof nombre !== "string" || typeof comuna !== "string") {
+    return null;
+  }
+
+  return { ...estado, id: valor.id, prestador: { nombre, rut: typeof rut === "string" ? rut : null, comuna } };
+}
+
 function leerDetalles(valor: unknown): DetalleError[] {
   if (!Array.isArray(valor)) {
     return [];
@@ -233,7 +296,9 @@ export function crearClienteApi() {
   async function enviar(ruta: string, opciones: OpcionesPeticion, token: string | null) {
     const cabeceras: Record<string, string> = {};
 
-    if (opciones.cuerpo !== undefined) {
+    // Con FormData no se fija Content-Type: el navegador pone
+    // "multipart/form-data" junto con el separador (boundary) que eligió.
+    if (opciones.cuerpo !== undefined && !opciones.formulario) {
       cabeceras["Content-Type"] = "application/json";
     }
 
@@ -244,7 +309,7 @@ export function crearClienteApi() {
     return fetch(`/api${ruta}`, {
       method: opciones.metodo ?? "GET",
       headers: cabeceras,
-      body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
+      body: opciones.formulario ?? (opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo)),
       credentials: "include",
     });
   }
@@ -455,6 +520,82 @@ export function crearClienteApi() {
       }
 
       return perfil;
+    },
+
+    async obtenerMiIdentidad(): Promise<MiIdentidad> {
+      const cuerpo = await peticion("/prestadores/yo/identidad", { autenticada: true });
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.cargasDisponibles !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return { identidad: leerEstadoIdentidad(cuerpo.identidad), cargasDisponibles: cuerpo.cargasDisponibles };
+    },
+
+    async subirDocumentoIdentidad(archivo: File): Promise<EstadoIdentidad> {
+      const formulario = new FormData();
+      formulario.append("documento", archivo);
+
+      const cuerpo = await peticion("/prestadores/yo/identidad", {
+        metodo: "POST",
+        formulario,
+        autenticada: true,
+      });
+      const identidad = esObjeto(cuerpo) ? leerEstadoIdentidad(cuerpo.identidad) : null;
+
+      if (!identidad) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return identidad;
+    },
+
+    async listarIdentidades(pagina: number, porPagina: number): Promise<ColaIdentidades> {
+      const consulta = new URLSearchParams({ estado: "PENDIENTE", pagina: String(pagina), porPagina: String(porPagina) });
+      const cuerpo = await peticion(`/admin/identidades?${consulta.toString()}`, { autenticada: true });
+
+      if (
+        !esObjeto(cuerpo) ||
+        !Array.isArray(cuerpo.identidades) ||
+        typeof cuerpo.total !== "number" ||
+        typeof cuerpo.pagina !== "number" ||
+        typeof cuerpo.porPagina !== "number"
+      ) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return {
+        identidades: cuerpo.identidades.flatMap((fila: unknown) => {
+          const leida = leerIdentidadEnCola(fila);
+          return leida ? [leida] : [];
+        }),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
+    },
+
+    /** URL firmada de corta duración. No se guarda en ningún lado: se usa y se descarta. */
+    async obtenerDocumentoIdentidad(id: string): Promise<{ url: string; expiraEn: string }> {
+      const cuerpo = await peticion(`/admin/identidades/${encodeURIComponent(id)}/documento`, { autenticada: true });
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.url !== "string" || typeof cuerpo.expiraEn !== "string") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return { url: cuerpo.url, expiraEn: cuerpo.expiraEn };
+    },
+
+    async aprobarIdentidad(id: string): Promise<void> {
+      await peticion(`/admin/identidades/${encodeURIComponent(id)}/aprobar`, { metodo: "PATCH", autenticada: true });
+    },
+
+    async rechazarIdentidad(id: string, motivo: string): Promise<void> {
+      await peticion(`/admin/identidades/${encodeURIComponent(id)}/rechazar`, {
+        metodo: "PATCH",
+        cuerpo: { motivo },
+        autenticada: true,
+      });
     },
 
     async obtenerResumenAdmin(): Promise<ResumenAdmin> {

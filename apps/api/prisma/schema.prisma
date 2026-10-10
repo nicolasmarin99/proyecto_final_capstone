@@ -80,6 +80,7 @@ model Usuario {
   denunciasResueltas      Denuncia[]            @relation("ResolutorDenuncia")
   aceptacionesTerminos    AceptacionTerminos[]
   eventosSeguridad        EventoSeguridad[]
+  accesosDocumento        AccesoDocumento[]
 
   @@index([rol])
   @@map("usuarios")
@@ -359,7 +360,8 @@ model Credencial {
   creadoEn               DateTime           @default(now()) @map("creado_en")
   actualizadoEn          DateTime           @updatedAt @map("actualizado_en")
 
-  eventos EventoCredencial[]
+  eventos  EventoCredencial[]
+  accesos  AccesoDocumento[]
 
   @@index([prestadorId, estado])
   @@index([tipoId])
@@ -384,6 +386,27 @@ model EventoCredencial {
 
   @@index([credencialId, creadoEn])
   @@map("eventos_credencial")
+}
+
+/// Bitácora de cada vez que un administrador pidió ver el documento que
+/// respalda una credencial (p. ej. la cédula de identidad). Solo admite
+/// inserciones: el mismo trigger que eventos_credencial rechaza UPDATE y
+/// DELETE.
+///
+/// Es una tabla aparte y no un evento de credencial porque mirar un
+/// documento no cambia su estado, y eventos_credencial exige que cambie.
+/// Nunca guarda la URL firmada: solo quién, qué credencial y cuándo.
+model AccesoDocumento {
+  id              String     @id @default(uuid())
+  credencialId    String     @map("credencial_id")
+  credencial      Credencial @relation(fields: [credencialId], references: [id], onDelete: Restrict)
+  administradorId String     @map("administrador_id")
+  administrador   Usuario    @relation(fields: [administradorId], references: [id], onDelete: Restrict)
+  creadoEn        DateTime   @default(now()) @map("creado_en")
+
+  @@index([credencialId, creadoEn])
+  @@index([administradorId, creadoEn])
+  @@map("accesos_documento")
 }
 
 // ─── Reputación ──────────────────────────────────────────────────────────

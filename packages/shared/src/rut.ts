@@ -88,3 +88,19 @@ export function esRutValido(valor: string): boolean {
 
   return calcularDigitoVerificador(cuerpo) === digitoVerificador;
 }
+
+/**
+ * "12345678-5" → "12.345.678-5", para mostrarlo. Acepta cualquier escritura:
+ * primero la lleva a la forma canónica. No valida el dígito verificador.
+ */
+export function formatearRut(valor: string): string {
+  const canonico = normalizarRut(valor);
+
+  if (!canonico) {
+    return "";
+  }
+
+  const [cuerpo = "", digitoVerificador = ""] = canonico.split("-");
+
+  return `${cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}-${digitoVerificador}`;
+}

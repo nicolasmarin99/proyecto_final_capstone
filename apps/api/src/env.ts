@@ -34,6 +34,22 @@ const esquema = z.object({
   // servicio donde corre la API.
   CORREO_API_CLAVE: z.string().default(""),
 
+  // Dónde se guardan los documentos de identidad. "memoria" los guarda en el
+  // proceso y no toca la red: es lo que usan las pruebas y el desarrollo
+  // local. "produccion" los sube a Cloudinary como recursos privados.
+  ALMACENAMIENTO_TRANSPORTE: z.enum(["memoria", "produccion"]).default("memoria"),
+
+  // Credenciales de Cloudinary. Vacías por defecto, igual que la clave del
+  // correo: se exigen abajo solo con ALMACENAMIENTO_TRANSPORTE=produccion.
+  CLOUDINARY_CLOUD_NAME: z.string().default(""),
+  CLOUDINARY_API_KEY: z.string().default(""),
+  CLOUDINARY_API_SECRET: z.string().default(""),
+
+  // Carpeta propia para los documentos de identidad (la cuenta usa carpetas
+  // dinámicas: es la carpeta de la biblioteca, no parte del public_id). Así
+  // quedan separados del resto de los recursos y se pueden auditar juntos.
+  CLOUDINARY_CARPETA_IDENTIDADES: z.string().default("localcl/identidades"),
+
   // Consulta a Have I Been Pwned al elegir contraseña. Se apaga en las pruebas
   // de integración para que no dependan de la red: el comportamiento del
   // módulo se prueba aparte, con fetch simulado.
@@ -47,6 +63,20 @@ const esquema = z.object({
   // en una variable de credencial es justo lo que después se cuela a
   // producción sin que nadie lo note.
   .superRefine((valores, contexto) => {
+    if (valores.ALMACENAMIENTO_TRANSPORTE === "produccion") {
+      for (const clave of ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"] as const) {
+        if (valores[clave].length === 0) {
+          contexto.addIssue({
+            code: "custom",
+            path: [clave],
+            message:
+              "Es obligatoria cuando ALMACENAMIENTO_TRANSPORTE=produccion. Sin ella la API " +
+              "arrancaría y fallaría recién cuando un prestador subiera su documento.",
+          });
+        }
+      }
+    }
+
     if (valores.CORREO_TRANSPORTE === "produccion" && valores.CORREO_API_CLAVE.length === 0) {
       contexto.addIssue({
         code: "custom",

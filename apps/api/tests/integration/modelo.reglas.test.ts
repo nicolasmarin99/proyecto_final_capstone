@@ -341,7 +341,7 @@ describe("datos maestros", () => {
     expect(await prisma.comuna.count({ where: { regionId: 13 } })).toBe(52);
     expect(await prisma.comuna.count({ where: { regionId: 16 } })).toBe(21);
     expect(await prisma.categoria.count()).toBe(6);
-    expect(await prisma.tipoCredencial.count()).toBe(5);
+    expect(await prisma.tipoCredencial.count()).toBe(6);
     expect(await prisma.versionTerminos.count()).toBe(1);
   });
 });

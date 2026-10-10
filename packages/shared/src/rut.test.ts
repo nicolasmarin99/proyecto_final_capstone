@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { esRutValido, normalizarRut } from "./rut.js";
+import { esRutValido, formatearRut, normalizarRut } from "./rut.js";
 
 // RUT real de referencia: 12.345.678-5 tiene dígito verificador correcto.
 const RUT_VALIDO = "12345678-5";
@@ -92,5 +92,22 @@ describe("esRutValido", () => {
 
   it("rechaza un RUT demasiado largo aunque el verificador cuadre", () => {
     expect(esRutValido("123456789-2")).toBe(false);
+  });
+});
+
+describe("formatearRut", () => {
+  it("agrega los puntos de miles a la forma canónica", () => {
+    expect(formatearRut("12345678-5")).toBe("12.345.678-5");
+    expect(formatearRut("1234567-4")).toBe("1.234.567-4");
+    expect(formatearRut("10000013-K")).toBe("10.000.013-K");
+  });
+
+  it("acepta cualquier escritura y la normaliza antes", () => {
+    expect(formatearRut("12.345.678-5")).toBe("12.345.678-5");
+    expect(formatearRut("123456785")).toBe("12.345.678-5");
+  });
+
+  it("devuelve vacío si no hay un RUT", () => {
+    expect(formatearRut("")).toBe("");
   });
 });

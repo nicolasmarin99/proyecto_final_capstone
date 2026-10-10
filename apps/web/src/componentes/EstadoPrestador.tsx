@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router";
-import type { ClienteApi } from "../api/cliente";
+import type { ClienteApi, EstadoIdentidad } from "../api/cliente";
 import { clasesBoton } from "./Boton";
 import { Icono } from "./iconos";
 
@@ -8,20 +8,51 @@ interface Paso {
   titulo: string;
   listo: boolean;
   detalle: string;
+  /** Texto del estado cuando no está listo. Por defecto, "Pendiente". */
+  estadoTexto?: string;
+}
+
+/** El paso de identidad según la última verificación del prestador. */
+function pasoIdentidad(identidad: EstadoIdentidad | null | undefined): Paso {
+  const titulo = "Identidad verificada";
+
+  switch (identidad?.estado) {
+    case "VERIFICADA":
+      return { titulo, listo: true, detalle: "Revisamos tu cédula y la eliminamos." };
+    case "PENDIENTE":
+      return { titulo, listo: false, estadoTexto: "En revisión", detalle: "Un administrador está revisando tu cédula." };
+    case "RECHAZADA":
+      return {
+        titulo,
+        listo: false,
+        detalle: `Rechazada: ${identidad.motivoRechazo ?? "sin motivo"}. Puedes volver a subirla.`,
+      };
+    default:
+      // undefined: no se pudo consultar; null: nunca la subió.
+      return {
+        titulo,
+        listo: false,
+        detalle:
+          identidad === undefined
+            ? "No pudimos consultar el estado de tu verificación."
+            : "Sube tu cédula desde tu perfil de prestador.",
+      };
+  }
 }
 
 /**
  * Qué le falta a un prestador para aparecer en las búsquedas.
  *
- * Solo el primer paso se puede cumplir hoy. Verificar la identidad y publicar
- * servicios todavía no existen en la plataforma: se muestran como pendientes
- * y sin enlace, para no prometer una pantalla que no hay.
+ * Publicar servicios todavía no existe en la plataforma: se muestra como
+ * pendiente y sin enlace, para no prometer una pantalla que no hay.
  */
 export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
   const idTitulo = useId();
   // undefined mientras carga; false si todavía no creó su perfil.
   const [tienePerfil, setTienePerfil] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState(false);
+  // undefined si no se pudo consultar; null si nunca subió su cédula.
+  const [identidad, setIdentidad] = useState<EstadoIdentidad | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelado = false;
@@ -33,6 +64,16 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
       })
       .catch(() => {
         if (!cancelado) setError(true);
+      });
+
+    // Aparte del perfil: si esta consulta falla, el resto del estado igual se muestra.
+    cliente
+      .obtenerMiIdentidad()
+      .then((datos) => {
+        if (!cancelado) setIdentidad(datos.identidad);
+      })
+      .catch(() => {
+        if (!cancelado) setIdentidad(undefined);
       });
 
     return () => {
@@ -56,11 +97,7 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
       listo: tienePerfil,
       detalle: tienePerfil ? "Comuna, descripción, teléfono y radio de atención." : "Te falta crearlo.",
     },
-    {
-      titulo: "Identidad verificada",
-      listo: false,
-      detalle: "La verificación de identidad aún no está disponible.",
-    },
+    pasoIdentidad(identidad),
     {
       titulo: "Al menos un servicio publicado",
       listo: false,
@@ -96,7 +133,7 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
                 <span className="font-semibold text-noche">{paso.titulo}</span>
                 {/* El estado va en texto: el color y el ícono solos no bastan. */}
                 <span className={`font-medium ${paso.listo ? "text-exito-700" : "text-texto-suave"}`}>
-                  {paso.listo ? "Listo" : "Pendiente"}
+                  {paso.listo ? "Listo" : (paso.estadoTexto ?? "Pendiente")}
                 </span>
               </span>
               <span className="block text-texto-suave">{paso.detalle}</span>

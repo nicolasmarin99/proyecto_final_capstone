@@ -9,3 +9,6 @@ coverage/
 .expo/
 *.log
 .DS_Store
+# Imágenes para probar a mano la carga de documentos de identidad.
+# Nunca deben subirse al repositorio, aunque sean de prueba.
+apps/api/tests/fixtures-manuales/

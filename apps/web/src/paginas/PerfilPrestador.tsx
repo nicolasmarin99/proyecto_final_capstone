@@ -15,6 +15,7 @@ import { CampoAreaTexto } from "../componentes/CampoAreaTexto";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { Pagina } from "../componentes/Pagina";
 import { SelectorComuna } from "../componentes/SelectorComuna";
+import { VerificacionIdentidad } from "../componentes/VerificacionIdentidad";
 
 const RADIO_POR_DEFECTO = "10";
 
@@ -251,7 +252,10 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
         </Boton>
       </form>
 
-      <Link to="/perfil" className={`mt-3 ${clasesBoton("secundario")}`}>
+      {/* La API pide el perfil antes de aceptar la cédula: se ofrece recién cuando existe. */}
+      {tienePerfil && <VerificacionIdentidad cliente={cliente} />}
+
+      <Link to="/perfil" className={`mt-6 ${clasesBoton("secundario")}`}>
         Volver a mi cuenta
       </Link>
     </Pagina>

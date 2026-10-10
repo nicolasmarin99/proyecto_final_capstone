@@ -498,3 +498,79 @@ Content-Type: application/json
   "radioAtencionKm": 15
 }
 
+
+# ─── Verificación de identidad ───────────────────────────────────────────────
+# Requisitos: npm run seed:maestros (crea el tipo IDENTIDAD), un prestador con
+# correo verificado y perfil (casos 34) y una cuenta ADMINISTRADOR.
+# Con ALMACENAMIENTO_TRANSPORTE=memoria los archivos viven en la API y se
+# pierden al reiniciarla.
+#
+# USA UNA IMAGEN DE PRUEBA, nunca una cédula real: guárdala en
+# apps/api/tests/fixtures-manuales/ (ignorada por Git) o ajusta la ruta.
+
+@tokenAdmin = pega-aqui-el-accessToken-de-un-administrador
+@idIdentidad = pega-aqui-el-id-que-devuelve-la-cola
+
+### 41. Subir el documento → 201, estado PENDIENTE
+POST {{host}}/prestadores/yo/identidad
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: multipart/form-data; boundary=LocalCL
+
+--LocalCL
+Content-Disposition: form-data; name="documento"; filename="cualquier-nombre.jpg"
+Content-Type: image/jpeg
+
+< ./tests/fixtures-manuales/documento-de-prueba.jpg
+--LocalCL--
+
+### 42. Subir otra vez con una pendiente → 409 VERIFICACION_PENDIENTE
+# Repite el caso 41.
+
+### 43. Un archivo de texto con nombre .jpg → 400, detalle en "documento"
+POST {{host}}/prestadores/yo/identidad
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: multipart/form-data; boundary=LocalCL
+
+--LocalCL
+Content-Disposition: form-data; name="documento"; filename="cedula.jpg"
+Content-Type: image/jpeg
+
+esto no es una imagen
+--LocalCL--
+
+### 44. Estado propio → 200, sin ninguna URL del documento
+GET {{host}}/prestadores/yo/identidad
+Authorization: Bearer {{tokenPrestador}}
+
+### 45. Cola de revisión → 200, paginada (copia un id en @idIdentidad)
+GET {{host}}/admin/identidades?estado=PENDIENTE&pagina=1&porPagina=20
+Authorization: Bearer {{tokenAdmin}}
+
+### 46. La cola con token de prestador → 403 SIN_PERMISOS
+GET {{host}}/admin/identidades
+Authorization: Bearer {{tokenPrestador}}
+
+### 47. URL firmada del documento → 200 { url, expiraEn }, Cache-Control: no-store
+# Queda registrado en accesos_documento. Compruébalo con:
+#   docker exec localcl-db psql -U postgres -d localcl \
+#     -c "SELECT credencial_id, administrador_id, creado_en FROM accesos_documento;"
+GET {{host}}/admin/identidades/{{idIdentidad}}/documento
+Authorization: Bearer {{tokenAdmin}}
+
+### 48. Rechazar sin motivo → 400, detalle en "motivo"
+PATCH {{host}}/admin/identidades/{{idIdentidad}}/rechazar
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{}
+
+### 49. Rechazar con motivo → 200, el archivo se elimina
+PATCH {{host}}/admin/identidades/{{idIdentidad}}/rechazar
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "motivo": "La foto está borrosa y no se lee el RUT." }
+
+### 50. Aprobar (sobre una pendiente) → 200, rut_verificado = true y archivo eliminado
+PATCH {{host}}/admin/identidades/{{idIdentidad}}/aprobar
+Authorization: Bearer {{tokenAdmin}}
