@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { clasesBoton } from "../componentes/Boton";
 import { clienteApi, type ClienteApi } from "../api/cliente";
+import { useAuth } from "../auth/ContextoAuth";
 import { PaginaAuth } from "../componentes/PaginaAuth";
 
 type Estado = "verificando" | "listo" | "invalido";
@@ -15,6 +16,10 @@ type Estado = "verificando" | "listo" | "invalido";
  */
 export default function PaginaVerificarCorreo({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const [parametros] = useSearchParams();
+  const { usuario } = useAuth();
+  // Normalmente el enlace se abre sin sesión. Si quien lo abre ya entró como
+  // prestador, se lo lleva directo al paso que sigue: completar su perfil.
+  const prestadorConectado = usuario?.rol === "PRESTADOR";
   const [estado, setEstado] = useState<Estado>("verificando");
 
   const token = parametros.get("token");
@@ -59,6 +64,12 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
             className="motion-safe:animate-aparecer-corto rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700"
           >
             Tu correo quedó confirmado. Ya puedes publicar servicios y dejar valoraciones.
+            {!usuario && (
+              <span className="mt-1 block">
+                Si eres prestador, al entrar te pediremos completar tu perfil: es lo que permite que
+                los clientes de tu zona te encuentren.
+              </span>
+            )}
           </div>
         )}
 
@@ -73,12 +84,18 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
         )}
       </div>
 
-      {estado !== "verificando" && (
+      {estado === "listo" && prestadorConectado && (
+        <Link to="/perfil-prestador" className={`mt-7 ${clasesBoton("principal")}`}>
+          Completar mi perfil de prestador
+        </Link>
+      )}
+
+      {estado !== "verificando" && !(estado === "listo" && prestadorConectado) && (
         <Link
-          to="/iniciar-sesion"
+          to={usuario ? "/perfil" : "/iniciar-sesion"}
           className={`mt-7 ${clasesBoton("principal")}`}
         >
-          Ir a iniciar sesión
+          {usuario ? "Ir a mi perfil" : "Ir a iniciar sesión"}
         </Link>
       )}
     </PaginaAuth>

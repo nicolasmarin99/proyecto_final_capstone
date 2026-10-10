@@ -337,7 +337,9 @@ describe("datos maestros", () => {
     await cargarMaestros(prisma);
 
     expect(await prisma.region.count()).toBe(16);
+    expect(await prisma.comuna.count()).toBe(346);
     expect(await prisma.comuna.count({ where: { regionId: 13 } })).toBe(52);
+    expect(await prisma.comuna.count({ where: { regionId: 16 } })).toBe(21);
     expect(await prisma.categoria.count()).toBe(6);
     expect(await prisma.tipoCredencial.count()).toBe(5);
     expect(await prisma.versionTerminos.count()).toBe(1);

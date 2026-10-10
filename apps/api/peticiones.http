@@ -256,7 +256,7 @@ POST {{host}}/auth/refrescar
 #
 #   # 4. Comprobar que no queda ninguna sesión activa del usuario
 #   docker exec localcl-db psql -U postgres -d localcl \
-#     -c "SELECT id, \"revocadaEn\", \"reemplazadaPor\" FROM sesiones;"
+#     -c "SELECT id, revocada_en, reemplazada_por FROM sesiones;"
 # =====================================================================
 
 # =====================================================================
@@ -398,7 +398,7 @@ Content-Type: application/json
 ### 31. Cambiar contraseña con la actual correcta → 200
 # Cierra las demás sesiones y mantiene esta. Comprueba con:
 #   docker exec localcl-db psql -U postgres -d localcl \
-#     -c "SELECT left(id,8), \"revocadaEn\" IS NULL AS activa FROM sesiones;"
+#     -c "SELECT left(id,8), revocada_en IS NULL AS activa FROM sesiones;"
 POST {{host}}/auth/cambiar-contrasena
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -407,3 +407,94 @@ Content-Type: application/json
   "contrasenaActual": "contrasena-segura-123",
   "contrasenaNueva": "otra-contrasena-987654"
 }
+
+# ─── Perfil de prestador y comunas ───────────────────────────────────────────
+# Requisitos: npm run seed:maestros (carga las 346 comunas) y un prestador
+# con el correo verificado (casos 9a y 21). Inicia sesión con él (caso 10) y
+# pega su accessToken aquí.
+
+@tokenPrestador = pega-aqui-el-accessToken-de-un-prestador-verificado
+
+### 32. Comunas → 200, pública, 346 filas con su región, ordenadas por nombre
+GET {{host}}/comunas
+
+### 33. Mi perfil antes de crearlo → 404 PERFIL_NO_ENCONTRADO
+GET {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+
+### 34. Crear el perfil → 201, teléfono guardado como +56912345678
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "descripcion": "Gasfíter con 10 años de experiencia en calefont y filtraciones.",
+  "telefono": "9 1234 5678",
+  "comunaId": 13101,
+  "radioAtencionKm": 15
+}
+
+### 35. Editarlo → 200 y el MISMO id (no crea un segundo perfil)
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "descripcion": "Gasfíter con 10 años de experiencia. Atiendo también en Ñuble.",
+  "telefono": "+56 9 1234 5678",
+  "comunaId": 16101,
+  "radioAtencionKm": 40
+}
+
+### 36. Mi perfil después de crearlo → 200
+GET {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+
+### 37. Teléfono fijo → 400 DATOS_INVALIDOS con detalle en telefono
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "descripcion": "Gasfíter con 10 años de experiencia en calefont y filtraciones.",
+  "telefono": "2 2123 4567",
+  "comunaId": 13101,
+  "radioAtencionKm": 15
+}
+
+### 38. Comuna inexistente → 400 con detalle en comunaId
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "descripcion": "Gasfíter con 10 años de experiencia en calefont y filtraciones.",
+  "telefono": "9 1234 5678",
+  "comunaId": 99999,
+  "radioAtencionKm": 15
+}
+
+### 39. Descripción de 19 caracteres → 400 con detalle en descripcion
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "descripcion": "aaaaaaaaaaaaaaaaaaa",
+  "telefono": "9 1234 5678",
+  "comunaId": 13101,
+  "radioAtencionKm": 15
+}
+
+### 40. Con token de CLIENTE → 403 SIN_PERMISOS
+PUT {{host}}/prestadores/yo
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{
+  "descripcion": "Intento crear un perfil de prestador siendo cliente.",
+  "telefono": "9 1234 5678",
+  "comunaId": 13101,
+  "radioAtencionKm": 15
+}
+
