@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { clasesBoton } from "../componentes/Boton";
+import { ColaIdentidades } from "../componentes/ColaIdentidades";
 import { clienteApi, ErrorApi, type ClienteApi, type ResumenAdmin } from "../api/cliente";
 import { Pagina } from "../componentes/Pagina";
 
@@ -34,7 +35,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
   }, [cliente]);
 
   return (
-    <Pagina titulo="Panel de administración">
+    <Pagina titulo="Panel de administración" ancho="amplio">
       <div className="mt-6">
         {error && (
           <p
@@ -64,6 +65,13 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
                 </div>
               ))}
             </dl>
+
+            {/*
+              Solo después de que el resumen cargó: el servidor ya confirmó
+              que es administrador, así que no se piden datos de personas
+              para terminar mostrando un 403.
+            */}
+            <ColaIdentidades cliente={cliente} />
           </>
         )}
       </div>

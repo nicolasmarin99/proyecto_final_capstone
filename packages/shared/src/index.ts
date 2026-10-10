@@ -1,4 +1,4 @@
-export { esRutValido, normalizarRut } from "./rut.js";
+export { esRutValido, formatearRut, normalizarRut } from "./rut.js";
 export {
   LARGO_MAXIMO_CONTRASENA,
   LARGO_MINIMO_CONTRASENA,
@@ -14,3 +14,4 @@ export {
   RADIO_MAXIMO_KM,
   RADIO_MINIMO_KM,
 } from "./perfilPrestador.js";
+export { TAMANO_MAXIMO_DOCUMENTO, TIPOS_DOCUMENTO_PERMITIDOS } from "./documento.js";

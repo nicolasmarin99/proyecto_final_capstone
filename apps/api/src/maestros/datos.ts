@@ -426,6 +426,17 @@ export const TIPOS_CREDENCIAL: {
   requiereVigencia: boolean;
 }[] = [
   {
+    // Se revisa a mano: un administrador compara el nombre y el RUT de la
+    // cuenta con la cédula. Sin vigencia guardada a propósito: la fecha de
+    // vencimiento de la cédula es un dato más que no hace falta conservar, y
+    // el documento se elimina al terminar la revisión.
+    codigo: "IDENTIDAD",
+    nombre: "Cédula de identidad",
+    fuenteOficial: "Servicio de Registro Civil e Identificación",
+    metodoVerificacion: "MANUAL",
+    requiereVigencia: false,
+  },
+  {
     codigo: "SEC_INSTALADOR_ELECTRICO",
     nombre: "Instalador eléctrico autorizado (SEC)",
     fuenteOficial: "Superintendencia de Electricidad y Combustibles",
