@@ -113,7 +113,8 @@ model Comuna {
   region   Region   @relation(fields: [regionId], references: [id], onDelete: Restrict)
   creadoEn DateTime @default(now()) @map("creado_en")
 
-  perfiles PerfilPrestador[]
+  perfiles               PerfilPrestador[]
+  prestadoresQueAtienden PrestadorComuna[]
 
   @@unique([regionId, nombre])
   @@map("comunas")
@@ -139,13 +140,32 @@ model PerfilPrestador {
   creadoEn         DateTime @default(now()) @map("creado_en")
   actualizadoEn    DateTime @updatedAt @map("actualizado_en")
 
-  servicios    Servicio[]
-  credenciales Credencial[]
-  contactos    Contacto[]
+  servicios       Servicio[]
+  credenciales    Credencial[]
+  contactos       Contacto[]
+  comunasAtencion PrestadorComuna[]
 
   @@index([comunaId])
   @@index([ubicacion], type: Gist)
   @@map("perfiles_prestador")
+}
+
+/// Comunas donde atiende un prestador (N:M). Es independiente de la comuna
+/// base del perfil (comunaId) y de su radio de atención: esos dos quedan para
+/// la búsqueda por cercanía; esta lista es la que el prestador declara.
+///
+/// Clave primaria compuesta: una comuna no puede repetirse para el mismo
+/// prestador. El máximo de 20 lo impone la API (un CHECK no puede contar filas).
+model PrestadorComuna {
+  prestadorId String          @map("prestador_id")
+  prestador   PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+  comunaId    Int             @map("comuna_id")
+  comuna      Comuna          @relation(fields: [comunaId], references: [id], onDelete: Restrict)
+
+  @@id([prestadorId, comunaId])
+  /// Para la búsqueda futura "quién atiende en esta comuna".
+  @@index([comunaId])
+  @@map("prestadores_comunas")
 }
 
 // ─── Catálogo ────────────────────────────────────────────────────────────

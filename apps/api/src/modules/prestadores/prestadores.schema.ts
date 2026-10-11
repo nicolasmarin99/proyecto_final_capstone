@@ -1,4 +1,6 @@
 import {
+  MAXIMO_COMUNAS_ATENCION,
+  MINIMO_COMUNAS_ATENCION,
   LARGO_MAXIMO_DESCRIPCION,
   LARGO_MINIMO_DESCRIPCION,
   normalizarTelefono,
@@ -58,3 +60,21 @@ export const esquemaPerfilPrestador = z.object({
 });
 
 export type DatosPerfilPrestador = z.infer<typeof esquemaPerfilPrestador>;
+
+/**
+ * PUT /prestadores/yo/comunas: la lista completa de comunas donde atiende.
+ * Reemplaza la anterior (no suma), así que la web siempre manda todas.
+ */
+export const esquemaComunasAtencion = z.object({
+  comunaIds: z
+    .array(z.number({ error: "Cada comuna debe ser un número." }).int().positive(), {
+      error: "Envía la lista de comunas.",
+    })
+    .min(MINIMO_COMUNAS_ATENCION, "Elige al menos una comuna donde atiendes.")
+    .max(MAXIMO_COMUNAS_ATENCION, `Puedes elegir hasta ${MAXIMO_COMUNAS_ATENCION} comunas.`)
+    .refine((ids) => new Set(ids).size === ids.length, "No repitas comunas."),
+});
+
+/** GET /prestadores/:id/contacto?servicio=... — ruta y consulta se validan por separado. */
+export const esquemaIdPrestador = z.object({ id: z.string().min(1).max(64) });
+export const esquemaConsultaContacto = z.object({ servicio: z.string().min(1).max(64).optional() });

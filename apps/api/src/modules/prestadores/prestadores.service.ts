@@ -1,7 +1,31 @@
 import { ErrorHttp } from "../../shared/errores.js";
 import { existeComuna } from "../territorio/territorio.repository.js";
-import { buscarPerfilPorUsuario, existePerfil, guardarPerfil } from "./prestadores.repository.js";
+import {
+  buscarIdPerfil,
+  buscarPerfilPorUsuario,
+  buscarPrestadorParaContacto,
+  buscarServicioParaContacto,
+  contarComunasExistentes,
+  existePerfil,
+  guardarPerfil,
+  reemplazarComunasAtencion,
+  registrarContacto,
+} from "./prestadores.repository.js";
 import type { DatosPerfilPrestador } from "./prestadores.schema.js";
+
+const ordenEspanol = new Intl.Collator("es");
+
+type PerfilLeido = NonNullable<Awaited<ReturnType<typeof buscarPerfilPorUsuario>>>;
+
+/** Aplana las comunas de atención (vienen como filas de la tabla intermedia). */
+function conComunasAtencion(perfil: PerfilLeido) {
+  return {
+    ...perfil,
+    comunasAtencion: perfil.comunasAtencion
+      .map(({ comuna }) => comuna)
+      .sort((a, b) => ordenEspanol.compare(a.nombre, b.nombre)),
+  };
+}
 
 export async function obtenerMiPerfil(usuarioId: string) {
   const perfil = await buscarPerfilPorUsuario(usuarioId);
@@ -12,7 +36,7 @@ export async function obtenerMiPerfil(usuarioId: string) {
     throw new ErrorHttp(404, "PERFIL_NO_ENCONTRADO", "Aún no has creado tu perfil de prestador.");
   }
 
-  return perfil;
+  return conComunasAtencion(perfil);
 }
 
 /**
@@ -32,5 +56,64 @@ export async function guardarMiPerfil(usuarioId: string, datos: DatosPerfilPrest
   const creado = !(await existePerfil(usuarioId));
   const perfil = await guardarPerfil(usuarioId, datos);
 
-  return { perfil, creado };
+  return { perfil: conComunasAtencion(perfil), creado };
+}
+
+function datoInvalido(campo: string, mensaje: string) {
+  return new ErrorHttp(400, "DATOS_INVALIDOS", "Los datos enviados no son válidos.", [{ campo, mensaje }]);
+}
+
+export async function definirComunasAtencion(usuarioId: string, comunaIds: number[]) {
+  const perfil = await buscarIdPerfil(usuarioId);
+
+  if (!perfil) {
+    throw new ErrorHttp(409, "PERFIL_REQUERIDO", "Completa tu perfil de prestador antes de elegir comunas.");
+  }
+
+  // Antes de tocar nada: si una no existe, no se borra ninguna de las actuales.
+  if ((await contarComunasExistentes(comunaIds)) !== comunaIds.length) {
+    throw datoInvalido("comunaIds", "Alguna de las comunas elegidas no existe.");
+  }
+
+  const comunas = await reemplazarComunasAtencion(perfil.id, comunaIds);
+
+  return comunas.sort((a, b) => ordenEspanol.compare(a.nombre, b.nombre));
+}
+
+/**
+ * Entrega el teléfono de un prestador y deja registrado el contacto.
+ *
+ * - Solo de prestadores con al menos un servicio PUBLICADO: sin esta regla,
+ *   cualquiera con sesión podría recorrer ids y juntar los teléfonos de
+ *   quienes nunca publicaron nada.
+ * - El contacto se registra ANTES de devolver el teléfono: es la prueba de
+ *   que hubo una relación, y de él colgará la valoración.
+ * - Nadie se contacta a sí mismo: ensuciaría la reputación.
+ */
+export async function obtenerContacto(usuarioId: string, prestadorId: string, servicioId: string | undefined) {
+  const prestador = await buscarPrestadorParaContacto(prestadorId);
+
+  if (!prestador || prestador._count.servicios === 0) {
+    throw new ErrorHttp(404, "PRESTADOR_NO_ENCONTRADO", "Ese prestador no existe o no tiene servicios publicados.");
+  }
+
+  if (prestador.usuarioId === usuarioId) {
+    throw new ErrorHttp(400, "AUTOCONTACTO", "No puedes contactarte a ti mismo.");
+  }
+
+  if (servicioId !== undefined) {
+    const servicio = await buscarServicioParaContacto(servicioId);
+
+    if (!servicio || servicio.prestadorId !== prestadorId || servicio.estado !== "PUBLICADO") {
+      throw datoInvalido("servicio", "Ese servicio no está publicado por este prestador.");
+    }
+  }
+
+  if (!prestador.telefono) {
+    throw new ErrorHttp(409, "SIN_TELEFONO", "Este prestador todavía no registró un teléfono de contacto.");
+  }
+
+  await registrarContacto({ clienteId: usuarioId, prestadorId, servicioId: servicioId ?? null });
+
+  return { telefono: prestador.telefono };
 }

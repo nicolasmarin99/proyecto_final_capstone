@@ -13,6 +13,7 @@ import PaginaRegistro from "./paginas/Registro";
 import PaginaRegistroPrestador from "./paginas/RegistroPrestador";
 import PaginaRestablecerContrasena from "./paginas/RestablecerContrasena";
 import PaginaRevisaTuCorreo from "./paginas/RevisaTuCorreo";
+import PaginaServicio from "./paginas/Servicio";
 import PaginaVerificarCorreo from "./paginas/VerificarCorreo";
 
 export default function App() {
@@ -20,6 +21,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<PaginaInicio />} />
       <Route path="/buscar" element={<PaginaBuscar />} />
+      {/* Pública: la ve cualquiera. Solo el contacto exige sesión. */}
+      <Route path="/servicios/:id" element={<PaginaServicio />} />
       <Route path="/estado" element={<PaginaEstado />} />
       <Route path="/registro" element={<PaginaRegistro />} />
       <Route path="/registro-prestador" element={<PaginaRegistroPrestador />} />

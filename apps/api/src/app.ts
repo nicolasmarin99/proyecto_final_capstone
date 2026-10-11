@@ -11,7 +11,7 @@ import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
 import { rutasIdentidadAdmin, rutasIdentidadPrestador } from "./modules/identidad/identidad.routes.js";
 import { rutasPrestadores } from "./modules/prestadores/prestadores.routes.js";
-import { rutasServicios } from "./modules/servicios/servicios.routes.js";
+import { rutasCategorias, rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { rutasComunas } from "./modules/territorio/territorio.routes.js";
 import { ErrorHttp } from "./shared/errores.js";
 
@@ -39,6 +39,7 @@ app.use("/admin", rutasAdmin);
 app.use("/servicios", rutasServicios);
 app.use("/prestadores", rutasPrestadores);
 app.use("/comunas", rutasComunas);
+app.use("/categorias", rutasCategorias);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { codigo: "NO_ENCONTRADO", mensaje: "Recurso no encontrado" } });
