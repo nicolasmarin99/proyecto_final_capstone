@@ -58,6 +58,68 @@ export interface PerfilPrestador {
   telefono: string;
   radioAtencionKm: number;
   comuna: Comuna;
+  /** Comunas donde declara atender (distintas de su comuna base). */
+  comunasAtencion: Comuna[];
+}
+
+export type UnidadPrecio = "POR_SERVICIO" | "POR_HORA" | "POR_DIA" | "POR_METRO_CUADRADO" | "POR_PERSONA";
+export type EstadoServicio = "BORRADOR" | "PUBLICADO" | "PAUSADO" | "OCULTO";
+
+export interface Categoria {
+  slug: string;
+  nombre: string;
+}
+
+export interface Precio {
+  precioDesde: number | null;
+  precioHasta: number | null;
+  unidadPrecio: UnidadPrecio | null;
+}
+
+export interface ServicioPropio extends Precio {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  estado: EstadoServicio;
+  categoria: Categoria;
+}
+
+export interface RequisitoPendiente {
+  codigo: string;
+  mensaje: string;
+}
+
+export interface ResultadoServicio {
+  servicio: ServicioPropio;
+  requisitosPendientes: RequisitoPendiente[];
+}
+
+export interface DatosServicio extends Precio {
+  categoria: string;
+  titulo: string;
+  descripcion: string;
+  estado: "PUBLICADO" | "PAUSADO";
+}
+
+export interface CredencialPublica {
+  tipo: string;
+  emisor: string;
+  verificadaEn: string | null;
+  /** Contrastada contra el registro del organismo, o revisada a mano por LocalCL. */
+  acreditacion: "REGISTRO_OFICIAL" | "REVISADA_POR_LOCALCL";
+}
+
+export interface ServicioPublico extends Precio {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: Categoria;
+  prestador: {
+    id: string;
+    nombre: string;
+    comunas: { id: number; nombre: string; region: string }[];
+    credenciales: CredencialPublica[];
+  };
 }
 
 export interface DatosPerfilPrestador {
@@ -192,7 +254,7 @@ function leerPerfilPrestador(valor: unknown): PerfilPrestador | null {
     return null;
   }
 
-  const { id, descripcion, telefono, radioAtencionKm, comuna } = valor.perfil;
+  const { id, descripcion, telefono, radioAtencionKm, comuna, comunasAtencion } = valor.perfil;
   const comunaLeida = leerComuna(comuna);
 
   if (
@@ -205,7 +267,137 @@ function leerPerfilPrestador(valor: unknown): PerfilPrestador | null {
     return null;
   }
 
-  return { id, descripcion, telefono, radioAtencionKm, comuna: comunaLeida };
+  return {
+    id,
+    descripcion,
+    telefono,
+    radioAtencionKm,
+    comuna: comunaLeida,
+    comunasAtencion: leerLista(comunasAtencion, leerComuna),
+  };
+}
+
+/** Lee una lista descartando los elementos que no tienen la forma esperada. */
+function leerLista<T>(valor: unknown, leer: (elemento: unknown) => T | null): T[] {
+  if (!Array.isArray(valor)) return [];
+  return valor.flatMap((elemento: unknown) => {
+    const leido = leer(elemento);
+    return leido === null ? [] : [leido];
+  });
+}
+
+const UNIDADES: readonly string[] = ["POR_SERVICIO", "POR_HORA", "POR_DIA", "POR_METRO_CUADRADO", "POR_PERSONA"];
+const ESTADOS_SERVICIO: readonly string[] = ["BORRADOR", "PUBLICADO", "PAUSADO", "OCULTO"];
+
+function esUnidad(valor: unknown): valor is UnidadPrecio {
+  return typeof valor === "string" && UNIDADES.includes(valor);
+}
+
+function esEstadoServicio(valor: unknown): valor is EstadoServicio {
+  return typeof valor === "string" && ESTADOS_SERVICIO.includes(valor);
+}
+
+function leerCategoria(valor: unknown): Categoria | null {
+  return esObjeto(valor) && typeof valor.slug === "string" && typeof valor.nombre === "string"
+    ? { slug: valor.slug, nombre: valor.nombre }
+    : null;
+}
+
+function leerPrecio(valor: Record<string, unknown>): Precio {
+  return {
+    precioDesde: typeof valor.precioDesde === "number" ? valor.precioDesde : null,
+    precioHasta: typeof valor.precioHasta === "number" ? valor.precioHasta : null,
+    unidadPrecio: esUnidad(valor.unidadPrecio) ? valor.unidadPrecio : null,
+  };
+}
+
+function leerServicioPropio(valor: unknown): ServicioPropio | null {
+  if (!esObjeto(valor)) return null;
+  const categoria = leerCategoria(valor.categoria);
+  const { id, titulo, descripcion, estado } = valor;
+
+  if (
+    typeof id !== "string" ||
+    typeof titulo !== "string" ||
+    typeof descripcion !== "string" ||
+    !esEstadoServicio(estado) ||
+    !categoria
+  ) {
+    return null;
+  }
+
+  return { id, titulo, descripcion, estado, categoria, ...leerPrecio(valor) };
+}
+
+function leerRequisito(valor: unknown): RequisitoPendiente | null {
+  return esObjeto(valor) && typeof valor.codigo === "string" && typeof valor.mensaje === "string"
+    ? { codigo: valor.codigo, mensaje: valor.mensaje }
+    : null;
+}
+
+function leerResultadoServicio(valor: unknown): ResultadoServicio | null {
+  if (!esObjeto(valor)) return null;
+  const servicio = leerServicioPropio(valor.servicio);
+  return servicio ? { servicio, requisitosPendientes: leerLista(valor.requisitosPendientes, leerRequisito) } : null;
+}
+
+function leerCredencialPublica(valor: unknown): CredencialPublica | null {
+  if (
+    !esObjeto(valor) ||
+    typeof valor.tipo !== "string" ||
+    typeof valor.emisor !== "string" ||
+    (valor.acreditacion !== "REGISTRO_OFICIAL" && valor.acreditacion !== "REVISADA_POR_LOCALCL")
+  ) {
+    return null;
+  }
+
+  return {
+    tipo: valor.tipo,
+    emisor: valor.emisor,
+    verificadaEn: typeof valor.verificadaEn === "string" ? valor.verificadaEn : null,
+    acreditacion: valor.acreditacion,
+  };
+}
+
+function leerComunaPublica(valor: unknown): { id: number; nombre: string; region: string } | null {
+  return esObjeto(valor) &&
+    typeof valor.id === "number" &&
+    typeof valor.nombre === "string" &&
+    typeof valor.region === "string"
+    ? { id: valor.id, nombre: valor.nombre, region: valor.region }
+    : null;
+}
+
+function leerServicioPublico(valor: unknown): ServicioPublico | null {
+  if (!esObjeto(valor) || !esObjeto(valor.prestador)) return null;
+  const categoria = leerCategoria(valor.categoria);
+  const { id, titulo, descripcion } = valor;
+  const { id: idPrestador, nombre, comunas, credenciales } = valor.prestador;
+
+  if (
+    typeof id !== "string" ||
+    typeof titulo !== "string" ||
+    typeof descripcion !== "string" ||
+    typeof idPrestador !== "string" ||
+    typeof nombre !== "string" ||
+    !categoria
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    titulo,
+    descripcion,
+    categoria,
+    ...leerPrecio(valor),
+    prestador: {
+      id: idPrestador,
+      nombre,
+      comunas: leerLista(comunas, leerComunaPublica),
+      credenciales: leerLista(credenciales, leerCredencialPublica),
+    },
+  };
 }
 
 const ESTADOS_VERIFICACION: readonly string[] = ["PENDIENTE", "VERIFICADA", "RECHAZADA", "VENCIDA", "REVOCADA"];
@@ -596,6 +788,77 @@ export function crearClienteApi() {
         cuerpo: { motivo },
         autenticada: true,
       });
+    },
+
+    async listarCategorias(): Promise<Categoria[]> {
+      const cuerpo = await peticion("/categorias");
+      return esObjeto(cuerpo) ? leerLista(cuerpo.categorias, leerCategoria) : [];
+    },
+
+    /** Reemplaza las comunas donde atiende el prestador. Devuelve las guardadas. */
+    async definirComunasAtencion(comunaIds: number[]): Promise<Comuna[]> {
+      const cuerpo = await peticion("/prestadores/yo/comunas", {
+        metodo: "PUT",
+        cuerpo: { comunaIds },
+        autenticada: true,
+      });
+      return esObjeto(cuerpo) ? leerLista(cuerpo.comunas, leerComuna) : [];
+    },
+
+    async listarMisServicios(): Promise<{ servicios: ServicioPropio[]; requisitosPendientes: RequisitoPendiente[] }> {
+      const cuerpo = await peticion("/servicios/mios", { autenticada: true });
+
+      if (!esObjeto(cuerpo)) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return {
+        servicios: leerLista(cuerpo.servicios, leerServicioPropio),
+        requisitosPendientes: leerLista(cuerpo.requisitosPendientes, leerRequisito),
+      };
+    },
+
+    async crearServicio(datos: DatosServicio): Promise<ResultadoServicio> {
+      const resultado = leerResultadoServicio(
+        await peticion("/servicios", { metodo: "POST", cuerpo: datos, autenticada: true }),
+      );
+      if (!resultado) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return resultado;
+    },
+
+    async editarServicio(id: string, datos: DatosServicio): Promise<ResultadoServicio> {
+      const resultado = leerResultadoServicio(
+        await peticion(`/servicios/${encodeURIComponent(id)}`, { metodo: "PUT", cuerpo: datos, autenticada: true }),
+      );
+      if (!resultado) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return resultado;
+    },
+
+    async eliminarServicio(id: string): Promise<void> {
+      await peticion(`/servicios/${encodeURIComponent(id)}`, { metodo: "DELETE", autenticada: true });
+    },
+
+    /** Vista pública: sin sesión, y nunca con teléfono, correo ni RUT. */
+    async obtenerServicioPublico(id: string): Promise<ServicioPublico> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(id)}`);
+      const servicio = esObjeto(cuerpo) ? leerServicioPublico(cuerpo.servicio) : null;
+      if (!servicio) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return servicio;
+    },
+
+    /** Registra el contacto en la API y devuelve el teléfono. Exige sesión. */
+    async obtenerContacto(prestadorId: string, servicioId: string): Promise<string> {
+      const consulta = new URLSearchParams({ servicio: servicioId });
+      const cuerpo = await peticion(
+        `/prestadores/${encodeURIComponent(prestadorId)}/contacto?${consulta.toString()}`,
+        { autenticada: true },
+      );
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.telefono !== "string") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return cuerpo.telefono;
     },
 
     async obtenerResumenAdmin(): Promise<ResumenAdmin> {

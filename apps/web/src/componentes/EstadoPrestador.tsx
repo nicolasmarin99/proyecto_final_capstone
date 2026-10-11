@@ -43,8 +43,7 @@ function pasoIdentidad(identidad: EstadoIdentidad | null | undefined): Paso {
 /**
  * Qué le falta a un prestador para aparecer en las búsquedas.
  *
- * Publicar servicios todavía no existe en la plataforma: se muestra como
- * pendiente y sin enlace, para no prometer una pantalla que no hay.
+ * Cada paso se consulta por separado: si uno falla, los demás se muestran igual.
  */
 export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
   const idTitulo = useId();
@@ -53,6 +52,8 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
   const [error, setError] = useState(false);
   // undefined si no se pudo consultar; null si nunca subió su cédula.
   const [identidad, setIdentidad] = useState<EstadoIdentidad | null | undefined>(undefined);
+  // undefined si no se pudo consultar.
+  const [publicados, setPublicados] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     let cancelado = false;
@@ -74,6 +75,15 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
       })
       .catch(() => {
         if (!cancelado) setIdentidad(undefined);
+      });
+
+    cliente
+      .listarMisServicios()
+      .then((datos) => {
+        if (!cancelado) setPublicados(datos.servicios.filter((servicio) => servicio.estado === "PUBLICADO").length);
+      })
+      .catch(() => {
+        if (!cancelado) setPublicados(undefined);
       });
 
     return () => {
@@ -100,8 +110,13 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
     pasoIdentidad(identidad),
     {
       titulo: "Al menos un servicio publicado",
-      listo: false,
-      detalle: "La publicación de servicios aún no está disponible.",
+      listo: (publicados ?? 0) > 0,
+      detalle:
+        publicados === undefined
+          ? "Publica tus servicios desde tu perfil de prestador."
+          : publicados > 0
+            ? `${publicados} ${publicados === 1 ? "servicio publicado" : "servicios publicados"}.`
+            : "Publica un servicio desde tu perfil de prestador.",
     },
   ];
   const pendientes = pasos.filter((paso) => !paso.listo).length;

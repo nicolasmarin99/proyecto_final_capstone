@@ -345,22 +345,30 @@ Content-Type: application/json
 
 { "correo": "ana.perez@ejemplo.cl" }
 
-### 25. Endpoint protegido por correo verificado, SIN verificar → 403
-# Inicia sesión con una cuenta recién creada y pega su token en @token.
+### 25. Publicar un servicio con una cuenta PRESTADOR SIN verificar el correo → 403
+# Inicia sesión con un prestador recién registrado y pega su token en @token.
 POST {{host}}/servicios
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "titulo": "Instalación eléctrica domiciliaria" }
+{
+  "categoria": "electricidad",
+  "titulo": "Instalación eléctrica domiciliaria",
+  "descripcion": "Instalaciones, enchufes, tableros y certificación de la instalación."
+}
 
-### 26. El mismo endpoint tras verificar → 201
-# Con el MISMO token de acceso: el estado se lee de la base, así que no
-# hay que volver a iniciar sesión.
+### 26. El mismo pedido tras verificar el correo → 201 o 409 PERFIL_REQUERIDO
+# Con el MISMO token de acceso: el estado se lee de la base, así que no hay
+# que volver a iniciar sesión. Si todavía no tiene perfil, responde 409.
 POST {{host}}/servicios
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "titulo": "Instalación eléctrica domiciliaria" }
+{
+  "categoria": "electricidad",
+  "titulo": "Instalación eléctrica domiciliaria",
+  "descripcion": "Instalaciones, enchufes, tableros y certificación de la instalación."
+}
 
 ### 27. Pedir recuperación → 202 (idéntico exista o no la cuenta)
 POST {{host}}/auth/recuperar
@@ -574,3 +582,102 @@ Content-Type: application/json
 ### 50. Aprobar (sobre una pendiente) → 200, rut_verificado = true y archivo eliminado
 PATCH {{host}}/admin/identidades/{{idIdentidad}}/aprobar
 Authorization: Bearer {{tokenAdmin}}
+
+# ─── Servicios y contacto ────────────────────────────────────────────────────
+# Requisitos: un prestador con perfil (caso 34). Para que un servicio quede
+# PUBLICADO además necesita identidad verificada (casos 41-50) y comunas de
+# atención (caso 51). Copia el id que devuelve el caso 52 en @idServicio, y
+# el "prestador.id" del caso 56 en @idPrestador.
+
+@idServicio = pega-aqui-el-id-de-un-servicio
+@idPrestador = pega-aqui-el-id-del-perfil-del-prestador
+
+### 51. Comunas de atención → 200 (reemplaza las anteriores; de 1 a 20)
+PUT {{host}}/prestadores/yo/comunas
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{ "comunaIds": [13101, 13114, 13123] }
+
+### 52. Publicar un servicio → 201; PUBLICADO o PAUSADO con requisitosPendientes
+POST {{host}}/servicios
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "categoria": "gasfiteria",
+  "titulo": "Gasfitería a domicilio",
+  "descripcion": "Reparación de calefont, filtraciones y destapes en toda la comuna.",
+  "precioDesde": 25000,
+  "precioHasta": 60000,
+  "unidadPrecio": "POR_SERVICIO",
+  "estado": "PUBLICADO"
+}
+
+### 53. Sin precio → 201, se muestra como «a convenir»
+POST {{host}}/servicios
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "categoria": "cerrajeria",
+  "titulo": "Apertura de puertas sin daño",
+  "descripcion": "Aperturas de urgencia, cambio de chapas y copias de llaves."
+}
+
+### 54. Precio desde mayor que hasta → 400, detalle en precioHasta
+POST {{host}}/servicios
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "categoria": "gasfiteria",
+  "titulo": "Gasfitería a domicilio",
+  "descripcion": "Reparación de calefont, filtraciones y destapes en toda la comuna.",
+  "precioDesde": 60000,
+  "precioHasta": 25000,
+  "unidadPrecio": "POR_SERVICIO"
+}
+
+### 55. Mis servicios → 200, en cualquier estado, con requisitosPendientes
+GET {{host}}/servicios/mios
+Authorization: Bearer {{tokenPrestador}}
+
+### 56. Vista pública, sin sesión → 200, sin teléfono, correo ni RUT (404 si está pausado)
+GET {{host}}/servicios/{{idServicio}}
+
+### 57. Pausar (PUT completo con estado PAUSADO) → 200
+PUT {{host}}/servicios/{{idServicio}}
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "categoria": "gasfiteria",
+  "titulo": "Gasfitería a domicilio",
+  "descripcion": "Reparación de calefont, filtraciones y destapes en toda la comuna.",
+  "precioDesde": 25000,
+  "precioHasta": 60000,
+  "unidadPrecio": "POR_SERVICIO",
+  "estado": "PAUSADO"
+}
+
+### 58. Contacto sin sesión → 401
+GET {{host}}/prestadores/{{idPrestador}}/contacto?servicio={{idServicio}}
+
+### 59. Contacto con sesión de cliente → 200 { telefono } y una fila en contactos
+# Compruébalo con:
+#   docker exec localcl-db psql -U postgres -d localcl #     -c "SELECT cliente_id, prestador_id, servicio_id, canal, creado_en FROM contactos;"
+GET {{host}}/prestadores/{{idPrestador}}/contacto?servicio={{idServicio}}
+Authorization: Bearer {{tokenCliente}}
+
+### 60. El prestador pidiendo su propio contacto → 400 AUTOCONTACTO
+GET {{host}}/prestadores/{{idPrestador}}/contacto
+Authorization: Bearer {{tokenPrestador}}
+
+### 61. Borrar un servicio con contactos → 409 SERVICIO_CON_CONTACTOS (sin contactos → 204)
+DELETE {{host}}/servicios/{{idServicio}}
+Authorization: Bearer {{tokenPrestador}}
+
+### 62. Categorías → 200, pública
+GET {{host}}/categorias
+

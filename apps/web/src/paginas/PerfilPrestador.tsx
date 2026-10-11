@@ -13,8 +13,10 @@ import { useAuth } from "../auth/ContextoAuth";
 import { Boton, clasesBoton } from "../componentes/Boton";
 import { CampoAreaTexto } from "../componentes/CampoAreaTexto";
 import { CampoTexto } from "../componentes/CampoTexto";
+import { ComunasAtencion } from "../componentes/ComunasAtencion";
 import { Pagina } from "../componentes/Pagina";
 import { SelectorComuna } from "../componentes/SelectorComuna";
+import { ServiciosPrestador } from "../componentes/ServiciosPrestador";
 import { VerificacionIdentidad } from "../componentes/VerificacionIdentidad";
 
 const RADIO_POR_DEFECTO = "10";
@@ -64,6 +66,9 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
   const [cargandoComunas, setCargandoComunas] = useState(true);
   // null mientras no se sabe; después, si ya existe un perfil guardado.
   const [tienePerfil, setTienePerfil] = useState<boolean | null>(null);
+  const [comunasAtencion, setComunasAtencion] = useState<Comuna[]>([]);
+  // Sube cuando se guardan las comunas: los servicios vuelven a preguntar qué falta.
+  const [versionRequisitos, setVersionRequisitos] = useState(0);
 
   const [formulario, setFormulario] = useState<Formulario>({
     comunaId: "",
@@ -96,6 +101,7 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
       .then((perfil) => {
         if (cancelado) return;
         setTienePerfil(perfil !== null);
+        setComunasAtencion(perfil?.comunasAtencion ?? []);
 
         if (perfil) {
           setFormulario({
@@ -254,6 +260,24 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
 
       {/* La API pide el perfil antes de aceptar la cédula: se ofrece recién cuando existe. */}
       {tienePerfil && <VerificacionIdentidad cliente={cliente} />}
+
+      {/*
+        Se monta recién cuando llegó el perfil (tienePerfil y las comunas de
+        atención se fijan juntos), así parte con las guardadas.
+      */}
+      {tienePerfil && !cargandoComunas && (
+        <ComunasAtencion
+          cliente={cliente}
+          comunas={comunas}
+          iniciales={comunasAtencion}
+          alGuardar={(guardadas) => {
+            setComunasAtencion(guardadas);
+            setVersionRequisitos((version) => version + 1);
+          }}
+        />
+      )}
+
+      {tienePerfil && <ServiciosPrestador cliente={cliente} version={versionRequisitos} />}
 
       <Link to="/perfil" className={`mt-6 ${clasesBoton("secundario")}`}>
         Volver a mi cuenta

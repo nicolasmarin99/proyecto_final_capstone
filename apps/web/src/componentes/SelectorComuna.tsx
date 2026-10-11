@@ -8,6 +8,8 @@ interface Props extends Mensajes {
   valor: string;
   alCambiar(valor: string): void;
   cargando?: boolean;
+  /** Por defecto "Comuna". */
+  etiqueta?: string;
 }
 
 /**
@@ -33,13 +35,21 @@ function agruparPorRegion(comunas: Comuna[]): { region: Region; comunas: Comuna[
  * sin trabajo extra, y en el celular abre el selector del sistema. Escribir
  * las primeras letras salta a la comuna, también entre 346.
  */
-export function SelectorComuna({ id, comunas, valor, alCambiar, cargando = false, ...mensajes }: Props) {
+export function SelectorComuna({
+  id,
+  comunas,
+  valor,
+  alCambiar,
+  cargando = false,
+  etiqueta = "Comuna",
+  ...mensajes
+}: Props) {
   const idMensaje = `${id}-mensaje`;
 
   return (
     <div className="mt-5">
       <label htmlFor={id} className="block text-sm font-bold text-noche">
-        Comuna
+        {etiqueta}
       </label>
       <select
         id={id}

@@ -108,7 +108,8 @@ function escribir(etiqueta: RegExp, valor: string) {
 
 /** Espera a que el formulario termine de cargar (el selector ya tiene comunas). */
 async function esperarFormulario() {
-  await screen.findByRole("option", { name: "Santiago" });
+  // Dentro del selector de la comuna base: el de comunas de atención también ofrece "Santiago".
+  await within(await screen.findByLabelText(/^comuna$/i)).findByRole("option", { name: "Santiago" });
 }
 
 beforeEach(() => {
@@ -125,7 +126,7 @@ describe("Formulario de perfil de prestador", () => {
     renderizar("/perfil-prestador");
     await esperarFormulario();
 
-    const selector = screen.getByLabelText(/comuna/i);
+    const selector = screen.getByLabelText(/^comuna$/i);
     const grupos = within(selector).getAllByRole("group");
     expect(grupos.map((grupo) => grupo.getAttribute("label"))).toEqual([
       "Arica y Parinacota",
@@ -149,7 +150,7 @@ describe("Formulario de perfil de prestador", () => {
     await esperarFormulario();
 
     await waitFor(() => expect(screen.getByLabelText(/descripción/i)).toHaveValue(PERFIL.descripcion));
-    expect(screen.getByLabelText(/comuna/i)).toHaveValue("13101");
+    expect(screen.getByLabelText(/^comuna$/i)).toHaveValue("13101");
     expect(screen.getByLabelText(/teléfono/i)).toHaveValue("+56 9 1234 5678");
   });
 
@@ -158,7 +159,7 @@ describe("Formulario de perfil de prestador", () => {
     renderizar("/perfil-prestador");
     await esperarFormulario();
 
-    fireEvent.change(screen.getByLabelText(/comuna/i), { target: { value: "16101" } });
+    fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "16101" } });
     escribir(/descripción/i, "Gasfíter con 10 años de experiencia en calefont.");
     escribir(/teléfono/i, "9 1234 5678");
     escribir(/radio/i, "25");
@@ -189,13 +190,13 @@ describe("Formulario de perfil de prestador", () => {
     renderizar("/perfil-prestador");
     await esperarFormulario();
 
-    fireEvent.change(screen.getByLabelText(/comuna/i), { target: { value: "13101" } });
+    fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "13101" } });
     escribir(/descripción/i, "Gasfíter con 10 años de experiencia en calefont.");
     escribir(/teléfono/i, "9 1234 5678");
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
 
     expect(await screen.findByText("La comuna seleccionada no existe.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/comuna/i)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^comuna$/i)).toHaveAttribute("aria-invalid", "true");
   });
 
   it("valida en el navegador antes de enviar: descripción corta y teléfono fijo", async () => {
@@ -203,7 +204,7 @@ describe("Formulario de perfil de prestador", () => {
     renderizar("/perfil-prestador");
     await esperarFormulario();
 
-    fireEvent.change(screen.getByLabelText(/comuna/i), { target: { value: "13101" } });
+    fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "13101" } });
     escribir(/descripción/i, "a".repeat(19));
     escribir(/teléfono/i, "2 2123 4567");
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));

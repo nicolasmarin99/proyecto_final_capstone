@@ -13,6 +13,7 @@ const seleccionPerfil = {
   telefono: true,
   radioAtencionKm: true,
   comuna: { select: seleccionComuna },
+  comunasAtencion: { select: { comuna: { select: seleccionComuna } } },
   creadoEn: true,
   actualizadoEn: true,
 } as const;
@@ -46,4 +47,48 @@ export async function guardarPerfil(usuarioId: string, datos: DatosPerfilPrestad
     update: campos,
     select: seleccionPerfil,
   });
+}
+
+export async function buscarIdPerfil(usuarioId: string) {
+  return prisma.perfilPrestador.findUnique({ where: { usuarioId }, select: { id: true } });
+}
+
+export async function contarComunasExistentes(ids: number[]) {
+  return prisma.comuna.count({ where: { id: { in: ids } } });
+}
+
+/**
+ * Reemplaza las comunas de atención en una transacción: si algo falla, el
+ * prestador conserva las que tenía en vez de quedar sin ninguna.
+ */
+export async function reemplazarComunasAtencion(prestadorId: string, comunaIds: number[]) {
+  return prisma.$transaction(async (tx) => {
+    await tx.prestadorComuna.deleteMany({ where: { prestadorId } });
+    await tx.prestadorComuna.createMany({ data: comunaIds.map((comunaId) => ({ prestadorId, comunaId })) });
+
+    return tx.comuna.findMany({ where: { id: { in: comunaIds } }, select: seleccionComuna });
+  });
+}
+
+/**
+ * Lo que hace falta para entregar el contacto: de quién es el perfil, su
+ * teléfono y cuántos servicios publicados tiene.
+ */
+export async function buscarPrestadorParaContacto(prestadorId: string) {
+  return prisma.perfilPrestador.findUnique({
+    where: { id: prestadorId },
+    select: {
+      usuarioId: true,
+      telefono: true,
+      _count: { select: { servicios: { where: { estado: "PUBLICADO" } } } },
+    },
+  });
+}
+
+export async function buscarServicioParaContacto(servicioId: string) {
+  return prisma.servicio.findUnique({ where: { id: servicioId }, select: { prestadorId: true, estado: true } });
+}
+
+export async function registrarContacto(datos: { clienteId: string; prestadorId: string; servicioId: string | null }) {
+  await prisma.contacto.create({ data: { ...datos, canal: "WHATSAPP" } });
 }
