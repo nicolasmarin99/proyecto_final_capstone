@@ -35,7 +35,7 @@ function pasoIdentidad(identidad: EstadoIdentidad | null | undefined): Paso {
         detalle:
           identidad === undefined
             ? "No pudimos consultar el estado de tu verificación."
-            : "Sube tu cédula desde tu perfil de prestador.",
+            : "Sube tu cédula en «Verificación de identidad».",
       };
   }
 }
@@ -113,10 +113,10 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
       listo: (publicados ?? 0) > 0,
       detalle:
         publicados === undefined
-          ? "Publica tus servicios desde tu perfil de prestador."
+          ? "Publica tus servicios en «Mis servicios»."
           : publicados > 0
             ? `${publicados} ${publicados === 1 ? "servicio publicado" : "servicios publicados"}.`
-            : "Publica un servicio desde tu perfil de prestador.",
+            : "Publica un servicio en «Mis servicios».",
     },
   ];
   const pendientes = pasos.filter((paso) => !paso.listo).length;
@@ -157,7 +157,7 @@ export function EstadoPrestador({ cliente }: { cliente: ClienteApi }) {
         ))}
       </ul>
 
-      <Link to="/perfil-prestador" className={`mt-4 ${clasesBoton(tienePerfil ? "secundario" : "principal")}`}>
+      <Link to="/mi/perfil" className={`mt-4 ${clasesBoton(tienePerfil ? "secundario" : "principal")}`}>
         {tienePerfil ? "Editar mi perfil de prestador" : "Completar mi perfil de prestador"}
       </Link>
     </section>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 import { rutaBusqueda } from "../componentes/landing/datos";
@@ -69,17 +69,13 @@ describe("PaginaInicio", () => {
     expect(screen.getAllByText("LocalCL").length).toBeGreaterThan(0);
   });
 
-  it("los botones de la barra llevan a iniciar sesión y al registro de prestador", () => {
+  // La barra con «Iniciar sesión» ahora es el encabezado global: se prueba
+  // en Navegacion.test.tsx. La portada sigue llevando al registro de prestador.
+  it("la portada lleva al registro de prestador", () => {
     renderizar();
-    const barra = screen.getByRole("banner");
-    expect(within(barra).getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute(
-      "href",
-      "/iniciar-sesion",
-    );
-    expect(within(barra).getByRole("link", { name: "Publica tu servicio" })).toHaveAttribute(
-      "href",
-      "/registro-prestador",
-    );
+    const enlaces = screen.getAllByRole("link", { name: "Publicar mi servicio" });
+    expect(enlaces).toHaveLength(2);
+    for (const enlace of enlaces) expect(enlace).toHaveAttribute("href", "/registro-prestador");
   });
 
   it("los campos del buscador tienen etiqueta", () => {
@@ -94,14 +90,5 @@ describe("PaginaInicio", () => {
     fireEvent.change(screen.getByLabelText("Comuna"), { target: { value: "Ñuñoa" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(screen.getByTestId("destino")).toHaveTextContent("/buscar?servicio=gasfiter&comuna=%C3%91u%C3%B1oa");
-  });
-
-  it("el menú móvil se abre y se cierra con Escape", () => {
-    renderizar();
-    const boton = screen.getByRole("button", { name: "Abrir menú" });
-    fireEvent.click(boton);
-    expect(boton).toHaveAttribute("aria-expanded", "true");
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Abrir menú" })).toHaveAttribute("aria-expanded", "false");
   });
 });

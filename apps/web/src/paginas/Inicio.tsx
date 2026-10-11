@@ -3,7 +3,6 @@ import { ComoFunciona } from "../componentes/landing/ComoFunciona";
 import { CtaFinal } from "../componentes/landing/CtaFinal";
 import { Footer } from "../componentes/landing/Footer";
 import { Hero } from "../componentes/landing/Hero";
-import { Navbar } from "../componentes/landing/Navbar";
 import { Prestadores } from "../componentes/landing/Prestadores";
 
 /**
@@ -13,7 +12,6 @@ import { Prestadores } from "../componentes/landing/Prestadores";
 export default function PaginaInicio() {
   return (
     <div className="bg-blanco font-texto text-noche">
-      <Navbar />
       <main>
         <Hero />
         <CategoriasScroll />

@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router";
 import {
   formatearTelefono,
   LARGO_MAXIMO_DESCRIPCION,
@@ -8,16 +7,15 @@ import {
   RADIO_MAXIMO_KM,
   RADIO_MINIMO_KM,
 } from "@localcl/shared";
-import { clienteApi, ErrorApi, type ClienteApi, type Comuna } from "../api/cliente";
-import { useAuth } from "../auth/ContextoAuth";
-import { Boton, clasesBoton } from "../componentes/Boton";
-import { CampoAreaTexto } from "../componentes/CampoAreaTexto";
-import { CampoTexto } from "../componentes/CampoTexto";
-import { ComunasAtencion } from "../componentes/ComunasAtencion";
-import { Pagina } from "../componentes/Pagina";
-import { SelectorComuna } from "../componentes/SelectorComuna";
-import { ServiciosPrestador } from "../componentes/ServiciosPrestador";
-import { VerificacionIdentidad } from "../componentes/VerificacionIdentidad";
+import { ErrorApi, type Comuna } from "../../api/cliente";
+import { useAuth } from "../../auth/ContextoAuth";
+import { SeccionArea } from "../../componentes/AreaPrestador";
+import { Boton } from "../../componentes/Boton";
+import { CampoAreaTexto } from "../../componentes/CampoAreaTexto";
+import { CampoTexto } from "../../componentes/CampoTexto";
+import { ComunasAtencion } from "../../componentes/ComunasAtencion";
+import { SelectorComuna } from "../../componentes/SelectorComuna";
+import { useEstadoPrestador } from "../../prestador/ContextoPrestador";
 
 const RADIO_POR_DEFECTO = "10";
 
@@ -59,16 +57,22 @@ function validar(formulario: Formulario): Record<string, string> {
   return errores;
 }
 
-export default function PaginaPerfilPrestador({ cliente = clienteApi }: { cliente?: ClienteApi }) {
-  const { usuario } = useAuth();
+/**
+ * /mi/perfil: los datos con que el prestador aparece en las búsquedas (comuna
+ * base, descripción, teléfono y radio) y las comunas donde atiende.
+ *
+ * Después de guardar se avisa al estado compartido, para que el menú y la
+ * navegación del área dejen de decir «Completar perfil».
+ */
+export default function PaginaMiPerfil() {
+  const { usuario, cliente } = useAuth();
+  const estado = useEstadoPrestador();
 
   const [comunas, setComunas] = useState<Comuna[]>([]);
   const [cargandoComunas, setCargandoComunas] = useState(true);
   // null mientras no se sabe; después, si ya existe un perfil guardado.
   const [tienePerfil, setTienePerfil] = useState<boolean | null>(null);
   const [comunasAtencion, setComunasAtencion] = useState<Comuna[]>([]);
-  // Sube cuando se guardan las comunas: los servicios vuelven a preguntar qué falta.
-  const [versionRequisitos, setVersionRequisitos] = useState(0);
 
   const [formulario, setFormulario] = useState<Formulario>({
     comunaId: "",
@@ -154,6 +158,7 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
       setFormulario((actual) => ({ ...actual, telefono: formatearTelefono(perfil.telefono) }));
       setTienePerfil(true);
       setGuardado(true);
+      void estado?.recargar();
     } catch (error) {
       if (error instanceof ErrorApi && error.codigo === "DATOS_INVALIDOS") {
         setErrores(Object.fromEntries(error.detalles.map((detalle) => [detalle.campo, detalle.mensaje])));
@@ -170,7 +175,11 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
   const telefonoNormalizado = normalizarTelefono(formulario.telefono);
 
   return (
-    <Pagina titulo={tienePerfil === false ? "Completa tu perfil" : "Tu perfil de prestador"}>
+    <SeccionArea
+      titulo={tienePerfil === false ? "Completa tu perfil" : "Tu perfil de prestador"}
+      // Sin perfil, el aviso de abajo ya lo explica con más detalle.
+      bajada={tienePerfil === false ? undefined : "Tu comuna y tu radio de atención deciden a quién le apareces; tu teléfono es cómo te contactan."}
+    >
       {tienePerfil === false && (
         <div className="mt-4 rounded-chico border border-borde bg-hielo/60 px-4 py-3 text-sm leading-relaxed text-noche">
           <p className="font-semibold">Sin perfil no puedes aparecer en las búsquedas.</p>
@@ -188,7 +197,7 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
         </div>
       )}
 
-      <form onSubmit={alEnviar} noValidate className="mt-2">
+      <form onSubmit={alEnviar} noValidate className="mt-2 max-w-xl">
         {errorGeneral && (
           <p
             role="alert"
@@ -258,9 +267,6 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
         </Boton>
       </form>
 
-      {/* La API pide el perfil antes de aceptar la cédula: se ofrece recién cuando existe. */}
-      {tienePerfil && <VerificacionIdentidad cliente={cliente} />}
-
       {/*
         Se monta recién cuando llegó el perfil (tienePerfil y las comunas de
         atención se fijan juntos), así parte con las guardadas.
@@ -272,16 +278,11 @@ export default function PaginaPerfilPrestador({ cliente = clienteApi }: { client
           iniciales={comunasAtencion}
           alGuardar={(guardadas) => {
             setComunasAtencion(guardadas);
-            setVersionRequisitos((version) => version + 1);
+            // Las comunas son uno de los requisitos para publicar.
+            void estado?.recargar();
           }}
         />
       )}
-
-      {tienePerfil && <ServiciosPrestador cliente={cliente} version={versionRequisitos} />}
-
-      <Link to="/perfil" className={`mt-6 ${clasesBoton("secundario")}`}>
-        Volver a mi cuenta
-      </Link>
-    </Pagina>
+    </SeccionArea>
   );
 }

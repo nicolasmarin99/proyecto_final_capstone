@@ -85,7 +85,7 @@ export default function PaginaVerificarCorreo({ cliente = clienteApi }: { client
       </div>
 
       {estado === "listo" && prestadorConectado && (
-        <Link to="/perfil-prestador" className={`mt-7 ${clasesBoton("principal")}`}>
+        <Link to="/mi/perfil" className={`mt-7 ${clasesBoton("principal")}`}>
           Completar mi perfil de prestador
         </Link>
       )}

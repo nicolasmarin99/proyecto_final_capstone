@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { clienteApi, ErrorApi, type ClienteApi, type Usuario } from "../api/cliente";
+import { ErrorApi } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -17,54 +17,44 @@ function leerMensajeDeExito(state: unknown): string | null {
 }
 
 /**
- * Adónde llevar a alguien que acaba de entrar.
+ * Destino guardado por quien mandó a iniciar sesión (una ruta protegida, o
+ * la página de un servicio que se quería contactar), en state.desde.
  *
- * Un prestador con el correo ya confirmado y sin perfil va directo a
- * completarlo: es el paso que le falta para que los clientes lo encuentren, y
- * es justo después de confirmar el correo cuando inicia sesión por primera
- * vez. Si el correo no está confirmado no se lo manda ahí, porque la API le
- * rechazaría el guardado; en /perfil ve el aviso de confirmación.
- *
- * Si la consulta del perfil falla, se va a /perfil igual: un error de red no
- * debe dejar a nadie en la pantalla de inicio de sesión.
+ * Solo se aceptan rutas internas: empiezan con "/" pero no con "//", que el
+ * navegador interpretaría como otro dominio. Así nadie puede armar un enlace
+ * a /iniciar-sesion que después de entrar lleve a un sitio falso.
  */
-async function destinoTrasIngreso(usuario: Usuario, cliente: ClienteApi): Promise<string> {
-  if (usuario.rol !== "PRESTADOR" || usuario.correoVerificado !== true) {
-    return "/perfil";
+function leerDestino(state: unknown): string | null {
+  if (typeof state !== "object" || state === null || !("desde" in state)) {
+    return null;
   }
 
-  try {
-    return (await cliente.obtenerMiPerfilPrestador()) ? "/perfil" : "/perfil-prestador";
-  } catch {
-    return "/perfil";
-  }
+  const desde: unknown = (state as Record<string, unknown>).desde;
+
+  return typeof desde === "string" && desde.startsWith("/") && !desde.startsWith("//") && !desde.startsWith("/iniciar-sesion")
+    ? desde
+    : null;
 }
 
-export default function PaginaIniciarSesion({ cliente = clienteApi }: { cliente?: ClienteApi }) {
+export default function PaginaIniciarSesion() {
   const navegar = useNavigate();
   const ubicacion = useLocation();
   const { usuario, iniciarSesion } = useAuth();
 
   const mensajeExito = leerMensajeDeExito(ubicacion.state);
+  const destino = leerDestino(ubicacion.state);
 
   // La navegación la dispara el estado ya confirmado, no el final del envío.
   // Si se navegara justo después de await iniciarSesion(), RutaProtegida
   // podría renderizarse con el usuario todavía en null y rebotar de vuelta.
+  //
+  // Sin destino guardado se va a la landing: el encabezado ya muestra la
+  // sesión y, al prestador, lo que le falta (por ejemplo, completar el perfil).
   useEffect(() => {
-    if (!usuario) {
-      return;
+    if (usuario) {
+      navegar(destino ?? "/", { replace: true });
     }
-
-    let cancelado = false;
-
-    void destinoTrasIngreso(usuario, cliente).then((destino) => {
-      if (!cancelado) navegar(destino, { replace: true });
-    });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [usuario, cliente, navegar]);
+  }, [usuario, destino, navegar]);
 
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");

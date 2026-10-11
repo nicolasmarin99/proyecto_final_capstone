@@ -3,10 +3,11 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { crearClienteApi, type ClienteApi } from "../api/cliente";
 import { ProveedorAuth } from "../auth/ContextoAuth";
+import { AreaPrestador } from "../componentes/AreaPrestador";
 import { RutaProtegida } from "../componentes/RutaProtegida";
 import PaginaAdmin from "./Admin";
 import PaginaPerfil from "./Perfil";
-import PaginaPerfilPrestador from "./PerfilPrestador";
+import PaginaMiIdentidad from "./mi/MiIdentidad";
 
 const prestador = { id: "p1", correo: "pedro@ejemplo.cl", nombre: "Pedro Soto", rol: "PRESTADOR", correoVerificado: true };
 const admin = { id: "a1", correo: "admin@ejemplo.cl", nombre: "Admin", rol: "ADMINISTRADOR", correoVerificado: true };
@@ -99,10 +100,9 @@ function renderizar(ruta: string, cliente: ClienteApi = crearClienteApi()) {
       <ProveedorAuth cliente={cliente}>
         <Routes>
           <Route path="/perfil" element={<RutaProtegida><PaginaPerfil cliente={cliente} /></RutaProtegida>} />
-          <Route
-            path="/perfil-prestador"
-            element={<RutaProtegida roles={["PRESTADOR"]}><PaginaPerfilPrestador cliente={cliente} /></RutaProtegida>}
-          />
+          <Route path="/mi" element={<RutaProtegida roles={["PRESTADOR"]}><AreaPrestador /></RutaProtegida>}>
+            <Route path="identidad" element={<PaginaMiIdentidad />} />
+          </Route>
           <Route path="/admin" element={<RutaProtegida><PaginaAdmin cliente={cliente} /></RutaProtegida>} />
         </Routes>
       </ProveedorAuth>
@@ -129,7 +129,7 @@ afterEach(() => {
 describe("Verificación de identidad del prestador", () => {
   it("explica para qué se usa el documento y que se elimina al verificar", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
 
     const seccion = await screen.findByRole("region", { name: /verifica tu identidad/i });
     expect(within(seccion).getByText(/se elimina/i)).toBeInTheDocument();
@@ -138,7 +138,7 @@ describe("Verificación de identidad del prestador", () => {
 
   it("sube el documento como multipart y muestra que quedó en revisión", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
     // El campo aparece cuando llega el estado desde la API.
     await screen.findByLabelText(/documento de identidad/i);
 
@@ -157,7 +157,7 @@ describe("Verificación de identidad del prestador", () => {
     ["un formato no permitido", archivo("cedula.gif", "image/gif"), /JPG, PNG o PDF/],
   ])("avisa en el navegador antes de enviar %s", async (_caso, elegido, mensaje) => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
     // El campo aparece cuando llega el estado desde la API.
     await screen.findByLabelText(/documento de identidad/i);
 
@@ -178,7 +178,7 @@ describe("Verificación de identidad del prestador", () => {
         429,
       ),
     });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
     // El campo aparece cuando llega el estado desde la API.
     await screen.findByLabelText(/documento de identidad/i);
 
@@ -190,7 +190,7 @@ describe("Verificación de identidad del prestador", () => {
 
   it("rechazada: muestra el motivo y deja volver a subir", async () => {
     simularApi({ estadoIdentidad: identidad("RECHAZADA", "La foto está borrosa y no se lee el RUT.") });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
 
     expect(await screen.findByText("La foto está borrosa y no se lee el RUT.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /enviar documento/i })).toBeInTheDocument();
@@ -198,7 +198,7 @@ describe("Verificación de identidad del prestador", () => {
 
   it("pendiente o verificada: no ofrece volver a subir", async () => {
     simularApi({ estadoIdentidad: identidad("VERIFICADA") });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/identidad");
 
     expect(await screen.findByText(/identidad verificada/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /enviar documento/i })).not.toBeInTheDocument();

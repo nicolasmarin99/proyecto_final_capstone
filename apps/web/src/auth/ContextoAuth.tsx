@@ -1,9 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
+import { ProveedorEstadoPrestador } from "../prestador/ContextoPrestador";
 
 interface ValorContexto {
   usuario: Usuario | null;
+  /**
+   * El cliente de la API de esta sesión. Lo usan los componentes globales
+   * (encabezado, estado del prestador) que no reciben uno por props: así las
+   * pruebas que inyectan su propio cliente lo inyectan también ahí.
+   */
+  cliente: ClienteApi;
   /** true mientras se intenta restaurar la sesión al arrancar la aplicación. */
   cargando: boolean;
   iniciarSesion(correo: string, contrasena: string): Promise<void>;
@@ -72,11 +79,17 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
   }, [cliente]);
 
   const valor = useMemo(
-    () => ({ usuario, cargando, iniciarSesion, cerrarSesion }),
-    [usuario, cargando, iniciarSesion, cerrarSesion],
+    () => ({ usuario, cliente, cargando, iniciarSesion, cerrarSesion }),
+    [usuario, cliente, cargando, iniciarSesion, cerrarSesion],
   );
 
-  return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
+  // El estado del prestador vive dentro: depende de quién inició sesión, y
+  // así quien monta ProveedorAuth (la app o una prueba) lo obtiene sin más.
+  return (
+    <Contexto.Provider value={valor}>
+      <ProveedorEstadoPrestador>{children}</ProveedorEstadoPrestador>
+    </Contexto.Provider>
+  );
 }
 
 export function useAuth(): ValorContexto {

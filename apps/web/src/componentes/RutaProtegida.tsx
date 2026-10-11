@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { useAuth } from "../auth/ContextoAuth";
 import { clasesBoton } from "./Boton";
 import { Pagina } from "./Pagina";
@@ -21,6 +21,7 @@ const NOMBRE_ROL: Record<string, string> = {
  */
 export function RutaProtegida({ children, roles }: { children: ReactNode; roles?: string[] }) {
   const { usuario, cargando } = useAuth();
+  const ubicacion = useLocation();
 
   if (cargando) {
     return (
@@ -31,7 +32,8 @@ export function RutaProtegida({ children, roles }: { children: ReactNode; roles?
   }
 
   if (!usuario) {
-    return <Navigate to="/iniciar-sesion" replace />;
+    // Se guarda el destino: después de iniciar sesión, vuelve acá.
+    return <Navigate to="/iniciar-sesion" replace state={{ desde: ubicacion.pathname + ubicacion.search }} />;
   }
 
   if (roles && !roles.includes(usuario.rol)) {
