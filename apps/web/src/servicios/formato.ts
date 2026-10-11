@@ -1,4 +1,4 @@
-import type { Precio, UnidadPrecio } from "../api/cliente";
+import type { Categoria, Precio, UnidadPrecio } from "../api/cliente";
 
 export const NOMBRE_UNIDAD: Record<UnidadPrecio, string> = {
   POR_SERVICIO: "por servicio",
@@ -7,6 +7,14 @@ export const NOMBRE_UNIDAD: Record<UnidadPrecio, string> = {
   POR_METRO_CUADRADO: "por m²",
   POR_PERSONA: "por persona",
 };
+
+/**
+ * El nombre de la categoría que se muestra: con «Otros», el oficio que
+ * escribió el prestador; con cualquier otra, el nombre de la lista.
+ */
+export function nombreCategoria(servicio: { categoria: Categoria; categoriaPersonalizada: string | null }): string {
+  return servicio.categoriaPersonalizada ?? servicio.categoria.nombre;
+}
 
 const pesos = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 

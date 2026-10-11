@@ -206,6 +206,67 @@ describe("POST /servicios", () => {
   });
 });
 
+describe("categoría «Otros» con nombre libre", () => {
+  const OTROS = { ...SERVICIO_VALIDO, categoria: "otros", categoriaPersonalizada: "  Pintura de interiores  " };
+
+  it("con «Otros» guarda el nombre que escribió el prestador", async () => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await crear(prestador.token, OTROS);
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.servicio).toMatchObject({
+      categoria: { slug: "otros", nombre: "Otros" },
+      categoriaPersonalizada: "Pintura de interiores",
+    });
+  });
+
+  it.each([
+    ["sin nombre", { categoriaPersonalizada: undefined }],
+    ["nombre vacío", { categoriaPersonalizada: "   " }],
+    ["nombre de 2 caracteres", { categoriaPersonalizada: "ab" }],
+    ["nombre de 61 caracteres", { categoriaPersonalizada: "a".repeat(61) }],
+  ])("con «Otros» y %s: 400 con detalle en el campo", async (_caso, cambio) => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await crear(prestador.token, { ...OTROS, ...cambio });
+
+    expect(respuesta.status).toBe(400);
+    expect(detalleDe(respuesta.body, "categoriaPersonalizada")).toBeDefined();
+    expect(await prisma.servicio.count()).toBe(0);
+  });
+
+  it("con otra categoría el nombre libre se ignora: no queda colgando de «Gasfitería»", async () => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await crear(prestador.token, { ...SERVICIO_VALIDO, categoriaPersonalizada: "Pintura" });
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.servicio.categoriaPersonalizada).toBeNull();
+  });
+
+  it("al cambiar de «Otros» a una categoría de la lista, el nombre libre se borra", async () => {
+    const prestador = await crearPrestador();
+    const { body } = await crear(prestador.token, OTROS);
+
+    const respuesta = await editar(prestador.token, body.servicio.id, SERVICIO_VALIDO);
+
+    expect(respuesta.body.servicio).toMatchObject({ categoria: { slug: "gasfiteria" }, categoriaPersonalizada: null });
+  });
+
+  it("la vista pública muestra el nombre libre", async () => {
+    const prestador = await crearPrestador();
+    const { body } = await crear(prestador.token, OTROS);
+
+    const respuesta = await request(app).get(`/servicios/${body.servicio.id}`);
+
+    expect(respuesta.body.servicio).toMatchObject({
+      categoria: { slug: "otros" },
+      categoriaPersonalizada: "Pintura de interiores",
+    });
+  });
+});
+
 describe("PUT y DELETE /servicios/:id", () => {
   it("un prestador no puede editar ni borrar el servicio de otro: 403", async () => {
     const duena = await crearPrestador();
@@ -505,6 +566,7 @@ describe("GET /categorias", () => {
       "soldadura",
       "carpinteria",
       "cerrajeria",
+      "otros",
     ]);
   });
 });

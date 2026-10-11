@@ -85,6 +85,7 @@ function estadoFinal(
 function campos(datos: DatosServicio, categoriaId: string, estado: EstadoServicio) {
   return {
     categoriaId,
+    categoriaPersonalizada: datos.categoriaPersonalizada,
     titulo: datos.titulo,
     descripcion: datos.descripcion,
     precioDesde: datos.precioDesde,
@@ -182,6 +183,8 @@ export async function publico(id: string) {
     precioHasta: servicio.precioHasta,
     unidadPrecio: servicio.unidadPrecio,
     categoria: servicio.categoria,
+    // Con «Otros», el nombre que escribió el prestador; nulo en el resto.
+    categoriaPersonalizada: servicio.categoriaPersonalizada,
     actualizadoEn: servicio.actualizadoEn,
     prestador: {
       id: servicio.prestador.id,

@@ -78,6 +78,8 @@ export interface Precio {
 
 export interface ServicioPropio extends Precio {
   id: string;
+  /** Con la categoría «Otros», el nombre del oficio que escribió el prestador. */
+  categoriaPersonalizada: string | null;
   titulo: string;
   descripcion: string;
   estado: EstadoServicio;
@@ -96,6 +98,7 @@ export interface ResultadoServicio {
 
 export interface DatosServicio extends Precio {
   categoria: string;
+  categoriaPersonalizada: string | null;
   titulo: string;
   descripcion: string;
   estado: "PUBLICADO" | "PAUSADO";
@@ -111,6 +114,7 @@ export interface CredencialPublica {
 
 export interface ServicioPublico extends Precio {
   id: string;
+  categoriaPersonalizada: string | null;
   titulo: string;
   descripcion: string;
   categoria: Categoria;
@@ -326,7 +330,15 @@ function leerServicioPropio(valor: unknown): ServicioPropio | null {
     return null;
   }
 
-  return { id, titulo, descripcion, estado, categoria, ...leerPrecio(valor) };
+  return {
+    id,
+    titulo,
+    descripcion,
+    estado,
+    categoria,
+    categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
+    ...leerPrecio(valor),
+  };
 }
 
 function leerRequisito(valor: unknown): RequisitoPendiente | null {
@@ -390,6 +402,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
     titulo,
     descripcion,
     categoria,
+    categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
     prestador: {
       id: idPrestador,
