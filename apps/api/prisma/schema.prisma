@@ -220,6 +220,10 @@ model Servicio {
   descripcion   String
   /// Pesos chilenos, enteros: el peso no tiene decimales y un entero evita
   /// los errores de redondeo de un número de punto flotante.
+  /// Nombre que escribe el prestador cuando su oficio no está en la lista
+  /// y elige la categoría «Otros». Nulo en cualquier otra categoría: lo
+  /// impone la API, porque un CHECK no puede mirar la tabla categorias.
+  categoriaPersonalizada String? @map("categoria_personalizada")
   precioDesde   Int? @map("precio_desde")
   precioHasta   Int? @map("precio_hasta")
   unidadPrecio  UnidadPrecio? @map("unidad_precio")
