@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
-import { LogoLocalCL } from "./LogoLocalCL";
 
 /**
  * Tarjeta centrada para las pantallas de dentro de la aplicación: estado,
@@ -22,15 +20,9 @@ export function Pagina({
   ancho?: "normal" | "amplio";
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-niebla bg-[radial-gradient(var(--color-malla)_1.4px,transparent_1.6px)] bg-size-[28px_28px] px-4 py-10 sm:p-6">
+    <main className="flex flex-1 items-center justify-center bg-niebla bg-[radial-gradient(var(--color-malla)_1.4px,transparent_1.6px)] bg-size-[28px_28px] px-4 py-10 sm:p-6">
       <div className={`w-full ${ancho === "amplio" ? "max-w-3xl" : "max-w-md"} motion-safe:animate-aparecer rounded-grande border border-borde bg-blanco p-6 shadow-tarjeta sm:p-8`}>
-        <Link
-          to="/"
-          className="inline-block rounded-chico focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primario"
-        >
-          <LogoLocalCL tamano={36} claseTexto="text-xl font-bold tracking-[-0.5px] text-noche" />
-        </Link>
-        <h1 className="mt-6 font-titulos text-titulo font-bold tracking-[-0.5px] text-noche">{titulo}</h1>
+        <h1 className="font-titulos text-titulo font-bold tracking-[-0.5px] text-noche">{titulo}</h1>
         {children}
       </div>
     </main>

@@ -3,9 +3,12 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { crearClienteApi, type ClienteApi } from "../api/cliente";
 import { ProveedorAuth } from "../auth/ContextoAuth";
+import { AreaPrestador } from "../componentes/AreaPrestador";
 import { RutaProtegida } from "../componentes/RutaProtegida";
+import PaginaEditorServicio from "./mi/EditorServicio";
+import PaginaMiPerfil from "./mi/MiPerfil";
+import PaginaMisServicios from "./mi/MisServicios";
 import PaginaPerfil from "./Perfil";
-import PaginaPerfilPrestador from "./PerfilPrestador";
 import PaginaServicio from "./Servicio";
 
 const cliente = { id: "c1", correo: "ana@ejemplo.cl", nombre: "Ana Pérez", rol: "CLIENTE", correoVerificado: true };
@@ -169,14 +172,22 @@ function renderizar(ruta: string, api: ClienteApi = crearClienteApi()) {
           <Route path="/servicios/:id" element={<PaginaServicio cliente={api} />} />
           <Route path="/iniciar-sesion" element={<p>Pantalla de inicio de sesión</p>} />
           <Route path="/perfil" element={<RutaProtegida><PaginaPerfil cliente={api} /></RutaProtegida>} />
-          <Route
-            path="/perfil-prestador"
-            element={<RutaProtegida roles={["PRESTADOR"]}><PaginaPerfilPrestador cliente={api} /></RutaProtegida>}
-          />
+          <Route path="/mi" element={<RutaProtegida roles={["PRESTADOR"]}><AreaPrestador /></RutaProtegida>}>
+            <Route path="perfil" element={<PaginaMiPerfil />} />
+            <Route path="servicios" element={<PaginaMisServicios />} />
+            <Route path="servicios/nuevo" element={<PaginaEditorServicio />} />
+            <Route path="servicios/:id/editar" element={<PaginaEditorServicio />} />
+          </Route>
         </Routes>
       </ProveedorAuth>
     </MemoryRouter>,
   );
+}
+
+/** Contenido de la página del área, una vez que muestra su título. */
+async function pagina(titulo: string) {
+  await screen.findByRole("heading", { level: 1, name: titulo });
+  return screen.getByRole("main");
 }
 
 beforeEach(() => {
@@ -285,10 +296,10 @@ describe("Página pública del servicio", () => {
   });
 });
 
-describe("Comunas de atención y servicios en el perfil del prestador", () => {
+describe("Comunas de atención y servicios del prestador", () => {
   it("agrega una comuna de atención y guarda la lista completa", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
 
     const seccion = await screen.findByRole("region", { name: /comunas donde atiendes/i });
     await within(seccion).findByRole("button", { name: /quitar santiago/i });
@@ -307,38 +318,42 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
     simularApi({
       requisitos: [{ codigo: "IDENTIDAD_NO_VERIFICADA", mensaje: "Verifica tu identidad: sube tu cédula desde tu perfil de prestador." }],
     });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/servicios");
 
-    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+    const seccion = await pagina("Mis servicios");
     expect(await within(seccion).findByText(/verifica tu identidad: sube tu cédula/i)).toBeInTheDocument();
   });
 
-  it("crea un servicio; si queda pausado dice por qué", async () => {
+  it("crea un servicio; antes de enviar advierte que quedará pausado, y al volver dice por qué", async () => {
+    const sinComunas = { codigo: "SIN_COMUNAS_ATENCION", mensaje: "Indica al menos una comuna donde atiendes." };
     simularApi({
-      respuestaGuardar: json(
-        {
-          servicio: servicioPropio("PAUSADO"),
-          requisitosPendientes: [{ codigo: "SIN_COMUNAS_ATENCION", mensaje: "Indica al menos una comuna donde atiendes." }],
-        },
-        201,
-      ),
+      requisitos: [sinComunas],
+      respuestaGuardar: json({ servicio: servicioPropio("PAUSADO"), requisitosPendientes: [sinComunas] }, 201),
     });
-    renderizar("/perfil-prestador");
-    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+    renderizar("/mi/servicios");
 
-    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
-    await within(seccion).findByRole("option", { name: "Gasfitería" });
-    fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "gasfiteria" } });
-    fireEvent.change(within(seccion).getByLabelText(/^título/i), { target: { value: "Gasfitería a domicilio" } });
-    fireEvent.change(within(seccion).getByLabelText(/descripción del servicio/i), {
+    // El enlace aparece cuando se sabe que tiene perfil.
+    fireEvent.click(await within(await pagina("Mis servicios")).findByRole("link", { name: "Publicar servicio" }));
+    const formulario = await pagina("Publicar servicio");
+    await within(formulario).findByRole("option", { name: "Gasfitería" });
+
+    // El aviso está antes de enviar: qué falta y que se guardará pausado.
+    expect(await within(formulario).findByText(/indica al menos una comuna/i)).toBeInTheDocument();
+    expect(within(formulario).getByText(/quedará pausado/i)).toBeInTheDocument();
+
+    fireEvent.change(within(formulario).getByLabelText(/categoría/i), { target: { value: "gasfiteria" } });
+    fireEvent.change(within(formulario).getByLabelText(/^título/i), { target: { value: "Gasfitería a domicilio" } });
+    fireEvent.change(within(formulario).getByLabelText(/descripción del servicio/i), {
       target: { value: "Reparación de calefont, filtraciones y destapes en toda la comuna." },
     });
-    fireEvent.change(within(seccion).getByLabelText(/precio desde/i), { target: { value: "25000" } });
-    fireEvent.change(within(seccion).getByLabelText(/cómo cobras/i), { target: { value: "POR_HORA" } });
-    fireEvent.click(within(seccion).getByRole("button", { name: /guardar servicio/i }));
+    fireEvent.change(within(formulario).getByLabelText(/precio desde/i), { target: { value: "25000" } });
+    fireEvent.change(within(formulario).getByLabelText(/cómo cobras/i), { target: { value: "POR_HORA" } });
+    fireEvent.click(within(formulario).getByRole("button", { name: /guardar servicio/i }));
 
-    expect(await within(seccion).findByText(/quedó pausado/i)).toBeInTheDocument();
-    expect(within(seccion).getByText(/indica al menos una comuna/i)).toBeInTheDocument();
+    // De vuelta en la lista, con la confirmación y lo que falta.
+    const lista = await pagina("Mis servicios");
+    expect(await within(lista).findByText(/quedó pausado/i)).toBeInTheDocument();
+    expect(await within(lista).findByText(/indica al menos una comuna/i)).toBeInTheDocument();
     expect(cuerpoDe("POST", /\/api\/servicios$/)).toEqual({
       categoria: "gasfiteria",
       categoriaPersonalizada: null,
@@ -353,10 +368,9 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
 
   it("con «Otros» pide el nombre del oficio y lo envía; con otra categoría el campo desaparece", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
-    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+    renderizar("/mi/servicios/nuevo");
+    const seccion = await pagina("Publicar servicio");
 
-    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
     await within(seccion).findByRole("option", { name: "Otros" });
     expect(within(seccion).queryByLabelText(/nombre de tu oficio/i)).not.toBeInTheDocument();
 
@@ -381,10 +395,9 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
 
   it("con «Otros» y sin nombre del oficio, no envía", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
-    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+    renderizar("/mi/servicios/nuevo");
+    const seccion = await pagina("Publicar servicio");
 
-    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
     await within(seccion).findByRole("option", { name: "Otros" });
     fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "otros" } });
     fireEvent.change(within(seccion).getByLabelText(/^título/i), { target: { value: "Pintura de departamentos y casas" } });
@@ -400,10 +413,9 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
 
   it("valida antes de enviar: título corto y precio hasta menor que desde", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
-    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+    renderizar("/mi/servicios/nuevo");
+    const seccion = await pagina("Publicar servicio");
 
-    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
     await within(seccion).findByRole("option", { name: "Gasfitería" });
     fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "gasfiteria" } });
     fireEvent.change(within(seccion).getByLabelText(/^título/i), { target: { value: "Gasfíter" } });
@@ -416,9 +428,25 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
     expect(llamadas("POST", /\/api\/servicios$/)).toHaveLength(0);
   });
 
+  it("edita un servicio en su propia página, con sus datos cargados", async () => {
+    simularApi({ misServicios: [servicioPropio("PUBLICADO")] });
+    renderizar("/mi/servicios");
+    const fila = await screen.findByRole("article", { name: /gasfitería a domicilio/i });
+
+    expect(within(fila).getByRole("link", { name: "Editar" })).toHaveAttribute("href", "/mi/servicios/s1/editar");
+    fireEvent.click(within(fila).getByRole("link", { name: "Editar" }));
+
+    const seccion = await pagina("Editar servicio");
+    await waitFor(() => expect(within(seccion).getByLabelText(/^título/i)).toHaveValue("Gasfitería a domicilio"));
+    fireEvent.click(within(seccion).getByRole("button", { name: /guardar servicio/i }));
+
+    await waitFor(() => expect(llamadas("PUT", /\/api\/servicios\/s1$/)).toHaveLength(1));
+    expect(await screen.findByRole("heading", { level: 1, name: "Mis servicios" })).toBeInTheDocument();
+  });
+
   it("pausa un servicio publicado", async () => {
     simularApi({ misServicios: [servicioPropio("PUBLICADO")] });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/servicios");
     const fila = await screen.findByRole("article", { name: /gasfitería a domicilio/i });
 
     fireEvent.click(within(fila).getByRole("button", { name: /^pausar$/i }));
@@ -434,7 +462,7 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
         409,
       ),
     });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/servicios");
     const fila = await screen.findByRole("article", { name: /gasfitería a domicilio/i });
 
     fireEvent.click(within(fila).getByRole("button", { name: /^eliminar$/i }));

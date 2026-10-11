@@ -1,7 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
-import { Navbar } from "../componentes/landing/Navbar";
 
 /**
  * Destino del buscador de la landing. La búsqueda real (PostGIS y texto
@@ -15,8 +14,7 @@ export default function PaginaBuscar() {
   const comuna = parametros.get("comuna");
 
   return (
-    <div className="flex min-h-screen flex-col bg-niebla font-texto text-noche">
-      <Navbar />
+    <div className="flex flex-1 flex-col bg-niebla font-texto text-noche">
       <main className="grow">
         <Contenedor className="flex flex-col items-start gap-5 py-20 md:py-28">
           <p className="rounded-full bg-hielo px-3.5 py-2 text-sm font-bold text-primario">Próximamente</p>

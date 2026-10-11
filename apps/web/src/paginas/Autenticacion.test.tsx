@@ -277,7 +277,8 @@ describe("Formulario de inicio de sesión", () => {
     expect(contrasena).toHaveAttribute("autocomplete", "current-password");
   });
 
-  it("entra y lleva al perfil cuando las credenciales son correctas", async () => {
+  // Sin destino guardado, después de entrar se va a la portada ("/").
+  it("entra y, sin destino guardado, lleva a la portada", async () => {
     sinSesion();
     const cliente = crearClienteApi();
     renderizarApp("/iniciar-sesion", cliente);
@@ -290,8 +291,8 @@ describe("Formulario de inicio de sesión", () => {
     escribir(/contraseña/i, "contrasena-segura-123");
     fireEvent.click(screen.getByRole("button", { name: /entrar/i }));
 
-    expect(await screen.findByText("Ana Pérez")).toBeInTheDocument();
-    expect(screen.getByText("CLIENTE")).toBeInTheDocument();
+    expect(await screen.findByText("Página de estado")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /entrar/i })).not.toBeInTheDocument();
   });
 });
 

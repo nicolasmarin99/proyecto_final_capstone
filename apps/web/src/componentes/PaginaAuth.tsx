@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
 import { Icono } from "./iconos";
-import { LogoLocalCL } from "./LogoLocalCL";
 
 interface Props {
   sobretitulo?: string;
@@ -26,20 +24,13 @@ export function PaginaAuth({ sobretitulo, titulo, intro, children }: Props) {
   return (
     // Grid y no flex: las pistas de Tailwind son minmax(0,1fr), así que la
     // columna nunca hereda el piso de min-content que arrastra un hijo flex.
-    <div className="grid min-h-screen grid-cols-1 bg-blanco lg:grid-cols-[minmax(0,42%)_minmax(0,1fr)]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-noche p-12 lg:flex">
+    <div className="grid flex-1 grid-cols-1 bg-blanco lg:grid-cols-[minmax(0,42%)_minmax(0,1fr)]">
+      <aside className="relative hidden flex-col justify-center overflow-hidden bg-noche p-12 lg:flex">
         {/* Fondo decorativo: la misma malla del hero, en tono noche. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(var(--color-noche-borde)_1.4px,transparent_1.6px)] bg-size-[28px_28px] motion-safe:animate-malla" />
           <div className="absolute -right-32 -bottom-40 size-[420px] rounded-full bg-primario/25 motion-safe:animate-deriva" />
         </div>
-
-        <Link
-          to="/"
-          className="relative self-start rounded-chico focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blanco"
-        >
-          <LogoLocalCL variante="invertido" claseTexto="text-2xl font-bold tracking-[-0.5px] text-blanco" />
-        </Link>
 
         <div
           className="relative motion-safe:animate-aparecer"
@@ -66,19 +57,11 @@ export function PaginaAuth({ sobretitulo, titulo, intro, children }: Props) {
           </div>
         </div>
 
-        <p className="relative text-[13px] text-noche-texto">Región Metropolitana · Duoc UC</p>
+        <p className="absolute bottom-12 left-12 text-[13px] text-noche-texto">Región Metropolitana · Duoc UC</p>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-12 sm:px-10">
         <div className="w-full max-w-md motion-safe:animate-aparecer">
-          {/* En móvil no hay panel, así que la marca entra acá. */}
-          <Link
-            to="/"
-            className="mb-10 inline-block rounded-chico focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primario lg:hidden"
-          >
-            <LogoLocalCL claseTexto="text-2xl font-bold tracking-[-0.5px] text-noche" />
-          </Link>
-
           {sobretitulo && (
             <p className="text-sm font-bold tracking-[1.2px] text-primario uppercase">{sobretitulo}</p>
           )}

@@ -6,7 +6,6 @@ import { Boton } from "../componentes/Boton";
 import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
-import { Navbar } from "../componentes/landing/Navbar";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "long" });
@@ -103,8 +102,7 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
   }, [cliente, id]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-niebla font-texto text-noche">
-      <Navbar />
+    <div className="flex flex-1 flex-col bg-niebla font-texto text-noche">
       <main className="grow">
         <Contenedor className="py-10 md:py-16">
           <div className="mx-auto max-w-3xl">

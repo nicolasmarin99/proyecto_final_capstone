@@ -21,13 +21,16 @@ function revisarArchivo(archivo: File | null): string | null {
 }
 
 /**
- * Carga del documento de identidad, dentro del perfil del prestador.
+ * Carga del documento de identidad, en su propia sección del área del prestador.
  *
  * Explica antes de pedir: para qué se usa, quién lo ve y cuándo se borra.
  * Pedir una cédula sin decir eso es lo que hace que la gente desconfíe, con
  * razón.
+ *
+ * `alSubir` avisa que se subió un documento, para refrescar el estado que
+ * muestran el menú y la navegación del área.
  */
-export function VerificacionIdentidad({ cliente }: { cliente: ClienteApi }) {
+export function VerificacionIdentidad({ cliente, alSubir }: { cliente: ClienteApi; alSubir?(): void }) {
   const idTitulo = useId();
   const idCampo = useId();
   const [datos, setDatos] = useState<MiIdentidad | null>(null);
@@ -69,6 +72,7 @@ export function VerificacionIdentidad({ cliente }: { cliente: ClienteApi }) {
         cargasDisponibles: Math.max(0, (actual?.cargasDisponibles ?? 1) - 1),
       }));
       setArchivo(null);
+      alSubir?.();
     } catch (causa) {
       setError(
         causa instanceof ErrorApi

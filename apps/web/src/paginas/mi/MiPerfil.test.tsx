@@ -1,13 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { crearClienteApi, type ClienteApi } from "../api/cliente";
-import { ProveedorAuth } from "../auth/ContextoAuth";
-import { RutaProtegida } from "../componentes/RutaProtegida";
-import PaginaIniciarSesion from "./IniciarSesion";
-import PaginaPerfil from "./Perfil";
-import PaginaPerfilPrestador from "./PerfilPrestador";
-import PaginaVerificarCorreo from "./VerificarCorreo";
+import { crearClienteApi, type ClienteApi } from "../../api/cliente";
+import { ProveedorAuth } from "../../auth/ContextoAuth";
+import { AreaPrestador } from "../../componentes/AreaPrestador";
+import { ConEncabezado } from "../../componentes/Encabezado";
+import { RutaProtegida } from "../../componentes/RutaProtegida";
+import PaginaIniciarSesion from "../IniciarSesion";
+import PaginaPerfil from "../Perfil";
+import PaginaVerificarCorreo from "../VerificarCorreo";
+import PaginaMiPerfil from "./MiPerfil";
 
 const prestador = {
   id: "p1",
@@ -78,24 +80,29 @@ function renderizar(ruta: string, cliente: ClienteApi = crearClienteApi()) {
     <MemoryRouter initialEntries={[ruta]}>
       <ProveedorAuth cliente={cliente}>
         <Routes>
-          <Route path="/iniciar-sesion" element={<PaginaIniciarSesion cliente={cliente} />} />
-          <Route
-            path="/perfil"
-            element={
-              <RutaProtegida>
-                <PaginaPerfil cliente={cliente} />
-              </RutaProtegida>
-            }
-          />
-          <Route path="/verificar-correo" element={<PaginaVerificarCorreo cliente={cliente} />} />
-          <Route
-            path="/perfil-prestador"
-            element={
-              <RutaProtegida roles={["PRESTADOR"]}>
-                <PaginaPerfilPrestador cliente={cliente} />
-              </RutaProtegida>
-            }
-          />
+          <Route element={<ConEncabezado />}>
+            <Route path="/" element={<h1>Portada</h1>} />
+            <Route path="/iniciar-sesion" element={<PaginaIniciarSesion />} />
+            <Route
+              path="/perfil"
+              element={
+                <RutaProtegida>
+                  <PaginaPerfil cliente={cliente} />
+                </RutaProtegida>
+              }
+            />
+            <Route path="/verificar-correo" element={<PaginaVerificarCorreo cliente={cliente} />} />
+            <Route
+              path="/mi"
+              element={
+                <RutaProtegida roles={["PRESTADOR"]}>
+                  <AreaPrestador />
+                </RutaProtegida>
+              }
+            >
+              <Route path="perfil" element={<PaginaMiPerfil />} />
+            </Route>
+          </Route>
         </Routes>
       </ProveedorAuth>
     </MemoryRouter>,
@@ -123,7 +130,7 @@ afterEach(() => {
 describe("Formulario de perfil de prestador", () => {
   it("puebla el selector de comunas desde la API, agrupado por región de norte a sur", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     const selector = screen.getByLabelText(/^comuna$/i);
@@ -138,7 +145,7 @@ describe("Formulario de perfil de prestador", () => {
 
   it("sin perfil explica por qué completarlo", async () => {
     simularApi({ perfil: null });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     expect(screen.getByText(/aparecer en las búsquedas/i)).toBeInTheDocument();
@@ -146,7 +153,7 @@ describe("Formulario de perfil de prestador", () => {
 
   it("con perfil carga sus datos en el formulario", async () => {
     simularApi({ perfil: PERFIL });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     await waitFor(() => expect(screen.getByLabelText(/descripción/i)).toHaveValue(PERFIL.descripcion));
@@ -156,7 +163,7 @@ describe("Formulario de perfil de prestador", () => {
 
   it("envía el perfil con el teléfono normalizado y confirma", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "16101" } });
@@ -187,7 +194,7 @@ describe("Formulario de perfil de prestador", () => {
         400,
       ),
     });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "13101" } });
@@ -201,7 +208,7 @@ describe("Formulario de perfil de prestador", () => {
 
   it("valida en el navegador antes de enviar: descripción corta y teléfono fijo", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     fireEvent.change(screen.getByLabelText(/^comuna$/i), { target: { value: "13101" } });
@@ -216,7 +223,7 @@ describe("Formulario de perfil de prestador", () => {
 
   it("cuenta los caracteres de la descripción mientras se escribe", async () => {
     simularApi();
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
     await esperarFormulario();
 
     escribir(/descripción/i, "Hola");
@@ -226,13 +233,15 @@ describe("Formulario de perfil de prestador", () => {
 
   it("un cliente no ve el formulario", async () => {
     simularApi({ usuario: { ...prestador, rol: "CLIENTE" } });
-    renderizar("/perfil-prestador");
+    renderizar("/mi/perfil");
 
     expect(await screen.findByText(/solo para prestadores/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/comuna/i)).not.toBeInTheDocument();
   });
 });
 
+// Antes el login llevaba directo a completar el perfil. Ahora, sin destino
+// guardado, lleva a la portada; el camino al perfil lo ofrece el menú.
 describe("Llegada al perfil de prestador", () => {
   async function iniciarSesion() {
     // Sin sesión al arrancar: el refresco inicial falla.
@@ -244,18 +253,29 @@ describe("Llegada al perfil de prestador", () => {
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
   }
 
-  it("un prestador verificado sin perfil va directo a completarlo", async () => {
+  async function abrirMenu() {
+    expect(await screen.findByRole("heading", { name: "Portada" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /pedro soto/i }));
+  }
+
+  it("un prestador verificado sin perfil tiene en el menú cómo completarlo", async () => {
     simularApi({ perfil: null });
     await iniciarSesion();
+    await abrirMenu();
 
+    expect(await screen.findByRole("link", { name: "Completar perfil" })).toHaveAttribute("href", "/mi/perfil");
+    fireEvent.click(screen.getByRole("link", { name: "Completar perfil" }));
     expect(await screen.findByRole("heading", { name: /completa tu perfil/i })).toBeInTheDocument();
   });
 
-  it("un prestador con perfil va a su cuenta", async () => {
+  it("un prestador con perfil tiene en el menú su perfil y sus servicios", async () => {
     simularApi({ perfil: PERFIL });
     await iniciarSesion();
+    await abrirMenu();
 
-    expect(await screen.findByRole("heading", { name: "Mi perfil" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Mi perfil" })).toHaveAttribute("href", "/mi/perfil");
+    expect(screen.getByRole("link", { name: "Mis servicios" })).toHaveAttribute("href", "/mi/servicios");
+    expect(screen.queryByRole("link", { name: "Completar perfil" })).not.toBeInTheDocument();
   });
 });
 
@@ -265,7 +285,7 @@ describe("Confirmación de correo", () => {
     renderizar("/verificar-correo?token=abc");
 
     const enlace = await screen.findByRole("link", { name: /completar mi perfil de prestador/i });
-    expect(enlace).toHaveAttribute("href", "/perfil-prestador");
+    expect(enlace).toHaveAttribute("href", "/mi/perfil");
   });
 
   it("sin sesión avisa que al entrar se pedirá el perfil", async () => {
@@ -295,7 +315,7 @@ describe("Estado del prestador en /perfil", () => {
     expect(pasos[1]).toHaveTextContent(/pendiente/i);
     expect(pasos[2]).toHaveTextContent(/al menos un servicio/i);
     expect(pasos[2]).toHaveTextContent(/pendiente/i);
-    expect(screen.getByRole("link", { name: /editar mi perfil/i })).toHaveAttribute("href", "/perfil-prestador");
+    expect(screen.getByRole("link", { name: /editar mi perfil/i })).toHaveAttribute("href", "/mi/perfil");
   });
 
   it("sin perfil lo marca pendiente y ofrece completarlo", async () => {
@@ -306,7 +326,7 @@ describe("Estado del prestador en /perfil", () => {
     expect(within(lista).getAllByRole("listitem")[0]).toHaveTextContent(/pendiente/i);
     expect(screen.getByRole("link", { name: /completar mi perfil/i })).toHaveAttribute(
       "href",
-      "/perfil-prestador",
+      "/mi/perfil",
     );
   });
 
