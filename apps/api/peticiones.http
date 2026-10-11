@@ -681,3 +681,17 @@ Authorization: Bearer {{tokenPrestador}}
 ### 62. Categorías → 200, pública
 GET {{host}}/categorias
 
+
+### 63. Categoría «Otros» con el nombre del oficio → 201, categoriaPersonalizada guardada
+# Sin "categoriaPersonalizada" (o con menos de 3 caracteres) → 400 con detalle en ese campo.
+# Con cualquier otra categoría, el nombre libre se ignora y queda null.
+POST {{host}}/servicios
+Authorization: Bearer {{tokenPrestador}}
+Content-Type: application/json
+
+{
+  "categoria": "otros",
+  "categoriaPersonalizada": "Pintura de interiores",
+  "titulo": "Pintura de departamentos y casas",
+  "descripcion": "Pintura interior, reparación de grietas y empaste. Materiales incluidos."
+}

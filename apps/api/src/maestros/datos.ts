@@ -408,7 +408,7 @@ export const COMUNAS: { id: number; nombre: string; regionId: number }[] = (
   ] as const
 ).map(([id, nombre]) => ({ id, nombre, regionId: Math.floor(id / 1000) }));
 
-/** Las mismas seis que muestra la landing, en el mismo orden. */
+/** Las seis que muestra la landing, en el mismo orden, y «Otros» al final. */
 export const CATEGORIAS: { slug: string; nombre: string; orden: number }[] = [
   { slug: "gasfiteria", nombre: "Gasfitería", orden: 1 },
   { slug: "electricidad", nombre: "Electricidad", orden: 2 },
@@ -416,6 +416,10 @@ export const CATEGORIAS: { slug: string; nombre: string; orden: number }[] = [
   { slug: "soldadura", nombre: "Soldadura", orden: 4 },
   { slug: "carpinteria", nombre: "Carpintería", orden: 5 },
   { slug: "cerrajeria", nombre: "Cerrajería", orden: 6 },
+  // Comodín para oficios que no están en la lista: el prestador escribe el
+  // nombre (servicios.categoria_personalizada). Orden alto para que vaya
+  // siempre al final del selector, aunque se agreguen categorías.
+  { slug: "otros", nombre: "Otros", orden: 99 },
 ];
 
 export const TIPOS_CREDENCIAL: {

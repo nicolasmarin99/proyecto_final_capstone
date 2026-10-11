@@ -1,4 +1,7 @@
 import {
+  LARGO_MAXIMO_CATEGORIA_PERSONALIZADA,
+  LARGO_MINIMO_CATEGORIA_PERSONALIZADA,
+  SLUG_CATEGORIA_OTROS,
   LARGO_MAXIMO_DESCRIPCION_SERVICIO,
   LARGO_MAXIMO_TITULO,
   LARGO_MINIMO_DESCRIPCION_SERVICIO,
@@ -29,6 +32,9 @@ const precio = (campo: string) =>
 export const esquemaServicio = z
   .object({
     categoria: z.string({ error: "Elige una categoría." }).trim().min(1, "Elige una categoría.").max(60),
+    // Solo cuenta con la categoría «Otros»; el largo se revisa abajo, porque
+    // depende de qué categoría se eligió.
+    categoriaPersonalizada: z.string({ error: "El nombre de tu oficio debe ser texto." }).trim().nullable().optional(),
     titulo: z
       .string({ error: "El título es obligatorio." })
       .trim()
@@ -71,6 +77,18 @@ export const esquemaServicio = z
       });
     }
 
+    if (datos.categoria === SLUG_CATEGORIA_OTROS) {
+      const largo = (datos.categoriaPersonalizada ?? "").length;
+
+      if (largo < LARGO_MINIMO_CATEGORIA_PERSONALIZADA || largo > LARGO_MAXIMO_CATEGORIA_PERSONALIZADA) {
+        contexto.addIssue({
+          code: "custom",
+          path: ["categoriaPersonalizada"],
+          message: `Escribe el nombre de tu oficio (de ${LARGO_MINIMO_CATEGORIA_PERSONALIZADA} a ${LARGO_MAXIMO_CATEGORIA_PERSONALIZADA} caracteres).`,
+        });
+      }
+    }
+
     if (desde !== null && !datos.unidadPrecio) {
       contexto.addIssue({
         code: "custom",
@@ -84,6 +102,10 @@ export const esquemaServicio = z
     const precioDesde = datos.precioDesde ?? null;
     return {
       ...datos,
+      // Con cualquier categoría de la lista, el nombre libre no aplica: se
+      // descarta para que no quede un «Pintura» colgando de «Gasfitería».
+      categoriaPersonalizada:
+        datos.categoria === SLUG_CATEGORIA_OTROS ? (datos.categoriaPersonalizada ?? null) : null,
       precioDesde,
       precioHasta: datos.precioHasta ?? null,
       unidadPrecio: precioDesde === null ? null : (datos.unidadPrecio ?? null),

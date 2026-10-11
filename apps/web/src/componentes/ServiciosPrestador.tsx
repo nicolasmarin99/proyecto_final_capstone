@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import {
+  LARGO_MAXIMO_CATEGORIA_PERSONALIZADA,
+  LARGO_MINIMO_CATEGORIA_PERSONALIZADA,
+  SLUG_CATEGORIA_OTROS,
   LARGO_MAXIMO_DESCRIPCION_SERVICIO,
   LARGO_MAXIMO_TITULO,
   LARGO_MINIMO_DESCRIPCION_SERVICIO,
@@ -17,7 +20,7 @@ import {
   type ServicioPropio,
   type UnidadPrecio,
 } from "../api/cliente";
-import { NOMBRE_UNIDAD, textoPrecio } from "../servicios/formato";
+import { NOMBRE_UNIDAD, nombreCategoria, textoPrecio } from "../servicios/formato";
 import { Boton, clasesBoton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
 import { CampoTexto } from "./CampoTexto";
@@ -34,6 +37,7 @@ const ESTADO_VISIBLE: Record<EstadoServicio, { texto: string; clases: string }> 
 function datosDe(servicio: ServicioPropio, estado: "PUBLICADO" | "PAUSADO"): DatosServicio {
   return {
     categoria: servicio.categoria.slug,
+    categoriaPersonalizada: servicio.categoriaPersonalizada,
     titulo: servicio.titulo,
     descripcion: servicio.descripcion,
     precioDesde: servicio.precioDesde,
@@ -55,6 +59,7 @@ function mensajeError(causa: unknown, porDefecto: string) {
 
 interface Formulario {
   categoria: string;
+  categoriaPersonalizada: string;
   titulo: string;
   descripcion: string;
   precioDesde: string;
@@ -66,6 +71,7 @@ interface Formulario {
 function formularioDe(servicio: ServicioPropio | null): Formulario {
   return {
     categoria: servicio?.categoria.slug ?? "",
+    categoriaPersonalizada: servicio?.categoriaPersonalizada ?? "",
     titulo: servicio?.titulo ?? "",
     descripcion: servicio?.descripcion ?? "",
     precioDesde: servicio?.precioDesde === null || !servicio ? "" : String(servicio.precioDesde),
@@ -96,6 +102,14 @@ function validar(formulario: Formulario): { errores: Record<string, string>; dat
   const hasta = leerPrecio(formulario.precioHasta);
 
   if (!formulario.categoria) errores.categoria = "Elige una categoría.";
+  const esOtros = formulario.categoria === SLUG_CATEGORIA_OTROS;
+  const oficio = formulario.categoriaPersonalizada.trim();
+  if (
+    esOtros &&
+    (oficio.length < LARGO_MINIMO_CATEGORIA_PERSONALIZADA || oficio.length > LARGO_MAXIMO_CATEGORIA_PERSONALIZADA)
+  ) {
+    errores.categoriaPersonalizada = `Escribe el nombre de tu oficio (de ${LARGO_MINIMO_CATEGORIA_PERSONALIZADA} a ${LARGO_MAXIMO_CATEGORIA_PERSONALIZADA} caracteres).`;
+  }
   if (titulo.length < LARGO_MINIMO_TITULO) errores.titulo = `El título debe tener al menos ${LARGO_MINIMO_TITULO} caracteres.`;
   else if (titulo.length > LARGO_MAXIMO_TITULO) errores.titulo = `El título no puede superar los ${LARGO_MAXIMO_TITULO} caracteres.`;
   if (descripcion.length < LARGO_MINIMO_DESCRIPCION_SERVICIO) {
@@ -119,6 +133,8 @@ function validar(formulario: Formulario): { errores: Record<string, string>; dat
     errores,
     datos: {
       categoria: formulario.categoria,
+      // Solo con «Otros»: en cualquier otra categoría no aplica.
+      categoriaPersonalizada: esOtros ? oficio : null,
       titulo,
       descripcion,
       precioDesde: desde,
@@ -223,6 +239,17 @@ function FormularioServicio({
         vacio="Elige la categoría"
         error={visibles.categoria}
       />
+      {formulario.categoria === SLUG_CATEGORIA_OTROS && (
+        <CampoTexto
+          id={`${prefijo}-oficio`}
+          etiqueta="Nombre de tu oficio"
+          autoComplete="off"
+          valor={formulario.categoriaPersonalizada}
+          alCambiar={cambiar("categoriaPersonalizada")}
+          error={visibles.categoriaPersonalizada}
+          ayuda="Por ejemplo: Pintura de interiores, Jardinería, Mudanzas. Es lo que verán los clientes en lugar de «Otros»."
+        />
+      )}
       <CampoTexto
         id={`${prefijo}-titulo`}
         etiqueta="Título"
@@ -246,18 +273,18 @@ function FormularioServicio({
       <div className="grid gap-x-4 sm:grid-cols-2">
         <CampoTexto
           id={`${prefijo}-desde`}
-          etiqueta="Precio desde (opcional)"
+          etiqueta="Precio desde"
           tipo="number"
           inputMode="numeric"
           autoComplete="off"
           valor={formulario.precioDesde}
           alCambiar={cambiar("precioDesde")}
           error={visibles.precioDesde}
-          ayuda="En pesos. Vacío = «a convenir»."
+          ayuda="Opcional, en pesos. Vacío = «a convenir»."
         />
         <CampoTexto
           id={`${prefijo}-hasta`}
-          etiqueta="Precio hasta (opcional)"
+          etiqueta="Precio hasta"
           tipo="number"
           inputMode="numeric"
           autoComplete="off"
@@ -341,7 +368,7 @@ function FilaServicio({
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${estado.clases}`}>{estado.texto}</span>
       </div>
       <p className="mt-1 text-sm text-texto-suave">
-        {servicio.categoria.nombre} · {textoPrecio(servicio)}
+        {nombreCategoria(servicio)} · {textoPrecio(servicio)}
       </p>
 
       {error && (

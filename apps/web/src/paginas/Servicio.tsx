@@ -7,7 +7,7 @@ import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
 import { Navbar } from "../componentes/landing/Navbar";
-import { textoPrecio } from "../servicios/formato";
+import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "long" });
 
@@ -121,7 +121,7 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
 
             {servicio && (
               <article className="motion-safe:animate-aparecer rounded-grande border border-borde bg-blanco p-6 shadow-tarjeta sm:p-8">
-                <p className="text-sm font-bold tracking-[1.2px] text-primario uppercase">{servicio.categoria.nombre}</p>
+                <p className="text-sm font-bold tracking-[1.2px] text-primario uppercase">{nombreCategoria(servicio)}</p>
                 <h1 className="mt-2 font-titulos text-[28px] leading-[1.15] font-bold tracking-[-0.5px] md:text-[36px]">
                   {servicio.titulo}
                 </h1>

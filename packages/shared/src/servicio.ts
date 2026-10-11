@@ -18,3 +18,12 @@ export const PRECIO_MAXIMO = 1_000_000_000;
 
 export const MINIMO_COMUNAS_ATENCION = 1;
 export const MAXIMO_COMUNAS_ATENCION = 20;
+
+/**
+ * Categoría comodín: si el oficio no está en la lista, el prestador elige
+ * «Otros» y escribe el nombre. El mismo rango que el CHECK
+ * servicios_categoria_personalizada_largo.
+ */
+export const SLUG_CATEGORIA_OTROS = "otros";
+export const LARGO_MINIMO_CATEGORIA_PERSONALIZADA = 3;
+export const LARGO_MAXIMO_CATEGORIA_PERSONALIZADA = 60;

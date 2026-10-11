@@ -4,6 +4,7 @@ import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client
 /** Lo que ve el dueño de su servicio. */
 const seleccionServicio = {
   id: true,
+  categoriaPersonalizada: true,
   titulo: true,
   descripcion: true,
   precioDesde: true,
@@ -17,6 +18,7 @@ const seleccionServicio = {
 
 interface CamposServicio {
   categoriaId: string;
+  categoriaPersonalizada: string | null;
   titulo: string;
   descripcion: string;
   precioDesde: number | null;
@@ -100,6 +102,7 @@ export async function buscarServicioPublico(id: string) {
     where: { id, estado: "PUBLICADO" },
     select: {
       id: true,
+      categoriaPersonalizada: true,
       titulo: true,
       descripcion: true,
       precioDesde: true,

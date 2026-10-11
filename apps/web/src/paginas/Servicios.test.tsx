@@ -22,6 +22,7 @@ interface ServicioDePrueba {
   precioHasta: number | null;
   unidadPrecio: string | null;
   categoria: { slug: string; nombre: string };
+  categoriaPersonalizada?: string | null;
   prestador: {
     id: string;
     nombre: string;
@@ -107,7 +108,13 @@ function simularApi({
     if (url === "/api/auth/yo") return json({ usuario });
     if (url === "/api/comunas") return json({ comunas: [LAS_CONDES, SANTIAGO] });
     if (url === "/api/categorias") {
-      return json({ categorias: [{ slug: "gasfiteria", nombre: "Gasfitería" }, { slug: "electricidad", nombre: "Electricidad" }] });
+      return json({
+        categorias: [
+          { slug: "gasfiteria", nombre: "Gasfitería" },
+          { slug: "electricidad", nombre: "Electricidad" },
+          { slug: "otros", nombre: "Otros" },
+        ],
+      });
     }
     if (url === "/api/prestadores/yo/identidad") return json({ identidad: null, cargasDisponibles: 3 });
     if (url === "/api/prestadores/yo/comunas") return json({ comunas: [LAS_CONDES, SANTIAGO] });
@@ -191,6 +198,21 @@ describe("Página pública del servicio", () => {
     expect(screen.getByText(/\$25\.000.*\$60\.000/)).toBeInTheDocument();
     const comunas = screen.getByRole("list", { name: /comunas donde atiende/i });
     expect(within(comunas).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Las Condes", "Santiago"]);
+  });
+
+  it("con «Otros» muestra el oficio que escribió el prestador, no «Otros»", async () => {
+    simularApi({
+      usuario: null,
+      servicioPublico: {
+        ...SERVICIO_PUBLICO,
+        categoria: { slug: "otros", nombre: "Otros" },
+        categoriaPersonalizada: "Pintura de interiores",
+      },
+    });
+    renderizar("/servicios/s1");
+
+    expect(await screen.findByText("Pintura de interiores")).toBeInTheDocument();
+    expect(screen.queryByText(/^otros$/i)).not.toBeInTheDocument();
   });
 
   it("sin precio muestra «a convenir»", async () => {
@@ -319,6 +341,7 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
     expect(within(seccion).getByText(/indica al menos una comuna/i)).toBeInTheDocument();
     expect(cuerpoDe("POST", /\/api\/servicios$/)).toEqual({
       categoria: "gasfiteria",
+      categoriaPersonalizada: null,
       titulo: "Gasfitería a domicilio",
       descripcion: "Reparación de calefont, filtraciones y destapes en toda la comuna.",
       precioDesde: 25000,
@@ -326,6 +349,53 @@ describe("Comunas de atención y servicios en el perfil del prestador", () => {
       unidadPrecio: "POR_HORA",
       estado: "PUBLICADO",
     });
+  });
+
+  it("con «Otros» pide el nombre del oficio y lo envía; con otra categoría el campo desaparece", async () => {
+    simularApi();
+    renderizar("/perfil-prestador");
+    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+
+    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
+    await within(seccion).findByRole("option", { name: "Otros" });
+    expect(within(seccion).queryByLabelText(/nombre de tu oficio/i)).not.toBeInTheDocument();
+
+    fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "gasfiteria" } });
+    expect(within(seccion).queryByLabelText(/nombre de tu oficio/i)).not.toBeInTheDocument();
+
+    fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "otros" } });
+    fireEvent.change(within(seccion).getByLabelText(/nombre de tu oficio/i), { target: { value: "Pintura de interiores" } });
+    fireEvent.change(within(seccion).getByLabelText(/^título/i), { target: { value: "Pintura de departamentos y casas" } });
+    fireEvent.change(within(seccion).getByLabelText(/descripción del servicio/i), {
+      target: { value: "Pintura interior, reparación de grietas y empaste. Materiales incluidos." },
+    });
+    fireEvent.click(within(seccion).getByRole("button", { name: /guardar servicio/i }));
+
+    await waitFor(() =>
+      expect(cuerpoDe("POST", /\/api\/servicios$/)).toMatchObject({
+        categoria: "otros",
+        categoriaPersonalizada: "Pintura de interiores",
+      }),
+    );
+  });
+
+  it("con «Otros» y sin nombre del oficio, no envía", async () => {
+    simularApi();
+    renderizar("/perfil-prestador");
+    const seccion = await screen.findByRole("region", { name: /tus servicios/i });
+
+    fireEvent.click(await within(seccion).findByRole("button", { name: /nuevo servicio/i }));
+    await within(seccion).findByRole("option", { name: "Otros" });
+    fireEvent.change(within(seccion).getByLabelText(/categoría/i), { target: { value: "otros" } });
+    fireEvent.change(within(seccion).getByLabelText(/^título/i), { target: { value: "Pintura de departamentos y casas" } });
+    fireEvent.change(within(seccion).getByLabelText(/descripción del servicio/i), {
+      target: { value: "Pintura interior, reparación de grietas y empaste. Materiales incluidos." },
+    });
+    fireEvent.click(within(seccion).getByRole("button", { name: /guardar servicio/i }));
+
+    const campo = within(seccion).getByLabelText(/nombre de tu oficio/i);
+    await waitFor(() => expect(campo).toHaveAttribute("aria-invalid", "true"));
+    expect(llamadas("POST", /\/api\/servicios$/)).toHaveLength(0);
   });
 
   it("valida antes de enviar: título corto y precio hasta menor que desde", async () => {
