@@ -1,5 +1,9 @@
 import {
   LARGO_MAXIMO_CATEGORIA_PERSONALIZADA,
+  LARGO_MAXIMO_CONSULTA,
+  MAXIMO_POR_PAGINA_BUSQUEDA,
+  ORDENES_BUSQUEDA,
+  POR_PAGINA_BUSQUEDA,
   LARGO_MINIMO_CATEGORIA_PERSONALIZADA,
   SLUG_CATEGORIA_OTROS,
   LARGO_MAXIMO_DESCRIPCION_SERVICIO,
@@ -116,3 +120,58 @@ export type DatosServicio = z.infer<typeof esquemaServicio>;
 
 /** Ids de la URL. Sin exigir formato UUID: un id con otra forma no existe (404). */
 export const esquemaId = z.object({ id: z.string().min(1).max(64) });
+
+/**
+ * Un parámetro vacío de la URL (?comuna=) cuenta como ausente: es lo que
+ * deja un formulario con el campo en blanco, no un error de quien busca.
+ */
+function opcional<T extends z.ZodType>(esquema: T) {
+  return z.preprocess((valor) => (typeof valor === "string" && valor.trim() === "" ? undefined : valor), esquema.optional());
+}
+
+/**
+ * Filtros de GET /servicios, todos opcionales:
+ * ?q=gasfiter&categoria=gasfiteria&comuna=13101&precioMax=50000&orden=precio&pagina=2&porPagina=12
+ *
+ * Un parámetro repetido (?q=a&q=b) llega como arreglo y no pasa: 400.
+ */
+export const esquemaBusqueda = z.object({
+  q: opcional(
+    z
+      .string({ error: "La búsqueda debe ser texto." })
+      .trim()
+      .max(LARGO_MAXIMO_CONSULTA, `La búsqueda no puede superar los ${LARGO_MAXIMO_CONSULTA} caracteres.`),
+  ),
+  // Un slug: minúsculas, dígitos y guiones. Cualquier otra cosa no es una categoría.
+  categoria: opcional(
+    z
+      .string({ error: "La categoría debe ser texto." })
+      .trim()
+      .max(60)
+      .regex(/^[a-z0-9-]+$/, "La categoría no es válida."),
+  ),
+  comuna: opcional(z.coerce.number({ error: "La comuna no es válida." }).int("La comuna no es válida.").positive("La comuna no es válida.")),
+  precioMax: opcional(
+    z.coerce
+      .number({ error: "El precio máximo debe ser un número." })
+      .int("El precio máximo va en pesos, sin decimales.")
+      .min(0, "El precio máximo no puede ser negativo.")
+      .max(PRECIO_MAXIMO, "El precio máximo es demasiado alto."),
+  ),
+  orden: z.enum(ORDENES_BUSQUEDA, { error: "El orden debe ser recientes o precio." }).default("recientes"),
+  pagina: z.coerce
+    .number({ error: "La página debe ser un número." })
+    .int("La página debe ser un número entero.")
+    .min(1, "La página parte en 1.")
+    // Más allá no hay nadie mirando, y un desplazamiento enorme es caro.
+    .max(500, "La página no puede superar 500.")
+    .default(1),
+  porPagina: z.coerce
+    .number({ error: "porPagina debe ser un número." })
+    .int("porPagina debe ser un número entero.")
+    .min(1, "porPagina debe ser al menos 1.")
+    .max(MAXIMO_POR_PAGINA_BUSQUEDA, `porPagina no puede superar ${MAXIMO_POR_PAGINA_BUSQUEDA}.`)
+    .default(POR_PAGINA_BUSQUEDA),
+});
+
+export type FiltrosBusqueda = z.infer<typeof esquemaBusqueda>;

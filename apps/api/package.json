@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
-    "seed:maestros": "tsx prisma/seed-maestros.ts"
+    "seed:maestros": "tsx prisma/seed-maestros.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts"
   },
   "keywords": [],
   "author": "",

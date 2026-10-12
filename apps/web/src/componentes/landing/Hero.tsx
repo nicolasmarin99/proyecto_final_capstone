@@ -1,7 +1,9 @@
-import { useEffect, useRef, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
+import { clienteApi, type ClienteApi, type Comuna } from "../../api/cliente";
+import { normalizarNombre, rutaBuscar } from "../../servicios/filtrosBusqueda";
 import { Contenedor } from "./Contenedor";
-import { POPULARES, rutaBusqueda } from "./datos";
+import { POPULARES } from "./datos";
 import { FondoHero } from "./FondoHero";
 import { Icono } from "../iconos";
 import { usePrefiereMenosMovimiento } from "./usePrefiereMenosMovimiento";
@@ -23,15 +25,49 @@ import { usePrefiereMenosMovimiento } from "./usePrefiereMenosMovimiento";
  * Bajo lg pasa a una columna con el video debajo del texto, y bajo sm el
  * buscador apila sus dos campos y el botón.
  */
-export function Hero() {
+export function Hero({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const navegar = useNavigate();
+  const idSugerencias = useId();
+  const idErrorComuna = useId();
+  const comunas = useRef<Promise<Comuna[]> | null>(null);
+  const [opciones, setOpciones] = useState<Comuna[]>([]);
+  const [errorComuna, setErrorComuna] = useState<string | null>(null);
 
-  // El formulario no guarda estado en React: se leen los campos al enviar.
-  // No hay nada que validar mientras se escribe, así que no hace falta más.
-  function buscar(evento: FormEvent<HTMLFormElement>) {
+  /**
+   * Las 346 comunas se piden recién cuando alguien va a escribir una (al
+   * enfocar el campo), no al cargar la portada. Se piden una sola vez.
+   */
+  function cargarComunas(): Promise<Comuna[]> {
+    comunas.current ??= cliente.listarComunas().catch(() => []);
+    void comunas.current.then(setOpciones);
+    return comunas.current;
+  }
+
+  // Los campos se leen al enviar. La comuna escrita se traduce a su código
+  // (la búsqueda filtra por id): «nunoa» o «Ñuñoa» encuentran la misma.
+  async function buscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const datos = new FormData(evento.currentTarget);
-    navegar(rutaBusqueda(String(datos.get("servicio") ?? ""), String(datos.get("comuna") ?? "")));
+    const q = String(datos.get("servicio") ?? "");
+    const textoComuna = normalizarNombre(String(datos.get("comuna") ?? ""));
+
+    if (!textoComuna) {
+      navegar(rutaBuscar({ q }));
+      return;
+    }
+
+    const lista = await cargarComunas();
+    const comuna = lista.find((candidata) => normalizarNombre(candidata.nombre) === textoComuna);
+
+    if (comuna) {
+      setErrorComuna(null);
+      navegar(rutaBuscar({ q, comuna: comuna.id }));
+    } else if (lista.length === 0) {
+      // Sin la lista no se puede traducir: se busca igual, y en /buscar se elige.
+      navegar(rutaBuscar({ q }));
+    } else {
+      setErrorComuna("No encontramos esa comuna. Elige una de la lista.");
+    }
   }
 
   return (
@@ -85,8 +121,19 @@ export function Hero() {
                 type="text"
                 placeholder="Comuna"
                 autoComplete="address-level2"
+                list={idSugerencias}
+                onFocus={() => void cargarComunas()}
+                onChange={() => setErrorComuna(null)}
+                aria-invalid={errorComuna ? true : undefined}
+                aria-describedby={errorComuna ? idErrorComuna : undefined}
                 className="min-w-0 flex-1 bg-transparent text-[17px] text-noche outline-none placeholder:text-texto-tenue"
               />
+              {/* Sugerencias nativas del navegador mientras se escribe. */}
+              <datalist id={idSugerencias}>
+                {opciones.map((comuna) => (
+                  <option key={comuna.id} value={comuna.nombre} />
+                ))}
+              </datalist>
             </label>
             <button
               type="submit"
@@ -95,19 +142,24 @@ export function Hero() {
               Buscar
             </button>
           </form>
+          {errorComuna && (
+            <p id={idErrorComuna} role="alert" className="-mt-4 text-sm font-medium text-error-700">
+              {errorComuna}
+            </p>
+          )}
 
           <div
             className="motion-safe:animate-aparecer flex flex-wrap items-center gap-2.5 text-[15px] text-texto-suave"
             style={{ animationDelay: "320ms" }}
           >
             <span>Populares:</span>
-            {POPULARES.map((servicio) => (
+            {POPULARES.map((categoria) => (
               <Link
-                key={servicio}
-                to={rutaBusqueda(servicio)}
+                key={categoria.slug}
+                to={rutaBuscar({ categoria: categoria.slug })}
                 className="rounded-full border border-borde-fuerte bg-blanco px-3 py-1.5 text-noche transition-colors hover:border-primario hover:text-primario focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
               >
-                {servicio}
+                {categoria.nombre}
               </Link>
             ))}
           </div>

@@ -1,9 +1,30 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { describe, expect, it } from "vitest";
-import { rutaBusqueda } from "../componentes/landing/datos";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calcularEtapa, calcularProgreso } from "../componentes/landing/useEtapaScroll";
+import { rutaBuscar } from "../servicios/filtrosBusqueda";
 import PaginaInicio from "./Inicio";
+
+const COMUNAS = [
+  { id: 13120, nombre: "Ñuñoa", region: { id: 13, nombre: "Metropolitana de Santiago", orden: 7 } },
+  { id: 13119, nombre: "Maipú", region: { id: 13, nombre: "Metropolitana de Santiago", orden: 7 } },
+];
+
+// El buscador de la portada pide las comunas para traducir el nombre escrito a su código.
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (entrada: RequestInfo | URL) =>
+      String(entrada) === "/api/comunas"
+        ? ({ ok: true, status: 200, json: async () => ({ comunas: COMUNAS }) } as Response)
+        : ({ ok: false, status: 404, json: async () => ({}) } as Response),
+    ),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 /** Muestra la dirección a la que se navegó, para comprobarla en la prueba. */
 function Destino() {
@@ -52,10 +73,10 @@ describe("calcularProgreso", () => {
   });
 });
 
-describe("rutaBusqueda", () => {
+describe("rutaBuscar", () => {
   it("arma los parámetros y omite los vacíos", () => {
-    expect(rutaBusqueda("Gasfitería", "Maipú")).toBe("/buscar?servicio=Gasfiter%C3%ADa&comuna=Maip%C3%BA");
-    expect(rutaBusqueda("  ", "")).toBe("/buscar");
+    expect(rutaBuscar({ q: "Gasfitería", comuna: 13119 })).toBe("/buscar?q=Gasfiter%C3%ADa&comuna=13119");
+    expect(rutaBuscar({ q: "  " })).toBe("/buscar");
   });
 });
 
@@ -84,11 +105,33 @@ describe("PaginaInicio", () => {
     expect(screen.getByLabelText("Comuna")).toBeInTheDocument();
   });
 
-  it("el buscador navega a /buscar con lo escrito", () => {
+  // La comuna escrita viaja como su código: la búsqueda filtra por id.
+  it("el buscador navega a /buscar con lo escrito", async () => {
     renderizar();
     fireEvent.change(screen.getByLabelText("Servicio"), { target: { value: "gasfiter" } });
     fireEvent.change(screen.getByLabelText("Comuna"), { target: { value: "Ñuñoa" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
-    expect(screen.getByTestId("destino")).toHaveTextContent("/buscar?servicio=gasfiter&comuna=%C3%91u%C3%B1oa");
+    expect(await screen.findByTestId("destino")).toHaveTextContent("/buscar?q=gasfiter&comuna=13120");
+  });
+
+  it("reconoce la comuna sin tildes ni mayúsculas", async () => {
+    renderizar();
+    fireEvent.change(screen.getByLabelText("Comuna"), { target: { value: "  MAIPU " } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    expect(await screen.findByTestId("destino")).toHaveTextContent("/buscar?comuna=13119");
+  });
+
+  it("si la comuna no existe, lo dice y no navega", async () => {
+    renderizar();
+    fireEvent.change(screen.getByLabelText("Comuna"), { target: { value: "Gotham" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    expect(await screen.findByText(/no encontramos esa comuna/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Comuna")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByTestId("destino")).not.toBeInTheDocument();
+  });
+
+  it("las categorías populares llevan a /buscar filtrado por categoría", () => {
+    renderizar();
+    expect(screen.getAllByRole("link", { name: "Gasfitería" })[0]).toHaveAttribute("href", "/buscar?categoria=gasfiteria");
   });
 });

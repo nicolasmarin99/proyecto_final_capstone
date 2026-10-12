@@ -1,8 +1,10 @@
+import { COMUNAS_POR_RESULTADO } from "@localcl/shared";
 import type { EstadoServicio } from "../../generated/prisma/client.js";
 import { ErrorHttp } from "../../shared/errores.js";
 import {
   actualizarServicio,
   buscarCategoriaActiva,
+  buscarServiciosPublicados,
   buscarDuenoServicio,
   buscarPerfilParaPublicar,
   buscarServicioPublico,
@@ -12,7 +14,7 @@ import {
   listarCategoriasActivas,
   listarServiciosDe,
 } from "./servicios.repository.js";
-import type { DatosServicio } from "./servicios.schema.js";
+import type { DatosServicio, FiltrosBusqueda } from "./servicios.schema.js";
 
 export interface RequisitoPendiente {
   codigo: "IDENTIDAD_NO_VERIFICADA" | "SIN_COMUNAS_ATENCION";
@@ -206,4 +208,74 @@ export async function publico(id: string) {
 
 export async function categorias() {
   return listarCategoriasActivas();
+}
+
+/** Más términos no afinan la búsqueda y solo encarecen la consulta. */
+const MAXIMO_TERMINOS = 8;
+
+/**
+ * Convierte lo que escribió la persona en una tsquery por prefijos:
+ * «Gasfiter domicilio» → «Gasfiter:* & domicilio:*».
+ *
+ * Solo sobreviven letras y dígitos (de cualquier idioma, con o sin tilde);
+ * todo lo demás separa palabras. Por eso comillas, apóstrofes, «&», «|»,
+ * «!», «:» o paréntesis nunca llegan a to_tsquery como operadores: no
+ * pueden romper su sintaxis. Y aunque llegaran, viajan como parámetro de la
+ * consulta, nunca como parte del SQL.
+ *
+ * null si no queda ninguna palabra: es una búsqueda sin texto.
+ */
+export function consultaPorPrefijos(texto: string | undefined): string | null {
+  const terminos = (texto ?? "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((termino) => termino.length > 0)
+    .slice(0, MAXIMO_TERMINOS);
+
+  return terminos.length > 0 ? terminos.map((termino) => `${termino}:*`).join(" & ") : null;
+}
+
+/**
+ * Búsqueda pública: solo servicios PUBLICADOS de prestadores con la
+ * identidad verificada. Como en publico(), la respuesta se arma campo por
+ * campo: del prestador salen su nombre, hasta tres comunas y si tiene
+ * credenciales acreditadas. Nunca teléfono, correo ni RUT.
+ */
+export async function buscar(filtros: FiltrosBusqueda) {
+  const filas = await buscarServiciosPublicados({
+    consulta: consultaPorPrefijos(filtros.q),
+    categoria: filtros.categoria ?? null,
+    comuna: filtros.comuna ?? null,
+    precioMax: filtros.precioMax ?? null,
+    orden: filtros.orden,
+    limite: filtros.porPagina,
+    desplazamiento: (filtros.pagina - 1) * filtros.porPagina,
+    comunasPorResultado: COMUNAS_POR_RESULTADO,
+  });
+
+  return {
+    resultados: filas.map((fila) => {
+      const comunas = fila.comunas ?? [];
+      return {
+        id: fila.id,
+        titulo: fila.titulo,
+        categoria: { slug: fila.categoriaSlug, nombre: fila.categoriaNombre },
+        categoriaPersonalizada: fila.categoriaPersonalizada,
+        precioDesde: fila.precioDesde,
+        precioHasta: fila.precioHasta,
+        unidadPrecio: fila.unidadPrecio,
+        // Explícito para quien consuma la API sin conocer la convención.
+        aConvenir: fila.precioDesde === null,
+        prestador: {
+          nombre: fila.prestadorNombre,
+          comunas,
+          comunasRestantes: Math.max(0, fila.totalComunas - comunas.length),
+          acreditado: fila.acreditado,
+        },
+      };
+    }),
+    pagina: filtros.pagina,
+    porPagina: filtros.porPagina,
+    // Fuera de rango (pagina más allá del final) no hay filas de donde leerlo.
+    total: filas[0]?.total ?? 0,
+  };
 }
