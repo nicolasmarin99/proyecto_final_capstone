@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaId, esquemaServicio } from "./servicios.schema.js";
-import { categorias, crear, editar, eliminar, mios, publico } from "./servicios.service.js";
+import { esquemaBusqueda, esquemaId, esquemaServicio } from "./servicios.schema.js";
+import { buscar, categorias, crear, editar, eliminar, mios, publico } from "./servicios.service.js";
 
 /**
  * Sin try/catch: Express 5 entrega los rechazos al manejador central.
@@ -42,6 +42,12 @@ export async function servicioPublico(req: Request, res: Response) {
   const { id } = esquemaId.parse(req.params);
 
   res.status(200).json({ servicio: await publico(id) });
+}
+
+export async function buscarServicios(req: Request, res: Response) {
+  const filtros = esquemaBusqueda.parse(req.query);
+
+  res.status(200).json(await buscar(filtros));
 }
 
 export async function listarCategorias(_req: Request, res: Response) {

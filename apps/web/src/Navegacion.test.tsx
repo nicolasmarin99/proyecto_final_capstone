@@ -120,6 +120,24 @@ describe("Encabezado", () => {
     expect(within(screen.getByRole("banner")).queryByRole("link", { name: "Iniciar sesión" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["un visitante lo ve", null, true],
+    ["un cliente lo ve", CLIENTE, true],
+    ["un prestador no", PRESTADOR, false],
+    ["un administrador no", ADMIN, false],
+  ] as const)("el enlace a Buscar se muestra según quién mira: %s", async (_quien, usuario, ofrece) => {
+    simularApi({ usuario });
+    renderizar("/estado");
+
+    const encabezado = screen.getByRole("banner");
+    // Se espera a que termine de restaurar la sesión: ahí aparece el menú o «Iniciar sesión».
+    await within(encabezado).findByRole(usuario ? "button" : "link", { name: usuario ? new RegExp(usuario.nombre) : "Iniciar sesión" });
+
+    const enlace = within(encabezado).queryByRole("link", { name: "Buscar" });
+    if (ofrece) expect(enlace).toHaveAttribute("href", "/buscar");
+    else expect(enlace).not.toBeInTheDocument();
+  });
+
   it("las opciones del menú dependen del rol", async () => {
     simularApi({ usuario: ADMIN });
     renderizar("/estado");

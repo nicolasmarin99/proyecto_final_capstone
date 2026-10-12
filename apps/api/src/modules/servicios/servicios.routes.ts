@@ -4,6 +4,7 @@ import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
 import {
+  buscarServicios,
   crearServicio,
   editarServicio,
   eliminarServicio,
@@ -19,6 +20,8 @@ const prestadorVerificado = [autenticar, autorizar(Rol.PRESTADOR), exigirCorreoV
 
 // /mios antes que /:id: si no, Express tomaría "mios" como un id.
 rutasServicios.get("/mios", autenticar, autorizar(Rol.PRESTADOR), misServicios);
+// Búsqueda pública: sin sesión, solo lo publicado (ver servicios.service.ts).
+rutasServicios.get("/", buscarServicios);
 rutasServicios.get("/:id", servicioPublico);
 rutasServicios.post("/", ...prestadorVerificado, crearServicio);
 rutasServicios.put("/:id", ...prestadorVerificado, editarServicio);

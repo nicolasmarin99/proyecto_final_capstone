@@ -27,3 +27,11 @@ export {
   MINIMO_COMUNAS_ATENCION,
   PRECIO_MAXIMO,
 } from "./servicio.js";
+export {
+  COMUNAS_POR_RESULTADO,
+  LARGO_MAXIMO_CONSULTA,
+  MAXIMO_POR_PAGINA_BUSQUEDA,
+  ORDENES_BUSQUEDA,
+  POR_PAGINA_BUSQUEDA,
+  type OrdenBusqueda,
+} from "./busqueda.js";

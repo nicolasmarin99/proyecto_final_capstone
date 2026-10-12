@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router";
 import { useAuth } from "../auth/ContextoAuth";
 import { Contenedor } from "./landing/Contenedor";
+import { Icono } from "./iconos";
 import { LogoLocalCL } from "./LogoLocalCL";
 import { MenuUsuario } from "./MenuUsuario";
 
@@ -20,10 +21,14 @@ const SECCIONES_LANDING = [
  * Con sesión: la marca y el menú del usuario con su nombre y su rol.
  * Mientras se restaura la sesión no muestra ninguno de los dos, para no
  * mostrar «Iniciar sesión» un instante a quien ya tiene sesión.
+ *
+ * «Buscar» es para quien contrata: visitantes y clientes. Al prestador y al
+ * administrador no se les ofrece, porque su menú ya lleva a lo suyo.
  */
 export function Encabezado() {
   const { usuario, cargando } = useAuth();
   const { pathname } = useLocation();
+  const ofreceBuscar = !cargando && (!usuario || usuario.rol === "CLIENTE");
 
   return (
     <header className="relative z-20 border-b border-borde bg-blanco">
@@ -43,25 +48,38 @@ export function Encabezado() {
           </nav>
         )}
 
-        {!cargando &&
-          (usuario ? (
-            <MenuUsuario usuario={usuario} />
-          ) : (
-            <nav aria-label="Cuenta" className="flex items-center gap-1.5 sm:gap-3">
-              <Link
-                to="/iniciar-sesion"
-                className={`flex h-11 items-center rounded-chico px-3 text-sm font-semibold text-primario transition-colors hover:bg-hielo sm:px-5 sm:text-[15px] ${foco}`}
-              >
-                Iniciar sesión
-              </Link>
-              <Link
-                to="/registro"
-                className={`flex h-11 items-center rounded-chico bg-primario px-4 text-sm font-bold text-blanco transition-colors hover:bg-noche sm:px-5 sm:text-[15px] ${foco}`}
-              >
-                Registrarse
-              </Link>
-            </nav>
-          ))}
+        <div className="flex items-center gap-1 sm:gap-3">
+          {ofreceBuscar && (
+            <Link
+              to="/buscar"
+              aria-current={pathname === "/buscar" ? "page" : undefined}
+              className={`flex h-11 items-center gap-2 rounded-chico px-2.5 text-sm font-semibold text-noche transition-colors hover:bg-niebla hover:text-primario aria-[current=page]:text-primario sm:px-4 sm:text-[15px] ${foco}`}
+            >
+              <Icono nombre="lupa" tamano={20} grosor={2} className="shrink-0" />
+              {/* En el celular queda el ícono; el nombre sigue ahí para el lector de pantalla. */}
+              <span className="sr-only sm:not-sr-only">Buscar</span>
+            </Link>
+          )}
+          {!cargando &&
+            (usuario ? (
+              <MenuUsuario usuario={usuario} />
+            ) : (
+              <nav aria-label="Cuenta" className="flex items-center gap-1.5 sm:gap-3">
+                <Link
+                  to="/iniciar-sesion"
+                  className={`flex h-11 items-center rounded-chico px-3 text-sm font-semibold text-primario transition-colors hover:bg-hielo sm:px-5 sm:text-[15px] ${foco}`}
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  to="/registro"
+                  className={`flex h-11 items-center rounded-chico bg-primario px-4 text-sm font-bold text-blanco transition-colors hover:bg-noche sm:px-5 sm:text-[15px] ${foco}`}
+                >
+                  Registrarse
+                </Link>
+              </nav>
+            ))}
+        </div>
       </Contenedor>
     </header>
   );

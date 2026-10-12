@@ -1,3 +1,5 @@
+import type { OrdenBusqueda } from "@localcl/shared";
+
 export interface DetalleError {
   campo: string;
   mensaje: string;
@@ -124,6 +126,39 @@ export interface ServicioPublico extends Precio {
     comunas: { id: number; nombre: string; region: string }[];
     credenciales: CredencialPublica[];
   };
+}
+
+/** Filtros de la búsqueda pública. Los ausentes no filtran. */
+export interface FiltrosBusqueda {
+  q?: string;
+  categoria?: string;
+  comuna?: number;
+  precioMax?: number;
+  orden?: OrdenBusqueda;
+  pagina?: number;
+}
+
+/** Una tarjeta de resultado. Nunca trae teléfono, correo ni RUT. */
+export interface ResultadoBusqueda extends Precio {
+  id: string;
+  titulo: string;
+  categoria: Categoria;
+  categoriaPersonalizada: string | null;
+  prestador: {
+    nombre: string;
+    /** Hasta tres; si se filtró por comuna, esa va primero. */
+    comunas: { id: number; nombre: string }[];
+    comunasRestantes: number;
+    /** Tiene al menos una credencial contrastada con un registro oficial. */
+    acreditado: boolean;
+  };
+}
+
+export interface PaginaBusqueda {
+  resultados: ResultadoBusqueda[];
+  pagina: number;
+  porPagina: number;
+  total: number;
 }
 
 export interface DatosPerfilPrestador {
@@ -411,6 +446,48 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
       credenciales: leerLista(credenciales, leerCredencialPublica),
     },
   };
+}
+
+function leerComunaResumida(valor: unknown): { id: number; nombre: string } | null {
+  if (!esObjeto(valor) || typeof valor.id !== "number" || typeof valor.nombre !== "string") return null;
+  return { id: valor.id, nombre: valor.nombre };
+}
+
+function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
+  if (!esObjeto(valor) || !esObjeto(valor.prestador)) return null;
+  const categoria = leerCategoria(valor.categoria);
+  const { id, titulo } = valor;
+  const { nombre, comunas, comunasRestantes, acreditado } = valor.prestador;
+
+  if (typeof id !== "string" || typeof titulo !== "string" || typeof nombre !== "string" || !categoria) {
+    return null;
+  }
+
+  return {
+    id,
+    titulo,
+    categoria,
+    categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
+    ...leerPrecio(valor),
+    prestador: {
+      nombre,
+      comunas: leerLista(comunas, leerComunaResumida),
+      comunasRestantes: typeof comunasRestantes === "number" ? comunasRestantes : 0,
+      acreditado: acreditado === true,
+    },
+  };
+}
+
+/** Arma la consulta de GET /servicios con solo los filtros presentes. */
+export function parametrosBusqueda(filtros: FiltrosBusqueda): URLSearchParams {
+  const parametros = new URLSearchParams();
+  if (filtros.q?.trim()) parametros.set("q", filtros.q.trim());
+  if (filtros.categoria) parametros.set("categoria", filtros.categoria);
+  if (filtros.comuna !== undefined) parametros.set("comuna", String(filtros.comuna));
+  if (filtros.precioMax !== undefined) parametros.set("precioMax", String(filtros.precioMax));
+  if (filtros.orden && filtros.orden !== "recientes") parametros.set("orden", filtros.orden);
+  if (filtros.pagina !== undefined && filtros.pagina > 1) parametros.set("pagina", String(filtros.pagina));
+  return parametros;
 }
 
 const ESTADOS_VERIFICACION: readonly string[] = ["PENDIENTE", "VERIFICADA", "RECHAZADA", "VENCIDA", "REVOCADA"];
@@ -857,6 +934,23 @@ export function crearClienteApi() {
       const servicio = esObjeto(cuerpo) ? leerServicioPublico(cuerpo.servicio) : null;
       if (!servicio) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return servicio;
+    },
+
+    /** Búsqueda pública: sin sesión, solo servicios publicados de prestadores verificados. */
+    async buscarServicios(filtros: FiltrosBusqueda): Promise<PaginaBusqueda> {
+      const consulta = parametrosBusqueda(filtros).toString();
+      const cuerpo = await peticion(consulta ? `/servicios?${consulta}` : "/servicios");
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return {
+        resultados: leerLista(cuerpo.resultados, leerResultadoBusqueda),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
     },
 
     /** Registra el contacto en la API y devuelve el teléfono. Exige sesión. */

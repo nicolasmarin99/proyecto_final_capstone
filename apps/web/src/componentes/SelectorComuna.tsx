@@ -10,6 +10,8 @@ interface Props extends Mensajes {
   cargando?: boolean;
   /** Por defecto "Comuna". */
   etiqueta?: string;
+  /** Texto de la opción vacía. Por defecto, el del perfil del prestador. */
+  vacio?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function SelectorComuna({
   alCambiar,
   cargando = false,
   etiqueta = "Comuna",
+  vacio = "Elige la comuna donde trabajas",
   ...mensajes
 }: Props) {
   const idMensaje = `${id}-mensaje`;
@@ -61,7 +64,7 @@ export function SelectorComuna({
         aria-describedby={mensajeVisible(mensajes) ? idMensaje : undefined}
         className={`mt-1.5 h-12 cursor-pointer disabled:cursor-wait disabled:opacity-60 ${clasesControl(mensajes)}`}
       >
-        <option value="">{cargando ? "Cargando comunas…" : "Elige la comuna donde trabajas"}</option>
+        <option value="">{cargando ? "Cargando comunas…" : vacio}</option>
         {agruparPorRegion(comunas).map(({ region, comunas: delGrupo }) => (
           <optgroup key={region.id} label={region.nombre}>
             {delGrupo.map((comuna) => (

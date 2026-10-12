@@ -9,6 +9,8 @@ import type { NombreIcono } from "../iconos";
  */
 
 export interface Categoria {
+  /** El mismo slug que la tabla categorias: el enlace filtra por categoría. */
+  slug: string;
   nombre: string;
   descripcion: string;
   icono: NombreIcono;
@@ -19,17 +21,20 @@ export interface Categoria {
  * largo tiene que ser múltiplo de 3 (ver GRUPOS_CATEGORIAS).
  */
 export const CATEGORIAS: Categoria[] = [
-  { nombre: "Gasfitería", descripcion: "Filtraciones, calefont, grifería y destapes.", icono: "gota" },
-  { nombre: "Electricidad", descripcion: "Instalaciones, enchufes, tableros y luminarias.", icono: "rayo" },
-  { nombre: "Banquetería", descripcion: "Cócteles, cumpleaños, matrimonios y eventos.", icono: "bandeja" },
-  { nombre: "Soldadura", descripcion: "Rejas, portones, estructuras y reparaciones.", icono: "llama" },
-  { nombre: "Carpintería", descripcion: "Muebles a medida, puertas y terminaciones.", icono: "martillo" },
-  { nombre: "Cerrajería", descripcion: "Aperturas, cambio de chapas y copias.", icono: "llave" },
+  { slug: "gasfiteria", nombre: "Gasfitería", descripcion: "Filtraciones, calefont, grifería y destapes.", icono: "gota" },
+  { slug: "electricidad", nombre: "Electricidad", descripcion: "Instalaciones, enchufes, tableros y luminarias.", icono: "rayo" },
+  { slug: "banqueteria", nombre: "Banquetería", descripcion: "Cócteles, cumpleaños, matrimonios y eventos.", icono: "bandeja" },
+  { slug: "soldadura", nombre: "Soldadura", descripcion: "Rejas, portones, estructuras y reparaciones.", icono: "llama" },
+  { slug: "carpinteria", nombre: "Carpintería", descripcion: "Muebles a medida, puertas y terminaciones.", icono: "martillo" },
+  { slug: "cerrajeria", nombre: "Cerrajería", descripcion: "Aperturas, cambio de chapas y copias.", icono: "llave" },
 ];
 
 export const GRUPOS_CATEGORIAS: Categoria[][] = [CATEGORIAS.slice(0, 3), CATEGORIAS.slice(3, 6)];
 
-export const POPULARES = ["Gasfitería", "Electricidad", "Banquetería", "Carpintería"];
+/** Atajos bajo el buscador: llevan a /buscar filtrado por esa categoría. */
+export const POPULARES = CATEGORIAS.filter((categoria) =>
+  ["gasfiteria", "electricidad", "banqueteria", "carpinteria"].includes(categoria.slug),
+);
 
 export const PASOS = [
   {
@@ -65,10 +70,3 @@ export const BENEFICIOS_PRESTADOR: { titulo: string; texto: string; icono: Nombr
 ];
 
 /** Dirección de búsqueda para un servicio. La usan el buscador, los chips y las tarjetas. */
-export function rutaBusqueda(servicio?: string, comuna?: string): string {
-  const parametros = new URLSearchParams();
-  if (servicio?.trim()) parametros.set("servicio", servicio.trim());
-  if (comuna?.trim()) parametros.set("comuna", comuna.trim());
-  const consulta = parametros.toString();
-  return consulta ? `/buscar?${consulta}` : "/buscar";
-}
