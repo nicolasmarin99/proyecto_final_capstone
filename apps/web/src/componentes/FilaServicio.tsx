@@ -4,6 +4,8 @@ import type { DatosServicio, EstadoServicio, ServicioPropio } from "../api/clien
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 import { Boton, clasesBoton } from "./Boton";
 
+const fechaModeracion = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium" });
+
 export const ESTADO_VISIBLE: Record<EstadoServicio, { texto: string; clases: string }> = {
   PUBLICADO: { texto: "Publicado", clases: "bg-exito-50 text-exito-700" },
   PAUSADO: { texto: "Pausado", clases: "bg-niebla text-texto-suave" },
@@ -71,6 +73,20 @@ export function FilaServicio({
       <p className="mt-1 text-sm text-texto-suave">
         {nombreCategoria(servicio)} · {textoPrecio(servicio)}
       </p>
+
+      {/* Solo la decisión y su motivo: nada sobre reportes ni sobre quién los hizo. */}
+      {servicio.estado === "OCULTO" && (
+        <div className="mt-3 rounded-chico border border-alerta-700/20 bg-alerta-50 px-3 py-2 text-sm text-alerta-700">
+          <p className="font-semibold">Este servicio fue ocultado por moderación y no aparece en LocalCL.</p>
+          {servicio.moderacion && (
+            <p className="mt-1">
+              <span className="font-semibold">Motivo:</span> {servicio.moderacion.motivo}{" "}
+              <span className="text-xs">({fechaModeracion.format(new Date(servicio.moderacion.ocultadoEn))})</span>
+            </p>
+          )}
+          <p className="mt-1 text-xs">Si crees que es un error, escríbenos desde la página de contacto.</p>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="motion-safe:animate-aparecer-corto mt-3 text-sm font-medium text-error-700">

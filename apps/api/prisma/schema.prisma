@@ -82,6 +82,7 @@ model Usuario {
   eventosSeguridad        EventoSeguridad[]
   accesosDocumento        AccesoDocumento[]
   moderacionesImagen      ModeracionImagen[]
+  decisionesReporte       DecisionReporte[]
 
   @@index([rol])
   @@map("usuarios")
@@ -603,11 +604,14 @@ model RespuestaValoracion {
 
 // ─── Cumplimiento ────────────────────────────────────────────────────────
 
+/// Motivos cerrados de un reporte. OTRO exige un comentario (CHECK
+/// denuncias_otro_con_detalle); en el resto el comentario es opcional.
 enum MotivoDenuncia {
-  CONTENIDO_OFENSIVO
-  INFORMACION_FALSA
-  FRAUDE
-  SPAM
+  CONTENIDO_ENGANOSO
+  IMAGENES_INAPROPIADAS
+  DATOS_DE_CONTACTO_EN_LA_DESCRIPCION
+  SERVICIO_ILEGAL_O_PELIGROSO
+  SUPLANTACION_DE_IDENTIDAD
   OTRO
 
   @@map("motivo_denuncia")
@@ -616,8 +620,14 @@ enum MotivoDenuncia {
 enum EstadoDenuncia {
   ABIERTA
   EN_REVISION
+  /// Un administrador tomó una medida (p. ej. ocultó el servicio).
   RESUELTA
+  /// Un administrador revisó y no tomó medidas.
   DESESTIMADA
+  /// Quien reportó lo retiró antes de que se decidiera. La fila se conserva
+  /// (no se borra) para que retirar y volver a reportar no esquive el
+  /// límite diario.
+  RETIRADA
 
   @@map("estado_denuncia")
 }
@@ -629,6 +639,15 @@ enum EstadoDenuncia {
 /// (tipoObjeto, idObjeto): con el par genérico la base no puede comprobar
 /// que el id exista, porque una clave foránea apunta a una sola tabla. Un
 /// CHECK con num_nonnulls exige que haya exactamente una no nula.
+///
+/// Reglas que solo están en SQL (migración de reportes):
+/// - un índice único parcial: una sola denuncia abierta por persona y
+///   servicio (las retiradas o ya decididas no cuentan);
+/// - un CHECK: con motivo OTRO, el detalle no puede quedar vacío.
+///
+/// estado, resolucion, resueltaPor y resueltaEn son el estado actual; la
+/// historia inmutable de cada decisión está en decisiones_reporte (el mismo
+/// par que credenciales y eventos_credencial).
 model Denuncia {
   id            String         @id @default(uuid())
   denuncianteId String         @map("denunciante_id")
@@ -652,11 +671,46 @@ model Denuncia {
   actualizadoEn DateTime  @updatedAt @map("actualizado_en")
 
   @@index([estado, creadoEn])
-  @@index([denuncianteId])
+  /// Para el límite diario: denuncias de una persona en las últimas 24 horas.
+  @@index([denuncianteId, creadoEn])
   @@index([valoracionId])
-  @@index([servicioId])
+  @@index([servicioId, estado])
   @@index([usuarioDenunciadoId])
   @@map("denuncias")
+}
+
+/// Qué decidió un administrador sobre los reportes de un servicio.
+enum AccionReporte {
+  /// Revisó y no hay nada que corregir: el servicio sigue publicado.
+  DESESTIMAR
+  /// Ocultó el servicio (estado OCULTO).
+  OCULTAR_SERVICIO
+
+  @@map("accion_reporte")
+}
+
+/// Bitácora de las decisiones sobre reportes de servicios. Solo admite
+/// inserciones (el mismo trigger que eventos_credencial).
+///
+/// Los reportes NUNCA ocultan un servicio por sí solos: cada fila de esta
+/// tabla es una decisión que tomó una persona, con su motivo.
+///
+/// servicio_id va sin clave foránea, como en moderaciones_imagen: la
+/// decisión tiene que seguir constando aunque el servicio deje de existir.
+model DecisionReporte {
+  id               String        @id @default(uuid())
+  servicioId       String        @map("servicio_id")
+  accion           AccionReporte
+  motivo           String
+  /// Cuántos reportes abiertos cerró esta decisión.
+  reportesCerrados Int           @map("reportes_cerrados")
+  administradorId  String        @map("administrador_id")
+  administrador    Usuario       @relation(fields: [administradorId], references: [id], onDelete: Restrict)
+  creadoEn         DateTime      @default(now()) @map("creado_en")
+
+  @@index([servicioId, creadoEn])
+  @@index([administradorId, creadoEn])
+  @@map("decisiones_reporte")
 }
 
 /// Cada versión publicada de los términos y condiciones. No se editan:

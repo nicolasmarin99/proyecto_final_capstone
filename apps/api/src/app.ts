@@ -12,6 +12,7 @@ import { rutasAuth } from "./modules/auth/auth.routes.js";
 import { rutasIdentidadAdmin, rutasIdentidadPrestador } from "./modules/identidad/identidad.routes.js";
 import { rutasImagenesAdmin } from "./modules/imagenes/imagenes.routes.js";
 import { rutasImagenesLocales } from "./modules/imagenes/imagenes.locales.js";
+import { rutasReportesAdmin } from "./modules/reportes/reportes.routes.js";
 import { rutasPrestadores } from "./modules/prestadores/prestadores.routes.js";
 import { rutasCategorias, rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { rutasComunas } from "./modules/territorio/territorio.routes.js";
@@ -37,6 +38,7 @@ app.use("/auth", rutasAuth);
 // Antes que /admin y /prestadores: las rutas más específicas primero.
 app.use("/admin/identidades", rutasIdentidadAdmin);
 app.use("/admin/imagenes", rutasImagenesAdmin);
+app.use("/admin/reportes", rutasReportesAdmin);
 app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
 app.use("/admin", rutasAdmin);
 app.use("/servicios", rutasServicios);

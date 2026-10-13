@@ -127,7 +127,7 @@ describe("denuncias", () => {
       prisma.denuncia.create({
         data: {
           denuncianteId: denunciante.id,
-          motivo: "FRAUDE",
+          motivo: "CONTENIDO_ENGANOSO",
           servicioId: servicio.id,
           usuarioDenunciadoId: denunciado.id,
         },
@@ -139,7 +139,7 @@ describe("denuncias", () => {
     const { denunciante } = await prepararObjetos();
 
     await expect(
-      prisma.denuncia.create({ data: { denuncianteId: denunciante.id, motivo: "SPAM" } }),
+      prisma.denuncia.create({ data: { denuncianteId: denunciante.id, motivo: "IMAGENES_INAPROPIADAS" } }),
     ).rejects.toThrow("denuncias_exactamente_un_objeto");
   });
 
@@ -149,7 +149,7 @@ describe("denuncias", () => {
     const { denunciante, servicio } = await prepararObjetos();
 
     const denuncia = await prisma.denuncia.create({
-      data: { denuncianteId: denunciante.id, motivo: "FRAUDE", servicioId: servicio.id },
+      data: { denuncianteId: denunciante.id, motivo: "CONTENIDO_ENGANOSO", servicioId: servicio.id },
     });
 
     expect(denuncia.estado).toBe("ABIERTA");

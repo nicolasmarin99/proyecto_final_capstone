@@ -328,7 +328,7 @@ describe("PUT y DELETE /servicios/:id", () => {
     const respuesta = await borrar(prestador.token, body.servicio.id);
 
     expect(respuesta.status).toBe(409);
-    expect(respuesta.body.error.codigo).toBe("SERVICIO_CON_CONTACTOS");
+    expect(respuesta.body.error.codigo).toBe("SERVICIO_CON_HISTORIAL");
     expect(await prisma.servicio.count()).toBe(1);
   });
 
