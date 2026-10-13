@@ -28,6 +28,10 @@ apps/api · apps/web · apps/mobile · packages/shared (tipos y esquemas Zod)
 - Los errores devueltos al cliente no exponen trazas internas.
 - El estado de una credencial lo fija el servidor, nunca el cliente.
 
+## Idioma
+- Responde siempre en español: explicaciones, informes, resúmenes y
+  preguntas. Estos informes son material de la defensa del proyecto.
+
 ## Convenciones
 - Código y comentarios en español; nombres de tablas en snake_case
   mediante @@map.
