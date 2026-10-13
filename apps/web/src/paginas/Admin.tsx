@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { clasesBoton } from "../componentes/Boton";
 import { ColaIdentidades } from "../componentes/ColaIdentidades";
+import { ColaReportes } from "../componentes/ColaReportes";
 import { ModeracionImagenes } from "../componentes/ModeracionImagenes";
 import { clienteApi, ErrorApi, type ClienteApi, type ResumenAdmin } from "../api/cliente";
 import { Pagina } from "../componentes/Pagina";
@@ -72,6 +73,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
               que es administrador, así que no se piden datos de personas
               para terminar mostrando un 403.
             */}
+            <ColaReportes cliente={cliente} />
             <ColaIdentidades cliente={cliente} />
             <ModeracionImagenes cliente={cliente} />
           </>

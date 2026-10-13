@@ -5,6 +5,7 @@ import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { Icono } from "../componentes/iconos";
 import { GaleriaServicio } from "../componentes/GaleriaServicio";
+import { ReportarServicio } from "../componentes/ReportarServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
@@ -203,6 +204,11 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                     )}
                   </div>
                 </section>
+
+                {/* Discreto a propósito: está para quien lo necesite, no para invitar a reportar. */}
+                <div className="mt-6 flex justify-end">
+                  <ReportarServicio servicioId={servicio.id} />
+                </div>
               </article>
             )}
           </div>

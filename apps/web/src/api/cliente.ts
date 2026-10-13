@@ -1,4 +1,4 @@
-import type { OrdenBusqueda } from "@localcl/shared";
+import type { MotivoReporte, OrdenBusqueda } from "@localcl/shared";
 
 export interface DetalleError {
   campo: string;
@@ -113,6 +113,8 @@ export interface ServicioPropio extends Precio {
   estado: EstadoServicio;
   categoria: Categoria;
   imagenes: ImagenPropia[];
+  /** Si un administrador lo ocultó: el motivo de la decisión y cuándo. Nada sobre reportes. */
+  moderacion: { motivo: string; ocultadoEn: string } | null;
 }
 
 export interface RequisitoPendiente {
@@ -190,6 +192,45 @@ export interface PaginaBusqueda {
   pagina: number;
   porPagina: number;
   total: number;
+}
+
+/** Una fila de la cola de reportes: un servicio, nunca una persona. */
+export interface FilaColaReportes {
+  servicio: { id: string; titulo: string; estado: string; prestador: string };
+  /** Personas distintas que lo reportaron. */
+  personas: number;
+  reportes: number;
+  motivoFrecuente: MotivoReporte;
+  prioridad: "ALTA" | "NORMAL";
+  primerReporte: string;
+  /** Minutos esperando una decisión (solo en pendientes). */
+  esperaMinutos: number | null;
+  decision: { accion: "DESESTIMAR" | "OCULTAR_SERVICIO"; motivo: string; decididaEn: string } | null;
+}
+
+/** Un reporte en el detalle. Sin la identidad de quien lo envió: solo si su cuenta tenía más de una semana. */
+export interface ReporteDetalle {
+  id: string;
+  motivo: MotivoReporte;
+  comentario: string | null;
+  estado: string;
+  enviadoEn: string;
+  cuentaConMasDeUnaSemana: boolean;
+}
+
+export interface DecisionReporte {
+  accion: "DESESTIMAR" | "OCULTAR_SERVICIO";
+  motivo: string;
+  decididaEn: string;
+  administrador: string;
+  reportesCerrados: number;
+}
+
+export interface DetalleReportes {
+  servicio: { id: string; titulo: string; estado: string; categoria: string; prestador: string };
+  personas: number;
+  reportes: ReporteDetalle[];
+  decisiones: DecisionReporte[];
 }
 
 export interface DatosPerfilPrestador {
@@ -405,6 +446,102 @@ function leerServicioPropio(valor: unknown): ServicioPropio | null {
     categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
     imagenes: leerLista(valor.imagenes, leerImagenPropia),
+    moderacion:
+      esObjeto(valor.moderacion) && typeof valor.moderacion.motivo === "string" && typeof valor.moderacion.ocultadoEn === "string"
+        ? { motivo: valor.moderacion.motivo, ocultadoEn: valor.moderacion.ocultadoEn }
+        : null,
+  };
+}
+
+// ─── Reportes ──────────────────────────────────────────────────────────────
+
+const MOTIVOS: readonly string[] = [
+  "CONTENIDO_ENGANOSO",
+  "IMAGENES_INAPROPIADAS",
+  "DATOS_DE_CONTACTO_EN_LA_DESCRIPCION",
+  "SERVICIO_ILEGAL_O_PELIGROSO",
+  "SUPLANTACION_DE_IDENTIDAD",
+  "OTRO",
+];
+
+function esMotivo(valor: unknown): valor is MotivoReporte {
+  return typeof valor === "string" && MOTIVOS.includes(valor);
+}
+
+function leerFilaCola(valor: unknown): FilaColaReportes | null {
+  if (!esObjeto(valor) || !esObjeto(valor.servicio) || !esMotivo(valor.motivoFrecuente)) return null;
+  const { id, titulo, estado, prestador } = valor.servicio;
+  if (
+    typeof id !== "string" ||
+    typeof titulo !== "string" ||
+    typeof estado !== "string" ||
+    typeof prestador !== "string" ||
+    typeof valor.personas !== "number" ||
+    typeof valor.reportes !== "number" ||
+    typeof valor.primerReporte !== "string"
+  ) {
+    return null;
+  }
+  const decision = esObjeto(valor.decision) ? valor.decision : null;
+  return {
+    servicio: { id, titulo, estado, prestador },
+    personas: valor.personas,
+    reportes: valor.reportes,
+    motivoFrecuente: valor.motivoFrecuente,
+    prioridad: valor.prioridad === "ALTA" ? "ALTA" : "NORMAL",
+    primerReporte: valor.primerReporte,
+    esperaMinutos: typeof valor.esperaMinutos === "number" ? valor.esperaMinutos : null,
+    decision:
+      decision && (decision.accion === "DESESTIMAR" || decision.accion === "OCULTAR_SERVICIO") && typeof decision.motivo === "string" && typeof decision.decididaEn === "string"
+        ? { accion: decision.accion, motivo: decision.motivo, decididaEn: decision.decididaEn }
+        : null,
+  };
+}
+
+function leerReporteDetalle(valor: unknown): ReporteDetalle | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || !esMotivo(valor.motivo) || typeof valor.enviadoEn !== "string" || typeof valor.estado !== "string") {
+    return null;
+  }
+  return {
+    id: valor.id,
+    motivo: valor.motivo,
+    comentario: typeof valor.comentario === "string" ? valor.comentario : null,
+    estado: valor.estado,
+    enviadoEn: valor.enviadoEn,
+    cuentaConMasDeUnaSemana: valor.cuentaConMasDeUnaSemana === true,
+  };
+}
+
+function leerDecision(valor: unknown): DecisionReporte | null {
+  if (
+    !esObjeto(valor) ||
+    (valor.accion !== "DESESTIMAR" && valor.accion !== "OCULTAR_SERVICIO") ||
+    typeof valor.motivo !== "string" ||
+    typeof valor.decididaEn !== "string" ||
+    typeof valor.administrador !== "string"
+  ) {
+    return null;
+  }
+  return {
+    accion: valor.accion,
+    motivo: valor.motivo,
+    decididaEn: valor.decididaEn,
+    administrador: valor.administrador,
+    reportesCerrados: typeof valor.reportesCerrados === "number" ? valor.reportesCerrados : 0,
+  };
+}
+
+function leerDetalleReportes(valor: unknown): DetalleReportes | null {
+  if (!esObjeto(valor) || !esObjeto(valor.servicio) || typeof valor.personas !== "number") return null;
+  const { id, titulo, estado, categoria, prestador } = valor.servicio;
+  if (typeof id !== "string" || typeof titulo !== "string" || typeof estado !== "string" || typeof categoria !== "string" || typeof prestador !== "string") {
+    return null;
+  }
+  return {
+    servicio: { id, titulo, estado, categoria, prestador },
+    personas: valor.personas,
+    reportes: leerLista(valor.reportes, leerReporteDetalle),
+    decisiones: leerLista(valor.decisiones, leerDecision),
   };
 }
 
@@ -1064,6 +1201,55 @@ export function crearClienteApi() {
       const imagen = esObjeto(cuerpo) ? leerImagenPropia(cuerpo.imagen) : null;
       if (!imagen) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return imagen;
+    },
+
+    /** Reporta un servicio. La API responde igual haya o no un reporte previo propio. */
+    async reportarServicio(servicioId: string, datos: { motivo: MotivoReporte; comentario: string | null }): Promise<string> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/reportes`, {
+        metodo: "POST",
+        cuerpo: datos,
+        autenticada: true,
+      });
+      return esObjeto(cuerpo) && typeof cuerpo.mensaje === "string" ? cuerpo.mensaje : "Gracias. Revisaremos esta publicación.";
+    },
+
+    async retirarReporte(servicioId: string): Promise<void> {
+      await peticion(`/servicios/${encodeURIComponent(servicioId)}/reportes/mio`, { metodo: "DELETE", autenticada: true });
+    },
+
+    /** El reporte abierto propio sobre ese servicio, o null. */
+    async miReporte(servicioId: string): Promise<{ motivo: MotivoReporte; enviadoEn: string } | null> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/reportes/mio`, { autenticada: true });
+      if (!esObjeto(cuerpo) || !esObjeto(cuerpo.reporte)) return null;
+      const { motivo, enviadoEn } = cuerpo.reporte;
+      return esMotivo(motivo) && typeof enviadoEn === "string" ? { motivo, enviadoEn } : null;
+    },
+
+    async colaReportes(
+      filtros: { estado: "pendientes" | "resueltos"; pagina?: number },
+    ): Promise<{ servicios: FilaColaReportes[]; total: number; pagina: number; porPagina: number }> {
+      const consulta = new URLSearchParams({ estado: filtros.estado });
+      if (filtros.pagina) consulta.set("pagina", String(filtros.pagina));
+      const cuerpo = await peticion(`/admin/reportes?${consulta.toString()}`, { autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return { servicios: leerLista(cuerpo.servicios, leerFilaCola), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
+    },
+
+    async detalleReportes(servicioId: string): Promise<DetalleReportes> {
+      const detalle = leerDetalleReportes(await peticion(`/admin/reportes/${encodeURIComponent(servicioId)}`, { autenticada: true }));
+      if (!detalle) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return detalle;
+    },
+
+    /** Desestima u oculta, siempre con motivo. Devuelve el detalle actualizado. */
+    async decidirReportes(servicioId: string, accion: "desestimar" | "ocultar", motivo: string): Promise<DetalleReportes> {
+      const detalle = leerDetalleReportes(
+        await peticion(`/admin/reportes/${encodeURIComponent(servicioId)}/${accion}`, { metodo: "PATCH", cuerpo: { motivo }, autenticada: true }),
+      );
+      if (!detalle) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return detalle;
     },
 
     /** Búsqueda pública: sin sesión, solo servicios publicados de prestadores verificados. */

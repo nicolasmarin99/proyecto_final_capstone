@@ -15,6 +15,7 @@ import {
   listarServiciosDe,
 } from "./servicios.repository.js";
 import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
+import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
 import { imagenesPropias, imagenPublica, urlMiniatura } from "../imagenes/imagenes.urls.js";
 import { obtenerAlmacenamientoPublico } from "../almacenamiento/index.js";
 import type { DatosServicio, FiltrosBusqueda } from "./servicios.schema.js";
@@ -162,10 +163,12 @@ export async function eliminar(usuarioId: string, id: string) {
   await servicioPropio(usuarioId, id);
 
   if ((await contarReferencias(id)) > 0) {
+    // Mensaje neutro a propósito: contactos y reportes bloquean igual, y el
+    // prestador no debe poder deducir que su servicio fue reportado.
     throw new ErrorHttp(
       409,
-      "SERVICIO_CON_CONTACTOS",
-      "Este servicio ya tiene contactos registrados, así que no se puede eliminar. Puedes pausarlo para que deje de mostrarse.",
+      "SERVICIO_CON_HISTORIAL",
+      "Este servicio tiene historial en la plataforma, así que no se puede eliminar. Puedes pausarlo para que deje de mostrarse.",
     );
   }
 
@@ -187,11 +190,21 @@ export async function eliminar(usuarioId: string, id: string) {
   });
 }
 
+/**
+ * Los servicios del prestador. Si alguno fue ocultado por moderación, trae
+ * el motivo de la decisión y su fecha, y nada más: ni cuántos reportes hubo
+ * ni quién reportó.
+ */
 export async function mios(usuarioId: string) {
   const perfil = await perfilRequerido(usuarioId);
+  const servicios = await Promise.all((await listarServiciosDe(perfil.id)).map(conImagenes));
+  const moderados = await motivosDeOcultamiento(servicios.filter((servicio) => servicio.estado === "OCULTO").map((servicio) => servicio.id));
 
   return {
-    servicios: await Promise.all((await listarServiciosDe(perfil.id)).map(conImagenes)),
+    servicios: servicios.map((servicio) => {
+      const moderacion = servicio.estado === "OCULTO" ? moderados.get(servicio.id) : undefined;
+      return { ...servicio, moderacion: moderacion ? { motivo: moderacion.motivo, ocultadoEn: moderacion.creadoEn } : null };
+    }),
     requisitosPendientes: requisitosPendientes(perfil),
   };
 }

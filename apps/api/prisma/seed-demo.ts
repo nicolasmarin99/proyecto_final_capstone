@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { MAXIMO_IMAGENES_SERVICIO } from "@localcl/shared";
 import { hash } from "@node-rs/argon2";
 import { prisma } from "../src/db.js";
-import type { UnidadPrecio } from "../src/generated/prisma/client.js";
+import type { MotivoDenuncia, UnidadPrecio } from "../src/generated/prisma/client.js";
 import { obtenerAlmacenamientoPublico } from "../src/modules/almacenamiento/index.js";
 import { detectarTipoImagen, quitarMetadatosImagen } from "../src/modules/imagenes/imagenes.archivo.js";
 
@@ -300,10 +300,110 @@ async function subirFoto(servicioId: string, ruta: string, orden: number): Promi
   return true;
 }
 
+// ─── Reportes ──────────────────────────────────────────────────────────────
+
+const HORA = 60 * 60 * 1000;
+
+/** Clientes de demostración que reportan. Dos tienen la cuenta recién creada. */
+const CLIENTES_DEMO = [
+  { correo: "demo.cliente1@localcl.cl", nombre: "Camila Torres", haceDias: 120 },
+  { correo: "demo.cliente2@localcl.cl", nombre: "Matías Fuentes", haceDias: 60 },
+  { correo: "demo.cliente3@localcl.cl", nombre: "Fernanda Silva", haceDias: 2 },
+  { correo: "demo.cliente4@localcl.cl", nombre: "Diego Navarro", haceDias: 1 },
+];
+
+interface ReporteDemo {
+  servicio: string;
+  cliente: number;
+  motivo: MotivoDenuncia;
+  comentario?: string;
+  haceHoras: number;
+}
+
+/**
+ * Tres casos para la cola:
+ * - «Gasfitería a domicilio»: 3 personas distintas → prioridad alta.
+ * - «Cóctel para eventos y cumpleaños»: 1 persona, reciente.
+ * - «Reparación de puertas y ventanas»: ya desestimado (cola de resueltos).
+ */
+const REPORTES_DEMO: ReporteDemo[] = [
+  {
+    servicio: "Gasfitería a domicilio",
+    cliente: 0,
+    motivo: "DATOS_DE_CONTACTO_EN_LA_DESCRIPCION",
+    comentario: "Dice «visita sin costo» y pide que lo llamen por fuera.",
+    haceHoras: 70,
+  },
+  { servicio: "Gasfitería a domicilio", cliente: 2, motivo: "DATOS_DE_CONTACTO_EN_LA_DESCRIPCION", haceHoras: 30 },
+  { servicio: "Gasfitería a domicilio", cliente: 3, motivo: "CONTENIDO_ENGANOSO", comentario: "Los precios no son reales.", haceHoras: 26 },
+  { servicio: "Cóctel para eventos y cumpleaños", cliente: 1, motivo: "IMAGENES_INAPROPIADAS", haceHoras: 5 },
+  {
+    servicio: "Reparación de puertas y ventanas",
+    cliente: 1,
+    motivo: "OTRO",
+    comentario: "Creo que es la misma persona que otro servicio.",
+    haceHoras: 100,
+  },
+];
+
+async function sembrarReportes(idsPorTitulo: Map<string, string>, hashContrasena: string): Promise<number> {
+  const clientes = [];
+  for (const demo of CLIENTES_DEMO) {
+    clientes.push(
+      await prisma.usuario.upsert({
+        where: { correo: demo.correo },
+        update: { nombre: demo.nombre },
+        create: {
+          correo: demo.correo,
+          nombre: demo.nombre,
+          rol: "CLIENTE",
+          correoVerificado: true,
+          hashContrasena,
+          creadoEn: new Date(Date.now() - demo.haceDias * 24 * HORA),
+        },
+      }),
+    );
+  }
+
+  let creados = 0;
+  for (const reporte of REPORTES_DEMO) {
+    const servicioId = idsPorTitulo.get(reporte.servicio);
+    const cliente = clientes[reporte.cliente];
+    if (!servicioId || !cliente) continue;
+    await prisma.denuncia.create({
+      data: {
+        denuncianteId: cliente.id,
+        servicioId,
+        motivo: reporte.motivo,
+        detalle: reporte.comentario ?? null,
+        creadoEn: new Date(Date.now() - reporte.haceHoras * HORA),
+      },
+    });
+    creados += 1;
+  }
+
+  // Un caso ya resuelto, decidido por el administrador de prueba (si existe).
+  const administrador = await prisma.usuario.findUnique({ where: { correo: "admin@localcl.cl" }, select: { id: true } });
+  const resuelto = idsPorTitulo.get("Reparación de puertas y ventanas");
+  if (administrador && resuelto) {
+    const motivo = "La publicación es de un prestador verificado distinto; no hay suplantación.";
+    const { count } = await prisma.denuncia.updateMany({
+      where: { servicioId: resuelto, estado: "ABIERTA" },
+      data: { estado: "DESESTIMADA", resolucion: motivo, resueltaPorId: administrador.id, resueltaEn: new Date(Date.now() - 50 * HORA) },
+    });
+    await prisma.decisionReporte.create({
+      data: { servicioId: resuelto, accion: "DESESTIMAR", motivo, reportesCerrados: count, administradorId: administrador.id },
+    });
+  }
+
+  return creados;
+}
+
 async function main() {
   const hashContrasena = await hash(CONTRASENA);
   let servicios = 0;
   let fotos = 0;
+  const idsPorTitulo = new Map<string, string>();
   const disponibles = await readdir(CARPETA_FOTOS).catch(() => [] as string[]);
 
   for (const demo of PRESTADORES) {
@@ -356,6 +456,10 @@ async function main() {
       select: { identificador: true },
     });
     for (const { identificador } of anteriores) await obtenerAlmacenamientoPublico().eliminar(identificador);
+    // Los reportes apuntan a los servicios con RESTRICT: se borran antes. La
+    // bitácora de decisiones no se toca (solo inserción); sus filas viejas
+    // quedan con ids de servicios que ya no existen y no aparecen en la cola.
+    await prisma.denuncia.deleteMany({ where: { servicio: { prestadorId: perfil.id } } });
     await prisma.servicio.deleteMany({ where: { prestadorId: perfil.id } });
 
     for (const servicio of demo.servicios) {
@@ -374,6 +478,7 @@ async function main() {
         },
       });
       servicios += 1;
+      idsPorTitulo.set(servicio.titulo, creado.id);
 
       if (servicio.fotos) {
         const rutas = await fotosDe(servicio.fotos, disponibles);
@@ -388,7 +493,11 @@ async function main() {
     }
   }
 
-  console.log(`${PRESTADORES.length} prestadores, ${servicios} servicios y ${fotos} fotos de demostración listos`);
+  const reportes = await sembrarReportes(idsPorTitulo, hashContrasena);
+
+  console.log(
+    `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos y ${reportes} reportes de demostración listos`,
+  );
   if (fotos === 0) {
     console.log(`Sin fotos: copia archivos JPG, PNG o WEBP en ${CARPETA_FOTOS} (ver su README.md) y vuelve a correr el seed.`);
   }

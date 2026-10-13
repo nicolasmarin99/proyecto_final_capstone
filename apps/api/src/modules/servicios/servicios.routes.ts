@@ -4,6 +4,7 @@ import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
 import { rutasImagenesServicio } from "../imagenes/imagenes.routes.js";
+import { rutasReportesServicio } from "../reportes/reportes.routes.js";
 import {
   buscarServicios,
   crearServicio,
@@ -29,6 +30,8 @@ rutasServicios.put("/:id", ...prestadorVerificado, editarServicio);
 rutasServicios.delete("/:id", ...prestadorVerificado, eliminarServicio);
 // Fotos de trabajos: /servicios/:id/imagenes (ver imagenes.routes.ts).
 rutasServicios.use("/:id/imagenes", rutasImagenesServicio);
+// Reportes de usuarios: /servicios/:id/reportes (ver reportes.routes.ts).
+rutasServicios.use("/:id/reportes", rutasReportesServicio);
 
 // /categorias: pública, para el selector del formulario.
 export const rutasCategorias = Router();
