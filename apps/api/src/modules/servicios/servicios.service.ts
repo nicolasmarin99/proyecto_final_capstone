@@ -14,7 +14,17 @@ import {
   listarCategoriasActivas,
   listarServiciosDe,
 } from "./servicios.repository.js";
+import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
+import { imagenesPropias, imagenPublica, urlMiniatura } from "../imagenes/imagenes.urls.js";
+import { obtenerAlmacenamientoPublico } from "../almacenamiento/index.js";
 import type { DatosServicio, FiltrosBusqueda } from "./servicios.schema.js";
+
+type ServicioConImagenes = Awaited<ReturnType<typeof crearServicio>>;
+
+/** El servicio del dueño con sus imágenes como direcciones, sin el identificador interno. */
+async function conImagenes(servicio: ServicioConImagenes) {
+  return { ...servicio, imagenes: await imagenesPropias(servicio.imagenes) };
+}
 
 export interface RequisitoPendiente {
   codigo: "IDENTIDAD_NO_VERIFICADA" | "SIN_COMUNAS_ATENCION";
@@ -104,7 +114,7 @@ export async function crear(usuarioId: string, datos: DatosServicio) {
 
   const servicio = await crearServicio(perfil.id, campos(datos, categoriaId, estadoFinal(datos.estado, pendientes)));
 
-  return { servicio, requisitosPendientes: pendientes };
+  return { servicio: await conImagenes(servicio), requisitosPendientes: pendientes };
 }
 
 /**
@@ -127,6 +137,14 @@ async function servicioPropio(usuarioId: string, id: string) {
   return { servicio, perfil };
 }
 
+/**
+ * Para otros módulos (las imágenes): lanza 404 si el servicio no existe y
+ * 403 si es de otro prestador. El dueño sale siempre del token.
+ */
+export async function exigirDueno(usuarioId: string, servicioId: string): Promise<void> {
+  await servicioPropio(usuarioId, servicioId);
+}
+
 export async function editar(usuarioId: string, id: string, datos: DatosServicio) {
   const { servicio, perfil } = await servicioPropio(usuarioId, id);
   const categoriaId = await idCategoria(datos.categoria);
@@ -137,7 +155,7 @@ export async function editar(usuarioId: string, id: string, datos: DatosServicio
     campos(datos, categoriaId, estadoFinal(datos.estado, pendientes, servicio.estado)),
   );
 
-  return { servicio: actualizado, requisitosPendientes: pendientes };
+  return { servicio: await conImagenes(actualizado), requisitosPendientes: pendientes };
 }
 
 export async function eliminar(usuarioId: string, id: string) {
@@ -151,14 +169,29 @@ export async function eliminar(usuarioId: string, id: string) {
     );
   }
 
+  // La base borra las filas de imágenes en cascada, pero no puede llamar al
+  // proveedor: los archivos se borran acá, después de borrar el servicio.
+  // Las moderaciones que haya tenido quedan en la bitácora: no dependen del
+  // servicio ni de sus imágenes.
+  // Si alguno falla, el servicio igual queda borrado y se registra cuál
+  // quedó huérfano (solo su identificador, que no es un dato personal).
+  const archivos = await identificadoresDeServicio(id);
   await eliminarServicio(id);
+
+  const almacenamiento = obtenerAlmacenamientoPublico();
+  const resultados = await Promise.allSettled(archivos.map((archivo) => almacenamiento.eliminar(archivo)));
+  resultados.forEach((resultado, indice) => {
+    if (resultado.status === "rejected") {
+      console.error(`No se pudo borrar del almacenamiento la imagen ${archivos[indice]} del servicio eliminado.`);
+    }
+  });
 }
 
 export async function mios(usuarioId: string) {
   const perfil = await perfilRequerido(usuarioId);
 
   return {
-    servicios: await listarServiciosDe(perfil.id),
+    servicios: await Promise.all((await listarServiciosDe(perfil.id)).map(conImagenes)),
     requisitosPendientes: requisitosPendientes(perfil),
   };
 }
@@ -188,6 +221,8 @@ export async function publico(id: string) {
     // Con «Otros», el nombre que escribió el prestador; nulo en el resto.
     categoriaPersonalizada: servicio.categoriaPersonalizada,
     actualizadoEn: servicio.actualizadoEn,
+    // Solo las visibles (lo filtra la consulta), en el orden que eligió el prestador.
+    imagenes: servicio.imagenes.map((imagen) => imagenPublica(imagen.id, imagen.identificador)),
     prestador: {
       id: servicio.prestador.id,
       nombre: servicio.prestador.usuario.nombre,
@@ -265,6 +300,8 @@ export async function buscar(filtros: FiltrosBusqueda) {
         unidadPrecio: fila.unidadPrecio,
         // Explícito para quien consuma la API sin conocer la convención.
         aConvenir: fila.precioDesde === null,
+        // Solo la primera imagen visible, en tamaño de miniatura; null si no tiene.
+        imagen: fila.imagenIdentificador ? urlMiniatura(fila.imagenIdentificador) : null,
         prestador: {
           nombre: fila.prestadorNombre,
           comunas,

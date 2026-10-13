@@ -212,12 +212,16 @@ function Cargando() {
       </p>
       <ul aria-hidden="true" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }, (_, indice) => (
-          <li key={indice} className="h-[214px] rounded-medio border border-borde bg-blanco p-5 shadow-tarjeta motion-safe:animate-pulse">
-            <div className="h-6 w-24 rounded-full bg-hielo" />
-            <div className="mt-4 h-5 w-4/5 rounded-chico bg-niebla" />
-            <div className="mt-2 h-5 w-3/5 rounded-chico bg-niebla" />
-            <div className="mt-10 h-4 w-2/5 rounded-chico bg-niebla" />
-            <div className="mt-3 h-4 w-3/5 rounded-chico bg-niebla" />
+          <li key={indice} className="overflow-hidden rounded-medio border border-borde bg-blanco shadow-tarjeta motion-safe:animate-pulse">
+            {/* Misma forma que la tarjeta: la foto 4:3 arriba y el texto abajo. */}
+            <div className="aspect-[4/3] w-full bg-niebla" />
+            <div className="p-5">
+              <div className="h-6 w-24 rounded-full bg-hielo" />
+              <div className="mt-4 h-5 w-4/5 rounded-chico bg-niebla" />
+              <div className="mt-2 h-5 w-3/5 rounded-chico bg-niebla" />
+              <div className="mt-10 h-4 w-2/5 rounded-chico bg-niebla" />
+              <div className="mt-3 h-4 w-3/5 rounded-chico bg-niebla" />
+            </div>
           </li>
         ))}
       </ul>

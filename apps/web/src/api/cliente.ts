@@ -78,6 +78,32 @@ export interface Precio {
   unidadPrecio: UnidadPrecio | null;
 }
 
+/** Imagen como la ve el público: la dirección completa y la miniatura. */
+export interface ImagenPublica {
+  id: string;
+  url: string;
+  miniatura: string;
+}
+
+export type EstadoImagen = "VISIBLE" | "OCULTA";
+
+/** Imagen como la ve su dueño: con su posición y, si la moderación la ocultó, el motivo. */
+/**
+ * Imagen como la ve su dueño (o el administrador). Si la moderación la
+ * ocultó, su archivo ya se borró: url y miniatura son null y solo queda el
+ * motivo.
+ */
+export type ImagenPropia =
+  | (ImagenPublica & { orden: number; estado: "VISIBLE"; motivoOcultamiento: null })
+  | { id: string; url: null; miniatura: null; orden: number; estado: "OCULTA"; motivoOcultamiento: string };
+
+/** Imagen en el panel de moderación, con su servicio y prestador. */
+export type ImagenModeracion = ImagenPropia & {
+  subidaEn: string;
+  ocultadaPor: string | null;
+  servicio: { id: string; titulo: string; prestador: string };
+};
+
 export interface ServicioPropio extends Precio {
   id: string;
   /** Con la categoría «Otros», el nombre del oficio que escribió el prestador. */
@@ -86,6 +112,7 @@ export interface ServicioPropio extends Precio {
   descripcion: string;
   estado: EstadoServicio;
   categoria: Categoria;
+  imagenes: ImagenPropia[];
 }
 
 export interface RequisitoPendiente {
@@ -126,6 +153,8 @@ export interface ServicioPublico extends Precio {
     comunas: { id: number; nombre: string; region: string }[];
     credenciales: CredencialPublica[];
   };
+  /** Solo las visibles, en el orden que eligió el prestador. La primera es la portada. */
+  imagenes: ImagenPublica[];
 }
 
 /** Filtros de la búsqueda pública. Los ausentes no filtran. */
@@ -144,6 +173,8 @@ export interface ResultadoBusqueda extends Precio {
   titulo: string;
   categoria: Categoria;
   categoriaPersonalizada: string | null;
+  /** Miniatura de la primera imagen visible, o null si no tiene. */
+  imagen: string | null;
   prestador: {
     nombre: string;
     /** Hasta tres; si se filtró por comuna, esa va primero. */
@@ -373,6 +404,46 @@ function leerServicioPropio(valor: unknown): ServicioPropio | null {
     categoria,
     categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
+    imagenes: leerLista(valor.imagenes, leerImagenPropia),
+  };
+}
+
+function leerImagenPublica(valor: unknown): ImagenPublica | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.url !== "string" || typeof valor.miniatura !== "string") {
+    return null;
+  }
+  return { id: valor.id, url: valor.url, miniatura: valor.miniatura };
+}
+
+function leerImagenPropia(valor: unknown): ImagenPropia | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.orden !== "number") return null;
+
+  if (valor.estado === "OCULTA") {
+    return {
+      id: valor.id,
+      url: null,
+      miniatura: null,
+      orden: valor.orden,
+      estado: "OCULTA",
+      motivoOcultamiento: typeof valor.motivoOcultamiento === "string" ? valor.motivoOcultamiento : "",
+    };
+  }
+
+  const publica = leerImagenPublica(valor);
+  if (!publica || valor.estado !== "VISIBLE") return null;
+  return { ...publica, orden: valor.orden, estado: "VISIBLE", motivoOcultamiento: null };
+}
+
+function leerImagenModeracion(valor: unknown): ImagenModeracion | null {
+  const propia = leerImagenPropia(valor);
+  if (!propia || !esObjeto(valor) || !esObjeto(valor.servicio) || typeof valor.subidaEn !== "string") return null;
+  const { id, titulo, prestador } = valor.servicio;
+  if (typeof id !== "string" || typeof titulo !== "string" || typeof prestador !== "string") return null;
+  return {
+    ...propia,
+    subidaEn: valor.subidaEn,
+    ocultadaPor: typeof valor.ocultadaPor === "string" ? valor.ocultadaPor : null,
+    servicio: { id, titulo, prestador },
   };
 }
 
@@ -439,6 +510,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
     categoria,
     categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
+    imagenes: leerLista(valor.imagenes, leerImagenPublica),
     prestador: {
       id: idPrestador,
       nombre,
@@ -469,6 +541,7 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
     categoria,
     categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
+    imagen: typeof valor.imagen === "string" ? valor.imagen : null,
     prestador: {
       nombre,
       comunas: leerLista(comunas, leerComunaResumida),
@@ -934,6 +1007,63 @@ export function crearClienteApi() {
       const servicio = esObjeto(cuerpo) ? leerServicioPublico(cuerpo.servicio) : null;
       if (!servicio) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return servicio;
+    },
+
+    /** Sube una foto a un servicio propio. La API quita los metadatos y le pone nombre nuevo. */
+    async subirImagenServicio(servicioId: string, archivo: File): Promise<ImagenPropia> {
+      const formulario = new FormData();
+      formulario.append("imagen", archivo);
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/imagenes`, {
+        metodo: "POST",
+        formulario,
+        autenticada: true,
+      });
+      const imagen = esObjeto(cuerpo) ? leerImagenPropia(cuerpo.imagen) : null;
+      if (!imagen) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return imagen;
+    },
+
+    async eliminarImagenServicio(servicioId: string, imagenId: string): Promise<void> {
+      await peticion(`/servicios/${encodeURIComponent(servicioId)}/imagenes/${encodeURIComponent(imagenId)}`, {
+        metodo: "DELETE",
+        autenticada: true,
+      });
+    },
+
+    /** Fija el orden de la galería. La primera es la portada y la miniatura. */
+    async ordenarImagenesServicio(servicioId: string, ids: string[]): Promise<ImagenPropia[]> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/imagenes/orden`, {
+        metodo: "PUT",
+        cuerpo: { imagenes: ids },
+        autenticada: true,
+      });
+      return esObjeto(cuerpo) ? leerLista(cuerpo.imagenes, leerImagenPropia) : [];
+    },
+
+    async listarImagenesModeracion(
+      filtros: { estado?: EstadoImagen; pagina?: number } = {},
+    ): Promise<{ imagenes: ImagenModeracion[]; total: number; pagina: number; porPagina: number }> {
+      const consulta = new URLSearchParams();
+      if (filtros.estado) consulta.set("estado", filtros.estado);
+      if (filtros.pagina) consulta.set("pagina", String(filtros.pagina));
+      const texto = consulta.toString();
+      const cuerpo = await peticion(texto ? `/admin/imagenes?${texto}` : "/admin/imagenes", { autenticada: true });
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return { imagenes: leerLista(cuerpo.imagenes, leerImagenModeracion), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
+    },
+
+    async ocultarImagen(imagenId: string, motivo: string): Promise<ImagenPropia> {
+      const cuerpo = await peticion(`/admin/imagenes/${encodeURIComponent(imagenId)}/ocultar`, {
+        metodo: "PATCH",
+        cuerpo: { motivo },
+        autenticada: true,
+      });
+      const imagen = esObjeto(cuerpo) ? leerImagenPropia(cuerpo.imagen) : null;
+      if (!imagen) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return imagen;
     },
 
     /** Búsqueda pública: sin sesión, solo servicios publicados de prestadores verificados. */

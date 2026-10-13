@@ -80,6 +80,14 @@ const trazos = {
   ),
   visto: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   cerrar: <path d="M6 6l12 12M18 6L6 18" />,
+  imagen: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  mas: <path d="M12 5v14M5 12h14" />,
 } satisfies Record<string, ReactNode>;
 
 export type NombreIcono = keyof typeof trazos;

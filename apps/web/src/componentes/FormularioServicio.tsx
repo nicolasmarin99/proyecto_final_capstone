@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
   LARGO_MAXIMO_CATEGORIA_PERSONALIZADA,
@@ -177,6 +177,7 @@ export function FormularioServicio({
   erroresApi,
   alEnviar,
   alCancelar,
+  imagenes,
 }: {
   categorias: Categoria[];
   inicial: ServicioPropio | null;
@@ -185,6 +186,8 @@ export function FormularioServicio({
   erroresApi: Record<string, string>;
   alEnviar(datos: DatosServicio): void;
   alCancelar(): void;
+  /** La sección de fotos, que va antes del aviso y de los botones. */
+  imagenes?: ReactNode;
 }) {
   const [formulario, setFormulario] = useState<Formulario>(() => formularioDe(inicial));
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -298,6 +301,8 @@ export function FormularioServicio({
           </span>
         </span>
       </label>
+
+      {imagenes}
 
       <AvisoPublicacion requisitos={requisitos} publicar={formulario.publicar} />
 

@@ -49,38 +49,39 @@ enum ProveedorAuth {
 }
 
 model Usuario {
-  id               String   @id @default(uuid())
-  correo           String   @unique
+  id               String    @id @default(uuid())
+  correo           String    @unique
   /// Nulo cuando el usuario solo accede con un proveedor externo.
-  hashContrasena   String? @map("hash_contrasena")
+  hashContrasena   String?   @map("hash_contrasena")
   nombre           String
   /// Se almacena normalizado, sin puntos y con guion: 12345678-9
-  rut              String?  @unique
-  rutVerificado    Boolean  @default(false) @map("rut_verificado")
-  rol              Rol      @default(CLIENTE)
-  correoVerificado Boolean  @default(false) @map("correo_verificado")
-  activo           Boolean  @default(true)
+  rut              String?   @unique
+  rutVerificado    Boolean   @default(false) @map("rut_verificado")
+  rol              Rol       @default(CLIENTE)
+  correoVerificado Boolean   @default(false) @map("correo_verificado")
+  activo           Boolean   @default(true)
   /// Fecha en que la cuenta se anonimizó a pedido de su dueño. Las cuentas
   /// con historial (credenciales, contactos, valoraciones) no se borran:
   /// se vacían sus datos personales y la fila queda como ancla anónima.
   anonimizadoEn    DateTime? @map("anonimizado_en")
-  creadoEn         DateTime @default(now()) @map("creado_en")
-  actualizadoEn    DateTime @updatedAt @map("actualizado_en")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  actualizadoEn    DateTime  @updatedAt @map("actualizado_en")
 
-  identidades      Identidad[]
-  sesiones         Sesion[]
-  tokens           TokenCuenta[]
-  perfilPrestador  PerfilPrestador?
+  identidades     Identidad[]
+  sesiones        Sesion[]
+  tokens          TokenCuenta[]
+  perfilPrestador PerfilPrestador?
 
-  credencialesVerificadas Credencial[]       @relation("VerificadorCredencial")
+  credencialesVerificadas Credencial[]         @relation("VerificadorCredencial")
   eventosCredencial       EventoCredencial[]
   contactosComoCliente    Contacto[]
-  denunciasHechas         Denuncia[]            @relation("Denunciante")
-  denunciasRecibidas      Denuncia[]            @relation("UsuarioDenunciado")
-  denunciasResueltas      Denuncia[]            @relation("ResolutorDenuncia")
+  denunciasHechas         Denuncia[]           @relation("Denunciante")
+  denunciasRecibidas      Denuncia[]           @relation("UsuarioDenunciado")
+  denunciasResueltas      Denuncia[]           @relation("ResolutorDenuncia")
   aceptacionesTerminos    AceptacionTerminos[]
   eventosSeguridad        EventoSeguridad[]
   accesosDocumento        AccesoDocumento[]
+  moderacionesImagen      ModeracionImagen[]
 
   @@index([rol])
   @@map("usuarios")
@@ -109,7 +110,7 @@ model Comuna {
   /// Código Único Territorial, p. ej. 13101 para Santiago.
   id       Int      @id
   nombre   String
-  regionId Int @map("region_id")
+  regionId Int      @map("region_id")
   region   Region   @relation(fields: [regionId], references: [id], onDelete: Restrict)
   creadoEn DateTime @default(now()) @map("creado_en")
 
@@ -123,22 +124,22 @@ model Comuna {
 /// Datos públicos del prestador, separados de la cuenta (usuarios), que
 /// queda solo con identidad y acceso. Relación 1:1 con el usuario.
 model PerfilPrestador {
-  id               String   @id @default(uuid())
-  usuarioId        String   @unique @map("usuario_id")
-  usuario          Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  descripcion      String?
+  id              String                                @id @default(uuid())
+  usuarioId       String                                @unique @map("usuario_id")
+  usuario         Usuario                               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  descripcion     String?
   /// Formato E.164 chileno: +56 y 9 dígitos. Lo garantiza un CHECK.
-  telefono         String?
-  comunaId         Int @map("comuna_id")
-  comuna           Comuna   @relation(fields: [comunaId], references: [id], onDelete: Restrict)
+  telefono        String?
+  comunaId        Int                                   @map("comuna_id")
+  comuna          Comuna                                @relation(fields: [comunaId], references: [id], onDelete: Restrict)
   /// Punto (longitud, latitud) en WGS 84. Prisma no maneja el tipo
   /// geography: se declara como no soportado para que las migraciones lo
   /// conozcan y no intenten borrarlo, y se consulta con $queryRaw.
-  ubicacion        Unsupported("geography(Point,4326)")?
+  ubicacion       Unsupported("geography(Point,4326)")?
   /// Distancia máxima a la que atiende, en kilómetros (CHECK 1 a 200).
-  radioAtencionKm  Int      @default(10) @map("radio_atencion_km")
-  creadoEn         DateTime @default(now()) @map("creado_en")
-  actualizadoEn    DateTime @updatedAt @map("actualizado_en")
+  radioAtencionKm Int                                   @default(10) @map("radio_atencion_km")
+  creadoEn        DateTime                              @default(now()) @map("creado_en")
+  actualizadoEn   DateTime                              @updatedAt @map("actualizado_en")
 
   servicios       Servicio[]
   credenciales    Credencial[]
@@ -211,23 +212,23 @@ model Categoria {
 }
 
 model Servicio {
-  id            String          @id @default(uuid())
-  prestadorId   String @map("prestador_id")
-  prestador     PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
-  categoriaId   String @map("categoria_id")
-  categoria     Categoria       @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
-  titulo        String
-  descripcion   String
+  id                     String                   @id @default(uuid())
+  prestadorId            String                   @map("prestador_id")
+  prestador              PerfilPrestador          @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+  categoriaId            String                   @map("categoria_id")
+  categoria              Categoria                @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  titulo                 String
+  descripcion            String
   /// Pesos chilenos, enteros: el peso no tiene decimales y un entero evita
   /// los errores de redondeo de un número de punto flotante.
   /// Nombre que escribe el prestador cuando su oficio no está en la lista
   /// y elige la categoría «Otros». Nulo en cualquier otra categoría: lo
   /// impone la API, porque un CHECK no puede mirar la tabla categorias.
-  categoriaPersonalizada String? @map("categoria_personalizada")
-  precioDesde   Int? @map("precio_desde")
-  precioHasta   Int? @map("precio_hasta")
-  unidadPrecio  UnidadPrecio? @map("unidad_precio")
-  estado        EstadoServicio  @default(BORRADOR)
+  categoriaPersonalizada String?                  @map("categoria_personalizada")
+  precioDesde            Int?                     @map("precio_desde")
+  precioHasta            Int?                     @map("precio_hasta")
+  unidadPrecio           UnidadPrecio?            @map("unidad_precio")
+  estado                 EstadoServicio           @default(BORRADOR)
   /// Columna generada por la base a partir de título y descripción (ver la
   /// migración del catálogo). Prisma no la escribe nunca: solo existe para
   /// la búsqueda de texto completo con $queryRaw.
@@ -235,12 +236,13 @@ model Servicio {
   /// El dbgenerated repite, carácter por carácter, la expresión tal como
   /// PostgreSQL la guarda. Sin él, Prisma cree que la expresión es un
   /// default sobrante y la próxima migración intentaría borrarlo.
-  busqueda      Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
-  creadoEn      DateTime        @default(now()) @map("creado_en")
-  actualizadoEn DateTime        @updatedAt @map("actualizado_en")
+  busqueda               Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
+  creadoEn               DateTime                 @default(now()) @map("creado_en")
+  actualizadoEn          DateTime                 @updatedAt @map("actualizado_en")
 
   contactos Contacto[]
   denuncias Denuncia[]
+  imagenes  ImagenServicio[]
 
   /// Destino de la clave compuesta de contactos (servicio del mismo prestador).
   @@unique([id, prestadorId])
@@ -250,16 +252,88 @@ model Servicio {
   @@map("servicios")
 }
 
+/// Visibilidad de una imagen pública. Solo la moderación la oculta: el
+/// prestador que no quiere una imagen la elimina.
+enum EstadoImagen {
+  VISIBLE
+  OCULTA
+
+  @@map("estado_imagen")
+}
+
+/// Fotos de trabajos anteriores de un servicio. Son PÚBLICAS y permanentes,
+/// a diferencia de los documentos de identidad: viven en otra carpeta del
+/// proveedor y con otra configuración de acceso.
+///
+/// Se borran en cascada con el servicio. El archivo del proveedor lo borra
+/// la API al borrar el servicio (la base no puede llamar al proveedor).
+///
+/// Ocultar es moderación y es irreversible: la API borra el archivo del
+/// proveedor (una URL pública pudo quedar guardada en cualquier parte), deja
+/// la fila en OCULTA para que el prestador vea el motivo, y registra quién,
+/// cuándo y por qué en moderaciones_imagen. La evidencia vive allá, no acá:
+/// el prestador puede borrar la imagen oculta o el servicio entero sin
+/// borrar el registro.
+///
+/// PENDIENTE (servicio de anonimización de cuentas): borrar una cuenta
+/// borra en cascada perfil, servicios e imágenes, pero no sus archivos en el
+/// proveedor, que quedan huérfanos. Ese servicio debe recorrer los
+/// identificadores de sus imágenes VISIBLES y borrarlos del almacenamiento
+/// público antes de borrar o anonimizar la cuenta.
+model ImagenServicio {
+  id            String       @id @default(uuid())
+  servicioId    String       @map("servicio_id")
+  servicio      Servicio     @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  /// Identificador del archivo en el proveedor (public_id de Cloudinary).
+  /// Lo genera el servidor; el nombre que traía el archivo no se guarda.
+  identificador String       @unique
+  /// Posición en la galería, desde 0. La primera es la portada y la miniatura.
+  orden         Int
+  estado        EstadoImagen @default(VISIBLE)
+  creadoEn      DateTime     @default(now()) @map("creado_en")
+
+  @@index([servicioId, orden])
+  @@map("imagenes_servicio")
+}
+
+/// Bitácora de moderación de imágenes: cada vez que un administrador ocultó
+/// una foto, con qué motivo y cuándo. Solo admite inserciones (el mismo
+/// trigger que eventos_credencial y accesos_documento).
+///
+/// servicio_id, imagen_id e identificador_archivo se guardan como valores,
+/// SIN clave foránea, a propósito: la evidencia tiene que sobrevivir a que
+/// el prestador borre la imagen o el servicio. Una clave foránea obligaría a
+/// elegir entre impedir ese borrado (RESTRICT), perder la evidencia
+/// (CASCADE) o modificar la bitácora (SET NULL, que el trigger rechaza).
+/// El administrador sí lleva clave foránea, RESTRICT: las cuentas de
+/// administración no se borran mientras tengan acciones registradas.
+model ModeracionImagen {
+  id                   String   @id @default(uuid())
+  servicioId           String   @map("servicio_id")
+  imagenId             String   @map("imagen_id")
+  /// Qué archivo se borró del proveedor (su public_id).
+  identificadorArchivo String   @map("identificador_archivo")
+  motivo               String
+  administradorId      String   @map("administrador_id")
+  administrador        Usuario  @relation(fields: [administradorId], references: [id], onDelete: Restrict)
+  creadoEn             DateTime @default(now()) @map("creado_en")
+
+  @@index([imagenId])
+  @@index([servicioId, creadoEn])
+  @@index([administradorId, creadoEn])
+  @@map("moderaciones_imagen")
+}
+
 /// Tokens de un solo uso que viajan por correo: verificación y recuperación.
 /// Igual que en las sesiones, nunca se guarda el token en claro, solo su hash.
 model TokenCuenta {
   id        String    @id @default(uuid())
-  usuarioId String @map("usuario_id")
+  usuarioId String    @map("usuario_id")
   usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tipo      TipoToken
   /// SHA-256 del token que viaja en el enlace del correo.
   hashToken String    @unique @map("hash_token")
-  expiraEn  DateTime @map("expira_en")
+  expiraEn  DateTime  @map("expira_en")
   /// Nulo mientras no se canjea. La fila no se borra al usarse: deja rastro
   /// para distinguir internamente "ya se usó" de "nunca existió".
   usadoEn   DateTime? @map("usado_en")
@@ -274,11 +348,11 @@ model TokenCuenta {
 /// Un usuario puede tener varias: contraseña local y Google, por ejemplo.
 model Identidad {
   id            String        @id @default(uuid())
-  usuarioId     String @map("usuario_id")
+  usuarioId     String        @map("usuario_id")
   usuario       Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   proveedor     ProveedorAuth
   /// Identificador que entrega el proveedor (el "sub" de OpenID Connect).
-  sujetoExterno String @map("sujeto_externo")
+  sujetoExterno String        @map("sujeto_externo")
   creadoEn      DateTime      @default(now()) @map("creado_en")
 
   @@unique([proveedor, sujetoExterno])
@@ -289,22 +363,23 @@ model Identidad {
 /// Tokens de refresco emitidos. Permiten cerrar sesiones de forma
 /// remota y detectar la reutilización de un token ya consumido.
 model Sesion {
-  id            String    @id @default(uuid())
-  usuarioId     String @map("usuario_id")
-  usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid())
+  usuarioId      String    @map("usuario_id")
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   /// Nunca se guarda el token en claro, solo su hash.
-  hashToken     String    @unique @map("hash_token")
-  expiraEn      DateTime @map("expira_en")
-  revocadaEn    DateTime? @map("revocada_en")
+  hashToken      String    @unique @map("hash_token")
+  expiraEn       DateTime  @map("expira_en")
+  revocadaEn     DateTime? @map("revocada_en")
   /// Apunta a la sesión que la reemplazó al rotar el token.
-  reemplazadaPor String? @map("reemplazada_por")
-  agenteUsuario String? @map("agente_usuario")
-  creadaEn      DateTime  @default(now()) @map("creada_en")
+  reemplazadaPor String?   @map("reemplazada_por")
+  agenteUsuario  String?   @map("agente_usuario")
+  creadaEn       DateTime  @default(now()) @map("creada_en")
 
   @@index([usuarioId])
   @@index([expiraEn])
   @@map("sesiones")
 }
+
 // ─── Credenciales ────────────────────────────────────────────────────────
 
 enum MetodoVerificacion {
@@ -337,12 +412,12 @@ model TipoCredencial {
   codigo             String             @unique
   nombre             String
   /// Organismo que emite o registra la credencial (SEC, ChileValora...).
-  fuenteOficial      String @map("fuente_oficial")
+  fuenteOficial      String             @map("fuente_oficial")
   /// Método previsto para este tipo. Cada credencial guarda además el que
   /// se usó de verdad: si el registro oficial no responde, una automática
   /// puede terminar revisándose a mano.
   metodoVerificacion MetodoVerificacion @map("metodo_verificacion")
-  requiereVigencia   Boolean @map("requiere_vigencia")
+  requiereVigencia   Boolean            @map("requiere_vigencia")
   activo             Boolean            @default(true)
   creadoEn           DateTime           @default(now()) @map("creado_en")
   actualizadoEn      DateTime           @updatedAt @map("actualizado_en")
@@ -358,34 +433,34 @@ model TipoCredencial {
 /// es evidencia de lo que la plataforma afirmó en su momento, y no puede
 /// desaparecer porque se elimine una cuenta. La cuenta se anonimiza.
 model Credencial {
-  id                     String             @id @default(uuid())
-  prestadorId            String @map("prestador_id")
-  prestador              PerfilPrestador    @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
-  tipoId                 String @map("tipo_id")
-  tipo                   TipoCredencial     @relation(fields: [tipoId], references: [id], onDelete: Restrict)
-  estado                 EstadoCredencial   @default(PENDIENTE)
+  id                     String              @id @default(uuid())
+  prestadorId            String              @map("prestador_id")
+  prestador              PerfilPrestador     @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
+  tipoId                 String              @map("tipo_id")
+  tipo                   TipoCredencial      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  estado                 EstadoCredencial    @default(PENDIENTE)
   /// Número de registro, folio o certificado tal como lo emite la fuente.
-  identificadorDocumento String @map("identificador_documento")
-  vigenteHasta           DateTime?          @db.Date @map("vigente_hasta")
+  identificadorDocumento String              @map("identificador_documento")
+  vigenteHasta           DateTime?           @map("vigente_hasta") @db.Date
   /// Método con que efectivamente se verificó (nulo mientras está pendiente).
   metodo                 MetodoVerificacion?
   /// Fuente consultada al verificar, p. ej. la URL del registro público.
   fuente                 String?
-  fechaConsulta          DateTime? @map("fecha_consulta")
+  fechaConsulta          DateTime?           @map("fecha_consulta")
   /// Administrador que la revisó; nulo si la verificación fue automática.
-  verificadoPorId        String? @map("verificado_por_id")
-  verificadoPor          Usuario?           @relation("VerificadorCredencial", fields: [verificadoPorId], references: [id], onDelete: Restrict)
-  motivoRechazo          String? @map("motivo_rechazo")
+  verificadoPorId        String?             @map("verificado_por_id")
+  verificadoPor          Usuario?            @relation("VerificadorCredencial", fields: [verificadoPorId], references: [id], onDelete: Restrict)
+  motivoRechazo          String?             @map("motivo_rechazo")
   /// Credencial anterior que esta reemplaza (renovación). Una credencial
   /// solo puede ser reemplazada una vez: de ahí el UNIQUE.
-  reemplazaAId           String?            @unique @map("reemplaza_aid")
-  reemplazaA             Credencial?        @relation("ReemplazoCredencial", fields: [reemplazaAId], references: [id], onDelete: Restrict)
-  reemplazadaPor         Credencial?        @relation("ReemplazoCredencial")
-  creadoEn               DateTime           @default(now()) @map("creado_en")
-  actualizadoEn          DateTime           @updatedAt @map("actualizado_en")
+  reemplazaAId           String?             @unique @map("reemplaza_aid")
+  reemplazaA             Credencial?         @relation("ReemplazoCredencial", fields: [reemplazaAId], references: [id], onDelete: Restrict)
+  reemplazadaPor         Credencial?         @relation("ReemplazoCredencial")
+  creadoEn               DateTime            @default(now()) @map("creado_en")
+  actualizadoEn          DateTime            @updatedAt @map("actualizado_en")
 
-  eventos  EventoCredencial[]
-  accesos  AccesoDocumento[]
+  eventos EventoCredencial[]
+  accesos AccesoDocumento[]
 
   @@index([prestadorId, estado])
   @@index([tipoId])
@@ -397,13 +472,13 @@ model Credencial {
 /// base rechaza cualquier UPDATE o DELETE.
 model EventoCredencial {
   id             String            @id @default(uuid())
-  credencialId   String @map("credencial_id")
+  credencialId   String            @map("credencial_id")
   credencial     Credencial        @relation(fields: [credencialId], references: [id], onDelete: Restrict)
   /// Nulo en el evento de creación.
   estadoAnterior EstadoCredencial? @map("estado_anterior")
-  estadoNuevo    EstadoCredencial @map("estado_nuevo")
+  estadoNuevo    EstadoCredencial  @map("estado_nuevo")
   /// Nulo cuando el cambio lo hizo el sistema (p. ej. el vencimiento).
-  autorId        String? @map("autor_id")
+  autorId        String?           @map("autor_id")
   autor          Usuario?          @relation(fields: [autorId], references: [id], onDelete: Restrict)
   motivo         String?
   creadoEn       DateTime          @default(now()) @map("creado_en")
@@ -457,16 +532,16 @@ enum EstadoValoracion {
 /// valorar, y por eso la valoración cuelga del contacto.
 model Contacto {
   id          String          @id @default(uuid())
-  clienteId   String @map("cliente_id")
+  clienteId   String          @map("cliente_id")
   cliente     Usuario         @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  prestadorId String @map("prestador_id")
+  prestadorId String          @map("prestador_id")
   prestador   PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
   /// Opcional: el contacto puede ser desde el perfil y no desde un servicio.
   /// La clave compuesta (servicioId, prestadorId) obliga a que el servicio
   /// sea de este mismo prestador. Es RESTRICT y no SET NULL: con una clave
   /// compuesta, SET NULL intentaría anular también prestadorId. Además un
   /// servicio no se borra al dejar de ofrecerse, cambia de estado.
-  servicioId  String? @map("servicio_id")
+  servicioId  String?         @map("servicio_id")
   servicio    Servicio?       @relation(fields: [servicioId, prestadorId], references: [id, prestadorId], onDelete: Restrict)
   canal       CanalContacto
   creadoEn    DateTime        @default(now()) @map("creado_en")
@@ -494,8 +569,8 @@ model Contacto {
 model Valoracion {
   id            String           @id @default(uuid())
   contactoId    String           @unique @map("contacto_id")
-  clienteId     String @map("cliente_id")
-  prestadorId   String @map("prestador_id")
+  clienteId     String           @map("cliente_id")
+  prestadorId   String           @map("prestador_id")
   contacto      Contacto         @relation(fields: [contactoId, clienteId, prestadorId], references: [id, clienteId, prestadorId], onDelete: Restrict)
   /// 1 a 5, impuesto con CHECK.
   calificacion  Int
@@ -555,26 +630,26 @@ enum EstadoDenuncia {
 /// que el id exista, porque una clave foránea apunta a una sola tabla. Un
 /// CHECK con num_nonnulls exige que haya exactamente una no nula.
 model Denuncia {
-  id                  String         @id @default(uuid())
-  denuncianteId       String @map("denunciante_id")
-  denunciante         Usuario        @relation("Denunciante", fields: [denuncianteId], references: [id], onDelete: Restrict)
-  motivo              MotivoDenuncia
-  detalle             String?
-  estado              EstadoDenuncia @default(ABIERTA)
+  id            String         @id @default(uuid())
+  denuncianteId String         @map("denunciante_id")
+  denunciante   Usuario        @relation("Denunciante", fields: [denuncianteId], references: [id], onDelete: Restrict)
+  motivo        MotivoDenuncia
+  detalle       String?
+  estado        EstadoDenuncia @default(ABIERTA)
 
-  valoracionId        String? @map("valoracion_id")
-  valoracion          Valoracion?    @relation(fields: [valoracionId], references: [id], onDelete: Restrict)
-  servicioId          String? @map("servicio_id")
-  servicio            Servicio?      @relation(fields: [servicioId], references: [id], onDelete: Restrict)
-  usuarioDenunciadoId String? @map("usuario_denunciado_id")
-  usuarioDenunciado   Usuario?       @relation("UsuarioDenunciado", fields: [usuarioDenunciadoId], references: [id], onDelete: Restrict)
+  valoracionId        String?     @map("valoracion_id")
+  valoracion          Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: Restrict)
+  servicioId          String?     @map("servicio_id")
+  servicio            Servicio?   @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  usuarioDenunciadoId String?     @map("usuario_denunciado_id")
+  usuarioDenunciado   Usuario?    @relation("UsuarioDenunciado", fields: [usuarioDenunciadoId], references: [id], onDelete: Restrict)
 
-  resolucion          String?
-  resueltaPorId       String? @map("resuelta_por_id")
-  resueltaPor         Usuario?       @relation("ResolutorDenuncia", fields: [resueltaPorId], references: [id], onDelete: Restrict)
-  resueltaEn          DateTime? @map("resuelta_en")
-  creadoEn            DateTime       @default(now()) @map("creado_en")
-  actualizadoEn       DateTime       @updatedAt @map("actualizado_en")
+  resolucion    String?
+  resueltaPorId String?   @map("resuelta_por_id")
+  resueltaPor   Usuario?  @relation("ResolutorDenuncia", fields: [resueltaPorId], references: [id], onDelete: Restrict)
+  resueltaEn    DateTime? @map("resuelta_en")
+  creadoEn      DateTime  @default(now()) @map("creado_en")
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en")
 
   @@index([estado, creadoEn])
   @@index([denuncianteId])
@@ -602,9 +677,9 @@ model VersionTerminos {
 /// Relación N:M entre usuarios y versiones de términos. Es evidencia de
 /// consentimiento, por eso no cae en cascada al borrar un usuario.
 model AceptacionTerminos {
-  usuarioId  String @map("usuario_id")
+  usuarioId  String          @map("usuario_id")
   usuario    Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
-  versionId  String @map("version_id")
+  versionId  String          @map("version_id")
   version    VersionTerminos @relation(fields: [versionId], references: [id], onDelete: Restrict)
   aceptadaEn DateTime        @default(now()) @map("aceptada_en")
 
@@ -637,9 +712,9 @@ model EventoSeguridad {
   /// Opcional: un inicio de sesión fallido puede no corresponder a ninguna
   /// cuenta. SET NULL porque la bitácora de seguridad no es evidencia de
   /// la relación con terceros, y no debe impedir borrar una cuenta vacía.
-  usuarioId     String? @map("usuario_id")
+  usuarioId     String?             @map("usuario_id")
   usuario       Usuario?            @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-  agenteUsuario String? @map("agente_usuario")
+  agenteUsuario String?             @map("agente_usuario")
   creadoEn      DateTime            @default(now()) @map("creado_en")
 
   @@index([usuarioId, creadoEn])

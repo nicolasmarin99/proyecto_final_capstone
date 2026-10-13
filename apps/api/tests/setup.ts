@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 const rutaEnvTest = fileURLToPath(new URL("../.env.test", import.meta.url));
 config({ path: rutaEnvTest, override: true, quiet: true });
 
+// Las imágenes públicas de las pruebas viven en memoria: nunca en el disco
+// ni en Cloudinary, sin importar qué diga .env.test.
+process.env.ALMACENAMIENTO_PUBLICO_TRANSPORTE = "memoria";
+
 // Guardarraíl: las pruebas borran filas de la base. Si por un .env.test
 // ausente o mal configurado apuntaran a la base de desarrollo, se detienen
 // antes de tocar nada. En CI la base es un contenedor desechable, así que

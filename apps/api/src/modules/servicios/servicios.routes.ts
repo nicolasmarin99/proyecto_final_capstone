@@ -3,6 +3,7 @@ import { Rol } from "../../generated/prisma/client.js";
 import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
+import { rutasImagenesServicio } from "../imagenes/imagenes.routes.js";
 import {
   buscarServicios,
   crearServicio,
@@ -26,6 +27,8 @@ rutasServicios.get("/:id", servicioPublico);
 rutasServicios.post("/", ...prestadorVerificado, crearServicio);
 rutasServicios.put("/:id", ...prestadorVerificado, editarServicio);
 rutasServicios.delete("/:id", ...prestadorVerificado, eliminarServicio);
+// Fotos de trabajos: /servicios/:id/imagenes (ver imagenes.routes.ts).
+rutasServicios.use("/:id/imagenes", rutasImagenesServicio);
 
 // /categorias: pública, para el selector del formulario.
 export const rutasCategorias = Router();

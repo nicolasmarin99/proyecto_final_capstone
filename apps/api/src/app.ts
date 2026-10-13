@@ -10,6 +10,8 @@ import { prisma } from "./db.js";
 import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
 import { rutasIdentidadAdmin, rutasIdentidadPrestador } from "./modules/identidad/identidad.routes.js";
+import { rutasImagenesAdmin } from "./modules/imagenes/imagenes.routes.js";
+import { rutasImagenesLocales } from "./modules/imagenes/imagenes.locales.js";
 import { rutasPrestadores } from "./modules/prestadores/prestadores.routes.js";
 import { rutasCategorias, rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { rutasComunas } from "./modules/territorio/territorio.routes.js";
@@ -34,12 +36,15 @@ app.get("/health", async (_req, res) => {
 app.use("/auth", rutasAuth);
 // Antes que /admin y /prestadores: las rutas más específicas primero.
 app.use("/admin/identidades", rutasIdentidadAdmin);
+app.use("/admin/imagenes", rutasImagenesAdmin);
 app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
 app.use("/admin", rutasAdmin);
 app.use("/servicios", rutasServicios);
 app.use("/prestadores", rutasPrestadores);
 app.use("/comunas", rutasComunas);
 app.use("/categorias", rutasCategorias);
+// Solo existe con el almacenamiento público en disco (desarrollo local).
+app.use("/imagenes-locales", rutasImagenesLocales);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { codigo: "NO_ENCONTRADO", mensaje: "Recurso no encontrado" } });
