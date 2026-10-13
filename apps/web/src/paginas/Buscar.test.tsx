@@ -22,6 +22,7 @@ const RESULTADO = {
   precioHasta: null,
   unidadPrecio: null,
   aConvenir: true,
+  imagen: null,
   prestador: {
     nombre: "Pedro Soto",
     comunas: [
@@ -193,6 +194,32 @@ describe("Resultados", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Gasfitería a domicilio" })).toBeInTheDocument();
     expect(ubicacion()).toBe("/servicios/s1");
+  });
+
+  it("la tarjeta muestra la miniatura; sin foto, un marcador del mismo tamaño", async () => {
+    simularApi(() =>
+      json({
+        resultados: [
+          { ...RESULTADO, id: "con-foto", titulo: "Con foto", imagen: "https://img.prueba/miniatura/x" },
+          { ...RESULTADO, id: "sin-foto", titulo: "Sin foto", imagen: null },
+        ],
+        pagina: 1,
+        porPagina: 12,
+        total: 2,
+      }),
+    );
+    renderizar("/buscar");
+
+    const conFoto = await screen.findByRole("link", { name: "Con foto" });
+    const sinFoto = screen.getByRole("link", { name: "Sin foto" });
+    const miniatura = conFoto.querySelector("img");
+    expect(miniatura).toHaveAttribute("src", "https://img.prueba/miniatura/x");
+    // Decorativa: el enlace ya se nombra con el título.
+    expect(miniatura).toHaveAttribute("alt", "");
+    expect(sinFoto.querySelector("img")).toBeNull();
+    // El marcador ocupa el mismo lugar (4:3) para no descuadrar la grilla.
+    expect(sinFoto.firstElementChild).toHaveClass("aspect-[4/3]");
+    expect(miniatura).toHaveClass("aspect-[4/3]");
   });
 
   it("anuncia cuántos encontró", async () => {

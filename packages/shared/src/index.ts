@@ -35,3 +35,10 @@ export {
   POR_PAGINA_BUSQUEDA,
   type OrdenBusqueda,
 } from "./busqueda.js";
+export {
+  LARGO_MAXIMO_MOTIVO_OCULTAR,
+  LARGO_MINIMO_MOTIVO_OCULTAR,
+  MAXIMO_IMAGENES_SERVICIO,
+  TAMANO_MAXIMO_IMAGEN,
+  TIPOS_IMAGEN_PERMITIDOS,
+} from "./imagen.js";

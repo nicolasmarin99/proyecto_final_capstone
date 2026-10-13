@@ -48,3 +48,25 @@ export function pngConTexto(): Buffer {
 export function pdfMinimo(): Buffer {
   return Buffer.from("%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n", "latin1");
 }
+
+/** Fragmento RIFF: tipo + largo de 4 bytes little endian + datos + relleno si el largo es impar. */
+function fragmentoRiff(tipo: string, datos: Buffer): Buffer {
+  const largo = Buffer.alloc(4);
+  largo.writeUInt32LE(datos.length);
+  return Buffer.concat([Buffer.from(tipo, "latin1"), largo, datos, datos.length % 2 === 1 ? Buffer.alloc(1) : Buffer.alloc(0)]);
+}
+
+/** WEBP extendido: VP8X que anuncia EXIF y XMP, los datos de la imagen y los dos fragmentos de metadatos. */
+export function webpConExif(): Buffer {
+  // Banderas de VP8X: 0x08 = trae EXIF, 0x04 = trae XMP. Ancho y alto en 3 bytes cada uno.
+  const vp8x = Buffer.from([0x08 | 0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const cuerpo = Buffer.concat([
+    fragmentoRiff("VP8X", vp8x),
+    fragmentoRiff("VP8 ", Buffer.from("DATOS-DE-IMAGEN", "latin1")),
+    fragmentoRiff("EXIF", Buffer.from("Exif\0\0GPS-SECRETO -33.4378,-70.6505", "latin1")),
+    fragmentoRiff("XMP ", Buffer.from("<x:xmpmeta>GPS-SECRETO</x:xmpmeta>", "latin1")),
+  ]);
+  const largo = Buffer.alloc(4);
+  largo.writeUInt32LE(cuerpo.length + 4);
+  return Buffer.concat([Buffer.from("RIFF", "latin1"), largo, Buffer.from("WEBP", "latin1"), cuerpo]);
+}

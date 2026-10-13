@@ -1,4 +1,8 @@
 import type { TipoDocumento } from "../almacenamiento/index.js";
+import { ArchivoMalFormado, esJpg, esPng, quitarMetadatosJpg, quitarMetadatosPng } from "../../shared/metadatos.js";
+
+/** El mismo error que la limpieza compartida; se conserva el nombre que ya usaba este módulo. */
+export { ArchivoMalFormado as DocumentoMalFormado };
 
 /*
   Validación y limpieza del documento de identidad, antes de que salga del
@@ -16,15 +20,15 @@ import type { TipoDocumento } from "../almacenamiento/index.js";
   lado (minimización de datos), sea cual sea el adaptador.
 */
 
-const FIRMA_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const FIRMA_PDF = Buffer.from("%PDF-", "latin1");
 
 export function detectarTipo(bytes: Buffer): TipoDocumento | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+  // Solo JPG, PNG y PDF: un WEBP no se acepta como documento de identidad.
+  if (esJpg(bytes)) {
     return "jpg";
   }
 
-  if (bytes.subarray(0, FIRMA_PNG.length).equals(FIRMA_PNG)) {
+  if (esPng(bytes)) {
     return "png";
   }
 
@@ -33,105 +37,6 @@ export function detectarTipo(bytes: Buffer): TipoDocumento | null {
   }
 
   return null;
-}
-
-/** El archivo no tiene la estructura que dice su firma. */
-export class DocumentoMalFormado extends Error {
-  constructor(motivo: string) {
-    super(motivo);
-    this.name = "DocumentoMalFormado";
-  }
-}
-
-/**
- * Segmentos JPEG que se descartan:
- * - APP1 (0xE1): EXIF y XMP, donde van la cámara, la fecha y el GPS.
- * - APP3 a APP13 y APP15: datos de fabricantes y de Photoshop (IPTC: autor, lugar).
- * - COM (0xFE): comentarios de texto libre.
- *
- * Se conservan APP0 (JFIF), APP2 (perfil de color ICC) y APP14 (Adobe): sin
- * ellos algunas imágenes se verían con colores equivocados, y no identifican
- * a nadie.
- */
-function seDescartaSegmentoJpg(marcador: number): boolean {
-  return marcador === 0xe1 || (marcador >= 0xe3 && marcador <= 0xed) || marcador === 0xef || marcador === 0xfe;
-}
-
-function quitarMetadatosJpg(bytes: Buffer): Buffer {
-  const partes: Buffer[] = [bytes.subarray(0, 2)];
-  let posicion = 2;
-
-  while (posicion < bytes.length) {
-    if (bytes[posicion] !== 0xff || posicion + 1 >= bytes.length) {
-      throw new DocumentoMalFormado("Segmento JPEG sin marcador.");
-    }
-
-    const marcador = bytes[posicion + 1] ?? 0;
-
-    // Start of Scan: lo que sigue son los datos comprimidos de la imagen,
-    // hasta el final. No hay más metadatos que revisar.
-    if (marcador === 0xda) {
-      partes.push(bytes.subarray(posicion));
-      return Buffer.concat(partes);
-    }
-
-    // Marcadores sin largo (relleno, reinicio, fin de imagen).
-    if (marcador === 0xff || marcador === 0x01 || (marcador >= 0xd0 && marcador <= 0xd9)) {
-      partes.push(bytes.subarray(posicion, posicion + 2));
-      posicion += 2;
-      continue;
-    }
-
-    if (posicion + 4 > bytes.length) {
-      throw new DocumentoMalFormado("Segmento JPEG truncado.");
-    }
-
-    const largo = bytes.readUInt16BE(posicion + 2);
-    const fin = posicion + 2 + largo;
-
-    if (largo < 2 || fin > bytes.length) {
-      throw new DocumentoMalFormado("Segmento JPEG con un largo imposible.");
-    }
-
-    if (!seDescartaSegmentoJpg(marcador)) {
-      partes.push(bytes.subarray(posicion, fin));
-    }
-
-    posicion = fin;
-  }
-
-  throw new DocumentoMalFormado("El JPEG no tiene datos de imagen.");
-}
-
-/** Fragmentos PNG de texto libre (autor, comentarios), EXIF y fecha de modificación. */
-const FRAGMENTOS_PNG_DESCARTADOS = new Set(["tEXt", "zTXt", "iTXt", "eXIf", "tIME"]);
-
-function quitarMetadatosPng(bytes: Buffer): Buffer {
-  const partes: Buffer[] = [bytes.subarray(0, FIRMA_PNG.length)];
-  let posicion = FIRMA_PNG.length;
-
-  while (posicion + 8 <= bytes.length) {
-    const largo = bytes.readUInt32BE(posicion);
-    const tipo = bytes.toString("latin1", posicion + 4, posicion + 8);
-    // Largo + tipo + datos + CRC.
-    const fin = posicion + 12 + largo;
-
-    if (fin > bytes.length) {
-      throw new DocumentoMalFormado("Fragmento PNG truncado.");
-    }
-
-    if (!FRAGMENTOS_PNG_DESCARTADOS.has(tipo)) {
-      partes.push(bytes.subarray(posicion, fin));
-    }
-
-    if (tipo === "IEND") {
-      return Buffer.concat(partes);
-    }
-
-    posicion = fin;
-  }
-
-  throw new DocumentoMalFormado("El PNG no termina en IEND.");
 }
 
 /**

@@ -1,5 +1,6 @@
 import { prisma } from "../../db.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
+import { seleccionImagen } from "../imagenes/imagenes.repository.js";
 
 /** Lo que ve el dueño de su servicio. */
 const seleccionServicio = {
@@ -12,6 +13,11 @@ const seleccionServicio = {
   unidadPrecio: true,
   estado: true,
   categoria: { select: { slug: true, nombre: true } },
+  // El dueño ve todas sus imágenes, también las ocultas por moderación.
+  // Un solo criterio: con `as const` una lista quedaría de solo lectura y
+  // Prisma no la acepta. El orden no tiene huecos ni repetidos (lo compacta
+  // imagenes.repository al borrar).
+  imagenes: { orderBy: { orden: "asc" }, select: seleccionImagen },
   creadoEn: true,
   actualizadoEn: true,
 } as const;
@@ -110,6 +116,12 @@ export async function buscarServicioPublico(id: string) {
       unidadPrecio: true,
       categoria: { select: { slug: true, nombre: true } },
       actualizadoEn: true,
+      // Solo las visibles: una oculta por moderación no se publica.
+      imagenes: {
+        where: { estado: "VISIBLE" },
+        orderBy: [{ orden: "asc" }, { creadoEn: "asc" }],
+        select: { id: true, identificador: true },
+      },
       prestador: {
         select: {
           id: true,
@@ -146,6 +158,8 @@ export interface FilaBusqueda {
   comunas: { id: number; nombre: string }[] | null;
   totalComunas: number;
   acreditado: boolean;
+  /** La primera imagen visible, para la miniatura; null si no tiene. */
+  imagenIdentificador: string | null;
   total: number;
 }
 
@@ -201,6 +215,14 @@ export async function buscarServiciosPublicados(p: ParametrosBusqueda): Promise<
                WHERE cr.prestador_id = p.id
                  AND cr.estado = 'VERIFICADA'
                  AND cr.metodo = 'AUTOMATICO') AS acreditado,
+
+      -- La miniatura: la primera imagen VISIBLE de la galería, si hay.
+      -- Una oculta por moderación nunca llega a la búsqueda.
+      (SELECT im.identificador
+         FROM imagenes_servicio im
+        WHERE im.servicio_id = s.id AND im.estado = 'VISIBLE'
+        ORDER BY im.orden, im.creado_en
+        LIMIT 1)                 AS "imagenIdentificador",
 
       -- Total de coincidencias antes de LIMIT/OFFSET, para la paginación.
       count(*) OVER ()::int      AS total

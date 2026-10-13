@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/ContextoAuth";
 import { CompletarPerfilPrimero, SeccionArea } from "../../componentes/AreaPrestador";
 import { mensajeGuardado } from "../../componentes/FilaServicio";
 import { FormularioServicio } from "../../componentes/FormularioServicio";
+import { GestorImagenes } from "../../componentes/GestorImagenes";
 import { useEstadoPrestador } from "../../prestador/ContextoPrestador";
 
 /**
@@ -28,6 +29,8 @@ export default function PaginaEditorServicio() {
   const [enviando, setEnviando] = useState(false);
   const [erroresApi, setErroresApi] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // Fotos elegidas para un servicio nuevo: se suben recién cuando el servicio existe.
+  const [pendientes, setPendientes] = useState<File[]>([]);
 
   const tienePerfil = estado && !estado.cargando ? estado.perfil !== null : null;
 
@@ -60,8 +63,23 @@ export default function PaginaEditorServicio() {
 
     try {
       const resultado = servicio ? await cliente.editarServicio(servicio.id, datos) : await cliente.crearServicio(datos);
+
+      // Servicio nuevo: ahora que tiene id, se suben sus fotos en el orden elegido.
+      let fallidas = 0;
+      for (const archivo of servicio ? [] : pendientes) {
+        try {
+          await cliente.subirImagenServicio(resultado.servicio.id, archivo);
+        } catch {
+          fallidas += 1;
+        }
+      }
+
       await estado?.recargar();
-      navegar("/mi/servicios", { state: { mensaje: mensajeGuardado(resultado.servicio, datos.estado === "PUBLICADO") } });
+      const aviso =
+        fallidas === 0
+          ? ""
+          : ` ${fallidas === 1 ? "Una foto no se pudo subir" : `${fallidas} fotos no se pudieron subir`}: puedes agregarlas al editarlo.`;
+      navegar("/mi/servicios", { state: { mensaje: mensajeGuardado(resultado.servicio, datos.estado === "PUBLICADO") + aviso } });
     } catch (causa) {
       if (causa instanceof ErrorApi && causa.codigo === "DATOS_INVALIDOS") {
         setErroresApi(Object.fromEntries(causa.detalles.map((detalle) => [detalle.campo, detalle.mensaje])));
@@ -100,6 +118,14 @@ export default function PaginaEditorServicio() {
               erroresApi={erroresApi}
               alEnviar={guardar}
               alCancelar={() => navegar("/mi/servicios")}
+              imagenes={
+                <GestorImagenes
+                  servicioId={servicio?.id ?? null}
+                  iniciales={servicio?.imagenes ?? []}
+                  pendientes={pendientes}
+                  alCambiarPendientes={setPendientes}
+                />
+              }
             />
           </div>
         )

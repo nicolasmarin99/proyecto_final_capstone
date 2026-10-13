@@ -8,10 +8,26 @@
  * identidad verificada, que la búsqueda nunca debe mostrar.
  *
  * Todas las cuentas usan la contraseña de las cuentas de prueba del seed.
+ *
+ * Fotos: si en prisma/demo-imagenes/ hay archivos que empiezan con la clave
+ * `fotos` de un servicio (por ejemplo gasfiteria-1.jpg, gasfiteria-2.jpg),
+ * se suben a ese servicio en orden alfabético, hasta 5. Pasan por la misma
+ * limpieza de metadatos que una subida desde la web y van al almacenamiento
+ * público configurado (disco en desarrollo, Cloudinary en producción). Se
+ * puede indicar otra carpeta como primer argumento.
  */
+import { randomUUID } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { MAXIMO_IMAGENES_SERVICIO } from "@localcl/shared";
 import { hash } from "@node-rs/argon2";
 import { prisma } from "../src/db.js";
 import type { UnidadPrecio } from "../src/generated/prisma/client.js";
+import { obtenerAlmacenamientoPublico } from "../src/modules/almacenamiento/index.js";
+import { detectarTipoImagen, quitarMetadatosImagen } from "../src/modules/imagenes/imagenes.archivo.js";
+
+const CARPETA_FOTOS = path.resolve(process.argv[2] ?? fileURLToPath(new URL("./demo-imagenes/", import.meta.url)));
 
 const CONTRASENA = "Local.2026!";
 const REGION_METROPOLITANA = 13;
@@ -39,6 +55,8 @@ interface ServicioDemo {
   estado?: "PUBLICADO" | "PAUSADO";
   /** Días atrás en que se publicó, para que «más recientes» tenga sentido. */
   haceDias: number;
+  /** Prefijo de sus fotos en la carpeta de demostración. */
+  fotos?: string;
 }
 
 interface PrestadorDemo {
@@ -75,6 +93,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioHasta: 60000,
         unidad: "POR_SERVICIO",
         haceDias: 2,
+        fotos: "gasfiteria",
       },
       {
         titulo: "Mantención e instalación de calefont",
@@ -83,6 +102,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: 35000,
         unidad: "POR_SERVICIO",
         haceDias: 10,
+        fotos: "calefont",
       },
       {
         titulo: "Destape de cañerías y alcantarillado",
@@ -120,6 +140,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: 15000,
         unidad: "POR_HORA",
         haceDias: 3,
+        fotos: "electricidad",
       },
       {
         titulo: "Tableros eléctricos y certificación TE1",
@@ -149,6 +170,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: 300000,
         unidad: "POR_SERVICIO",
         haceDias: 7,
+        fotos: "carpinteria",
       },
       {
         titulo: "Reparación de puertas y ventanas",
@@ -185,6 +207,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: 12000,
         unidad: "POR_PERSONA",
         haceDias: 4,
+        fotos: "banqueteria",
       },
       {
         titulo: "Pintura de departamentos y casas",
@@ -194,6 +217,7 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: 8000,
         unidad: "POR_METRO_CUADRADO",
         haceDias: 12,
+        fotos: "pintura",
       },
     ],
   },
@@ -213,6 +237,7 @@ const PRESTADORES: PrestadorDemo[] = [
         categoria: "soldadura",
         precioDesde: null,
         haceDias: 9,
+        fotos: "soldadura",
       },
     ],
   },
@@ -250,9 +275,36 @@ async function idCategoria(slug: string): Promise<string> {
   return categoria.id;
 }
 
+/** Archivos de la carpeta de demostración que empiezan con `clave-`, en orden alfabético. */
+async function fotosDe(clave: string, disponibles: string[]): Promise<string[]> {
+  return disponibles
+    .filter((nombre) => nombre.toLowerCase().startsWith(`${clave}-`))
+    .sort()
+    .slice(0, MAXIMO_IMAGENES_SERVICIO)
+    .map((nombre) => path.join(CARPETA_FOTOS, nombre));
+}
+
+/** Sube una foto como lo haría la API: tipo por los bytes, sin metadatos, nombre nuevo. */
+async function subirFoto(servicioId: string, ruta: string, orden: number): Promise<boolean> {
+  const contenido = await readFile(ruta);
+  const tipo = detectarTipoImagen(contenido);
+
+  if (!tipo) {
+    console.warn(`  ${path.basename(ruta)}: no es JPG, PNG ni WEBP; se omite.`);
+    return false;
+  }
+
+  const identificador = randomUUID();
+  await obtenerAlmacenamientoPublico().guardar({ id: identificador, contenido: quitarMetadatosImagen(contenido, tipo), tipo });
+  await prisma.imagenServicio.create({ data: { servicioId, identificador, orden } });
+  return true;
+}
+
 async function main() {
   const hashContrasena = await hash(CONTRASENA);
   let servicios = 0;
+  let fotos = 0;
+  const disponibles = await readdir(CARPETA_FOTOS).catch(() => [] as string[]);
 
   for (const demo of PRESTADORES) {
     const usuario = await prisma.usuario.upsert({
@@ -298,9 +350,16 @@ async function main() {
     }
 
     // Los servicios de demostración se rehacen desde cero en cada corrida.
+    // Antes, sus fotos se borran del almacenamiento: la cascada solo borra filas.
+    const anteriores = await prisma.imagenServicio.findMany({
+      where: { servicio: { prestadorId: perfil.id } },
+      select: { identificador: true },
+    });
+    for (const { identificador } of anteriores) await obtenerAlmacenamientoPublico().eliminar(identificador);
     await prisma.servicio.deleteMany({ where: { prestadorId: perfil.id } });
+
     for (const servicio of demo.servicios) {
-      await prisma.servicio.create({
+      const creado = await prisma.servicio.create({
         data: {
           prestadorId: perfil.id,
           categoriaId: await idCategoria(servicio.categoria),
@@ -315,10 +374,24 @@ async function main() {
         },
       });
       servicios += 1;
+
+      if (servicio.fotos) {
+        const rutas = await fotosDe(servicio.fotos, disponibles);
+        let orden = 0;
+        for (const ruta of rutas) {
+          if (await subirFoto(creado.id, ruta, orden)) {
+            orden += 1;
+            fotos += 1;
+          }
+        }
+      }
     }
   }
 
-  console.log(`${PRESTADORES.length} prestadores y ${servicios} servicios de demostración listos`);
+  console.log(`${PRESTADORES.length} prestadores, ${servicios} servicios y ${fotos} fotos de demostración listos`);
+  if (fotos === 0) {
+    console.log(`Sin fotos: copia archivos JPG, PNG o WEBP en ${CARPETA_FOTOS} (ver su README.md) y vuelve a correr el seed.`);
+  }
 }
 
 main()

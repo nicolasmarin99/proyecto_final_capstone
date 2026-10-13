@@ -50,6 +50,17 @@ const esquema = z.object({
   // quedan separados del resto de los recursos y se pueden auditar juntos.
   CLOUDINARY_CARPETA_IDENTIDADES: z.string().default("localcl/identidades"),
 
+  // Fotos de trabajos de los servicios: PÚBLICAS y permanentes, en una
+  // carpeta distinta de la de identidades.
+  CLOUDINARY_CARPETA_SERVICIOS: z.string().default("localcl/servicios"),
+
+  // Dónde se guardan esas fotos. Si no se indica, sigue a
+  // ALMACENAMIENTO_TRANSPORTE: con "produccion" van a Cloudinary; si no, a una
+  // carpeta local ("disco"), para que sobrevivan a un reinicio en
+  // desarrollo. "memoria" es para las pruebas (lo fija tests/setup.ts).
+  ALMACENAMIENTO_PUBLICO_TRANSPORTE: z.enum(["memoria", "disco", "produccion"]).optional(),
+  ALMACENAMIENTO_PUBLICO_CARPETA_LOCAL: z.string().default(".almacenamiento-local/servicios"),
+
   // Consulta a Have I Been Pwned al elegir contraseña. Se apaga en las pruebas
   // de integración para que no dependan de la red: el comportamiento del
   // módulo se prueba aparte, con fetch simulado.
@@ -63,15 +74,15 @@ const esquema = z.object({
   // en una variable de credencial es justo lo que después se cuela a
   // producción sin que nadie lo note.
   .superRefine((valores, contexto) => {
-    if (valores.ALMACENAMIENTO_TRANSPORTE === "produccion") {
+    if (valores.ALMACENAMIENTO_TRANSPORTE === "produccion" || valores.ALMACENAMIENTO_PUBLICO_TRANSPORTE === "produccion") {
       for (const clave of ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"] as const) {
         if (valores[clave].length === 0) {
           contexto.addIssue({
             code: "custom",
             path: [clave],
             message:
-              "Es obligatoria cuando ALMACENAMIENTO_TRANSPORTE=produccion. Sin ella la API " +
-              "arrancaría y fallaría recién cuando un prestador subiera su documento.",
+              "Es obligatoria cuando el almacenamiento es de producción. Sin ella la API " +
+              "arrancaría y fallaría recién cuando un prestador subiera un archivo.",
           });
         }
       }

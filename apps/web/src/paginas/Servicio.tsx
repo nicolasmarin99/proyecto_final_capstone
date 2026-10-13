@@ -4,6 +4,7 @@ import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { Icono } from "../componentes/iconos";
+import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
@@ -129,6 +130,9 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                 <p className="mt-4 inline-block rounded-chico bg-hielo px-4 py-2 font-titulos text-lg font-bold text-noche">
                   {textoPrecio(servicio)}
                 </p>
+
+                {/* Opcional: sin fotos, la página queda igual que antes. */}
+                <GaleriaServicio imagenes={servicio.imagenes} titulo={servicio.titulo} categoria={nombreCategoria(servicio)} />
 
                 <p className="mt-6 leading-relaxed whitespace-pre-line text-noche">{servicio.descripcion}</p>
 
