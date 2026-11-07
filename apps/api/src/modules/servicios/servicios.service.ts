@@ -16,15 +16,34 @@ import {
 } from "./servicios.repository.js";
 import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
 import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
+import { esServicioVisible, serviciosVisiblesEntre } from "./servicios.visibilidad.js";
+
+/**
+ * La respuesta para todo servicio que el público no puede ver: no existe,
+ * está pausado, oculto, o su prestador perdió la verificación. Siempre la
+ * misma, para que no se pueda averiguar qué servicios existen ni en qué
+ * estado están.
+ */
+export function servicioNoVisible(): ErrorHttp {
+  return new ErrorHttp(404, "SERVICIO_NO_ENCONTRADO", "Ese servicio no existe o no está publicado.");
+}
 import { imagenesPropias, imagenPublica, urlMiniatura } from "../imagenes/imagenes.urls.js";
 import { obtenerAlmacenamientoPublico } from "../almacenamiento/index.js";
 import type { DatosServicio, FiltrosBusqueda } from "./servicios.schema.js";
 
 type ServicioConImagenes = Awaited<ReturnType<typeof crearServicio>>;
 
-/** El servicio del dueño con sus imágenes como direcciones, sin el identificador interno. */
-async function conImagenes(servicio: ServicioConImagenes) {
-  return { ...servicio, imagenes: await imagenesPropias(servicio.imagenes) };
+/**
+ * El servicio del dueño con sus imágenes como direcciones (sin el
+ * identificador interno) y si el público lo ve, según la misma regla que el
+ * buscador. `visible` se pasa cuando ya se calculó para varios a la vez.
+ */
+async function conImagenes(servicio: ServicioConImagenes, visible?: boolean) {
+  return {
+    ...servicio,
+    imagenes: await imagenesPropias(servicio.imagenes),
+    visiblePublicamente: visible ?? (await esServicioVisible(servicio.id)),
+  };
 }
 
 export interface RequisitoPendiente {
@@ -197,13 +216,19 @@ export async function eliminar(usuarioId: string, id: string) {
  */
 export async function mios(usuarioId: string) {
   const perfil = await perfilRequerido(usuarioId);
-  const servicios = await Promise.all((await listarServiciosDe(perfil.id)).map(conImagenes));
+  const filas = await listarServiciosDe(perfil.id);
+  // Con la misma regla que el público: «Ver publicación» solo si de verdad se ve.
+  const visibles = await serviciosVisiblesEntre(filas.map((servicio) => servicio.id));
+  const servicios = await Promise.all(filas.map((servicio) => conImagenes(servicio, visibles.has(servicio.id))));
   const moderados = await motivosDeOcultamiento(servicios.filter((servicio) => servicio.estado === "OCULTO").map((servicio) => servicio.id));
 
   return {
     servicios: servicios.map((servicio) => {
       const moderacion = servicio.estado === "OCULTO" ? moderados.get(servicio.id) : undefined;
-      return { ...servicio, moderacion: moderacion ? { motivo: moderacion.motivo, ocultadoEn: moderacion.creadoEn } : null };
+      return {
+        ...servicio,
+        moderacion: moderacion ? { motivo: moderacion.motivo, ocultadoEn: moderacion.creadoEn } : null,
+      };
     }),
     requisitosPendientes: requisitosPendientes(perfil),
   };
@@ -217,11 +242,11 @@ const ordenEspanol = new Intl.Collator("es");
  * publica sin que nadie lo decida.
  */
 export async function publico(id: string) {
-  const servicio = await buscarServicioPublico(id);
+  // La misma regla que el buscador: si no aparece ahí, no se ve acá.
+  if (!(await esServicioVisible(id))) throw servicioNoVisible();
 
-  if (!servicio) {
-    throw new ErrorHttp(404, "SERVICIO_NO_ENCONTRADO", "Ese servicio no existe o no está publicado.");
-  }
+  const servicio = await buscarServicioPublico(id);
+  if (!servicio) throw servicioNoVisible();
 
   return {
     id: servicio.id,

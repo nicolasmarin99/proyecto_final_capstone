@@ -115,6 +115,11 @@ export interface ServicioPropio extends Precio {
   imagenes: ImagenPropia[];
   /** Si un administrador lo ocultó: el motivo de la decisión y cuándo. Nada sobre reportes. */
   moderacion: { motivo: string; ocultadoEn: string } | null;
+  /**
+   * Si el público lo ve ahora mismo, según la misma regla que el buscador y
+   * la página del servicio (la decide la API, no se calcula acá).
+   */
+  visiblePublicamente: boolean;
 }
 
 export interface RequisitoPendiente {
@@ -450,6 +455,8 @@ function leerServicioPropio(valor: unknown): ServicioPropio | null {
       esObjeto(valor.moderacion) && typeof valor.moderacion.motivo === "string" && typeof valor.moderacion.ocultadoEn === "string"
         ? { motivo: valor.moderacion.motivo, ocultadoEn: valor.moderacion.ocultadoEn }
         : null,
+    // Sin el dato, se asume que no se ve: es preferible no ofrecer un enlace que lleve a un 404.
+    visiblePublicamente: valor.visiblePublicamente === true,
   };
 }
 

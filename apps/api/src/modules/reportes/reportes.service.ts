@@ -12,6 +12,8 @@ import {
   retirarReporte,
   ultimasDecisiones,
 } from "./reportes.repository.js";
+import { servicioNoVisible } from "../servicios/servicios.service.js";
+import { esServicioVisible } from "../servicios/servicios.visibilidad.js";
 import type { DatosReporte, FiltrosCola } from "./reportes.schema.js";
 
 /*
@@ -27,12 +29,13 @@ const UNA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 /** Lo que se responde al reportar, haya o no un reporte previo de la misma persona. */
 const RESPUESTA_REPORTE = { mensaje: "Gracias. Revisaremos esta publicación." } as const;
 
-/** Un servicio que no está publicado no se puede reportar: para el público, no existe. */
+/**
+ * Un servicio que el público no ve no se puede reportar: para el público, no
+ * existe. La misma regla y la misma respuesta que su página.
+ */
 async function servicioPublicado(servicioId: string) {
   const servicio = await buscarServicioReportable(servicioId);
-  if (!servicio || servicio.estado !== "PUBLICADO") {
-    throw new ErrorHttp(404, "SERVICIO_NO_ENCONTRADO", "Ese servicio no existe o no está publicado.");
-  }
+  if (!servicio || !(await esServicioVisible(servicioId))) throw servicioNoVisible();
   return servicio;
 }
 

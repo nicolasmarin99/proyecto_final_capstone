@@ -153,6 +153,7 @@ export default function PaginaMisServicios() {
                 <FilaServicio
                   key={servicio.id}
                   servicio={servicio}
+                  requisitos={requisitos}
                   alCambiarEstado={(nuevo) => cambiarEstado(servicio, nuevo)}
                   alEliminar={() => eliminar(servicio)}
                 />
