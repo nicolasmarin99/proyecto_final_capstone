@@ -71,22 +71,18 @@ export async function reemplazarComunasAtencion(prestadorId: string, comunaIds: 
 }
 
 /**
- * Lo que hace falta para entregar el contacto: de quién es el perfil, su
- * teléfono y cuántos servicios publicados tiene.
+ * Lo que hace falta para entregar el contacto: de quién es el perfil y su
+ * teléfono. Si tiene servicios visibles lo decide servicios.visibilidad.ts.
  */
 export async function buscarPrestadorParaContacto(prestadorId: string) {
   return prisma.perfilPrestador.findUnique({
     where: { id: prestadorId },
-    select: {
-      usuarioId: true,
-      telefono: true,
-      _count: { select: { servicios: { where: { estado: "PUBLICADO" } } } },
-    },
+    select: { usuarioId: true, telefono: true },
   });
 }
 
 export async function buscarServicioParaContacto(servicioId: string) {
-  return prisma.servicio.findUnique({ where: { id: servicioId }, select: { prestadorId: true, estado: true } });
+  return prisma.servicio.findUnique({ where: { id: servicioId }, select: { prestadorId: true } });
 }
 
 export async function registrarContacto(datos: { clienteId: string; prestadorId: string; servicioId: string | null }) {

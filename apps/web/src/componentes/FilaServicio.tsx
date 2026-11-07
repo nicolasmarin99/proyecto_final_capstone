@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { Link } from "react-router";
-import type { DatosServicio, EstadoServicio, ServicioPropio } from "../api/cliente";
+import type { DatosServicio, EstadoServicio, RequisitoPendiente, ServicioPropio } from "../api/cliente";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 import { Boton, clasesBoton } from "./Boton";
 
@@ -39,12 +39,33 @@ export function mensajeGuardado(servicio: ServicioPropio, pidioPublicar: boolean
  * publicar, ver la publicación y eliminar (con confirmación, porque no se
  * puede deshacer). Las acciones devuelven un mensaje de error o null.
  */
+/**
+ * Por qué un servicio no se ve, en palabras del prestador. Solo explica: si
+ * se ve o no lo decide la API (visiblePublicamente), con la misma regla que
+ * el buscador. Lo que falta sale de los requisitos que informa la API.
+ */
+function motivoNoVisible(servicio: ServicioPropio, requisitos: RequisitoPendiente[]): string[] {
+  if (servicio.estado === "PAUSADO") {
+    return requisitos.length > 0
+      ? ["Está pausado, y para publicarlo te falta:", ...requisitos.map((requisito) => requisito.mensaje)]
+      : ["Está pausado. Publícalo para que aparezca en la búsqueda."];
+  }
+  if (servicio.estado === "BORRADOR") return ["Es un borrador: todavía no se publicó."];
+  // PUBLICADO pero no visible: le falta algo a la cuenta (p. ej., perdió la verificación).
+  return requisitos.length > 0
+    ? ["Está publicado, pero no aparece porque te falta:", ...requisitos.map((requisito) => requisito.mensaje)]
+    : ["Está publicado, pero tu cuenta no está en condiciones de mostrarlo. Escríbenos si no sabes por qué."];
+}
+
 export function FilaServicio({
   servicio,
+  requisitos = [],
   alCambiarEstado,
   alEliminar,
 }: {
   servicio: ServicioPropio;
+  /** Lo que la API dice que falta para publicar (identidad, comunas). */
+  requisitos?: RequisitoPendiente[];
   alCambiarEstado(estado: "PUBLICADO" | "PAUSADO"): Promise<string | null>;
   alEliminar(): Promise<string | null>;
 }) {
@@ -73,6 +94,18 @@ export function FilaServicio({
       <p className="mt-1 text-sm text-texto-suave">
         {nombreCategoria(servicio)} · {textoPrecio(servicio)}
       </p>
+
+      {/* Si no se ve (y no es por moderación, que tiene su propio aviso), qué falta. */}
+      {!servicio.visiblePublicamente && servicio.estado !== "OCULTO" && (
+        <div className="mt-3 rounded-chico border border-borde bg-niebla px-3 py-2 text-sm text-noche">
+          <p className="font-semibold">No se ve en LocalCL.</p>
+          {motivoNoVisible(servicio, requisitos).map((linea) => (
+            <p key={linea} className="mt-0.5 text-texto-suave">
+              {linea}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Solo la decisión y su motivo: nada sobre reportes ni sobre quién los hizo. */}
       {servicio.estado === "OCULTO" && (
@@ -121,7 +154,8 @@ export function FilaServicio({
               Publicar
             </Boton>
           )}
-          {servicio.estado === "PUBLICADO" && (
+          {/* Solo si el público de verdad lo ve: nunca un enlace que lleve a un 404. */}
+          {servicio.visiblePublicamente && (
             <Link to={`/servicios/${servicio.id}`} className={clasesAccion}>
               Ver publicación
             </Link>

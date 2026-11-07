@@ -1,4 +1,5 @@
 import { ErrorHttp } from "../../shared/errores.js";
+import { contarServiciosVisiblesDe, esServicioVisible } from "../servicios/servicios.visibilidad.js";
 import { existeComuna } from "../territorio/territorio.repository.js";
 import {
   buscarIdPerfil,
@@ -83,9 +84,11 @@ export async function definirComunasAtencion(usuarioId: string, comunaIds: numbe
 /**
  * Entrega el teléfono de un prestador y deja registrado el contacto.
  *
- * - Solo de prestadores con al menos un servicio PUBLICADO: sin esta regla,
- *   cualquiera con sesión podría recorrer ids y juntar los teléfonos de
- *   quienes nunca publicaron nada.
+ * - Solo de prestadores con al menos un servicio VISIBLE al público (la
+ *   misma regla que el buscador y la página del servicio, en
+ *   servicios.visibilidad.ts): sin ella, cualquiera con sesión podría
+ *   recorrer ids y juntar los teléfonos de quienes nunca publicaron, o de
+ *   quienes perdieron la verificación de identidad.
  * - El contacto se registra ANTES de devolver el teléfono: es la prueba de
  *   que hubo una relación, y de él colgará la valoración.
  * - Nadie se contacta a sí mismo: ensuciaría la reputación.
@@ -93,7 +96,7 @@ export async function definirComunasAtencion(usuarioId: string, comunaIds: numbe
 export async function obtenerContacto(usuarioId: string, prestadorId: string, servicioId: string | undefined) {
   const prestador = await buscarPrestadorParaContacto(prestadorId);
 
-  if (!prestador || prestador._count.servicios === 0) {
+  if (!prestador || (await contarServiciosVisiblesDe(prestadorId)) === 0) {
     throw new ErrorHttp(404, "PRESTADOR_NO_ENCONTRADO", "Ese prestador no existe o no tiene servicios publicados.");
   }
 
@@ -104,7 +107,7 @@ export async function obtenerContacto(usuarioId: string, prestadorId: string, se
   if (servicioId !== undefined) {
     const servicio = await buscarServicioParaContacto(servicioId);
 
-    if (!servicio || servicio.prestadorId !== prestadorId || servicio.estado !== "PUBLICADO") {
+    if (!servicio || servicio.prestadorId !== prestadorId || !(await esServicioVisible(servicioId))) {
       throw datoInvalido("servicio", "Ese servicio no está publicado por este prestador.");
     }
   }

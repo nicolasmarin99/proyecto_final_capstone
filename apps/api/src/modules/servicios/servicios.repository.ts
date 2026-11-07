@@ -1,6 +1,7 @@
 import { prisma } from "../../db.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
 import { seleccionImagen } from "../imagenes/imagenes.repository.js";
+import { condicionServicioVisible } from "./servicios.visibilidad.js";
 
 /** Lo que ve el dueño de su servicio. */
 const seleccionServicio = {
@@ -96,7 +97,9 @@ export async function listarServiciosDe(prestadorId: string) {
 }
 
 /**
- * Vista pública de un servicio PUBLICADO.
+ * Datos públicos de un servicio. NO decide si es visible: eso lo revisa
+ * antes el servicio con esServicioVisible (servicios.visibilidad.ts), la
+ * misma regla que el buscador.
  *
  * La selección enumera campo por campo lo que puede salir. Del prestador:
  * solo su nombre, sus comunas y sus credenciales verificadas. Nunca su
@@ -104,8 +107,8 @@ export async function listarServiciosDe(prestadorId: string) {
  * identificador del documento (para la cédula, es el RUT).
  */
 export async function buscarServicioPublico(id: string) {
-  return prisma.servicio.findFirst({
-    where: { id, estado: "PUBLICADO" },
+  return prisma.servicio.findUnique({
+    where: { id },
     select: {
       id: true,
       categoriaPersonalizada: true,
@@ -237,11 +240,9 @@ export async function buscarServiciosPublicados(p: ParametrosBusqueda): Promise<
     -- igual. El «:*» de cada término la vuelve búsqueda por prefijo.
     CROSS JOIN (SELECT to_tsquery('espanol_sin_tildes', ${p.consulta}::text) AS q) busqueda
 
-    WHERE s.estado = 'PUBLICADO'
-      -- Solo prestadores con identidad verificada y cuenta en uso.
-      AND u.rut_verificado
-      AND u.activo
-      AND u.anonimizado_en IS NULL
+    -- La regla de visibilidad pública, la misma que la página del servicio y
+    -- el contacto (servicios.visibilidad.ts). No se reescribe acá.
+    WHERE ${condicionServicioVisible}
 
       -- Texto: título y descripción por la columna generada (índice GIN);
       -- además la categoría y el oficio escrito con «Otros», que no están en
