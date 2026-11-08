@@ -442,3 +442,48 @@ describe("Cursos", () => {
     expect(screen.queryByText("Prestador con certificaciones")).not.toBeInTheDocument();
   });
 });
+
+describe("Mensajes del envío", () => {
+  /** Llena un curso válido y lo envía. */
+  async function enviarCurso() {
+    fireEvent.click(await screen.findByRole("radio", { name: /curso/i }));
+    fireEvent.change(screen.getByLabelText("Nombre del curso"), { target: { value: "Primeros auxilios básicos" } });
+    fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "Cruz Roja Chilena" } });
+    fireEvent.change(screen.getByLabelText("Fecha de término"), { target: { value: "2025-06-20" } });
+    fireEvent.change(screen.getByLabelText(/certificado del curso/i), { target: { files: [archivo()] } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
+  }
+
+  it("si la API rechaza un campo que no está en pantalla, lo muestra como error junto al botón", async () => {
+    // Lo que pasaba en producción: sin el tipo CURSO en el catálogo, la API
+    // responde un error en «tipo», y con «Curso» elegido ese selector no se ve.
+    simularApi({
+      respuestaSubida: json(
+        {
+          error: {
+            codigo: "DATOS_INVALIDOS",
+            mensaje: "Los datos enviados no son válidos.",
+            detalles: [{ campo: "tipo", mensaje: "Elige un tipo de certificación de la lista." }],
+          },
+        },
+        400,
+      ),
+    });
+    renderizar("/mi/certificaciones");
+
+    await enviarCurso();
+
+    const formulario = screen.getByRole("form", { name: "Nuevo envío" });
+    expect(await within(formulario).findByRole("alert")).toHaveTextContent("Elige un tipo de certificación de la lista.");
+  });
+
+  it("la confirmación del envío aparece junto al botón, donde quedó la vista", async () => {
+    simularApi();
+    renderizar("/mi/certificaciones");
+
+    await enviarCurso();
+
+    const formulario = screen.getByRole("form", { name: "Nuevo envío" });
+    expect(await within(formulario).findByRole("status")).toHaveTextContent(/curso enviado/i);
+  });
+});
