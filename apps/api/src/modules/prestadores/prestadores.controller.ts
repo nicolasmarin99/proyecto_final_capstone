@@ -6,7 +6,13 @@ import {
   esquemaIdPrestador,
   esquemaPerfilPrestador,
 } from "./prestadores.schema.js";
-import { definirComunasAtencion, guardarMiPerfil, obtenerContacto, obtenerMiPerfil } from "./prestadores.service.js";
+import {
+  definirComunasAtencion,
+  guardarMiPerfil,
+  obtenerContacto,
+  obtenerMiPerfil,
+  obtenerPerfilPublico,
+} from "./prestadores.service.js";
 
 /**
  * Sin try/catch: Express 5 entrega el rechazo al manejador central de app.ts,
@@ -52,4 +58,10 @@ export async function contacto(req: Request, res: Response) {
   // Lleva un teléfono: ni el navegador ni un proxy lo guardan.
   res.set("Cache-Control", "no-store");
   res.status(200).json(resultado);
+}
+
+export async function perfilPublico(req: Request, res: Response) {
+  const { id } = esquemaIdPrestador.parse(req.params);
+
+  res.status(200).json({ prestador: await obtenerPerfilPublico(id) });
 }

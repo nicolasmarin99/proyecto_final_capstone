@@ -83,7 +83,7 @@ function simularApi({ usuario = PRESTADOR, imagenes = [], publicas = [] }: Escen
     }
     if (url === "/api/servicios/s1") {
       return json({
-        servicio: { ...SERVICIO, imagenes: publicas, prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], credenciales: [] } },
+        servicio: { ...SERVICIO, imagenes: publicas, prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], conCertificaciones: false, certificaciones: [] } },
       });
     }
     if (url === "/api/admin/resumen") return json({ resumen: { totalUsuarios: 2, porRol: { CLIENTE: 0, PRESTADOR: 1, ADMINISTRADOR: 1 } } });

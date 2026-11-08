@@ -88,3 +88,42 @@ export async function buscarServicioParaContacto(servicioId: string) {
 export async function registrarContacto(datos: { clienteId: string; prestadorId: string; servicioId: string | null }) {
   await prisma.contacto.create({ data: { ...datos, canal: "WHATSAPP" } });
 }
+
+/**
+ * Datos públicos de un prestador. NO decide si se puede mostrar: eso lo
+ * revisa antes el servicio (que tenga servicios visibles). Campo por campo:
+ * nombre, descripción y comunas. Nunca teléfono, correo ni RUT.
+ */
+export async function buscarPrestadorPublico(prestadorId: string) {
+  return prisma.perfilPrestador.findUnique({
+    where: { id: prestadorId },
+    select: {
+      id: true,
+      descripcion: true,
+      usuario: { select: { nombre: true } },
+      comunasAtencion: { select: { comuna: { select: { id: true, nombre: true, region: { select: { nombre: true } } } } } },
+    },
+  });
+}
+
+/** Los servicios que se listan en el perfil público, con su primera imagen visible. */
+export async function buscarServiciosParaPerfil(servicioIds: string[]) {
+  return prisma.servicio.findMany({
+    where: { id: { in: servicioIds } },
+    select: {
+      id: true,
+      titulo: true,
+      categoriaPersonalizada: true,
+      precioDesde: true,
+      precioHasta: true,
+      unidadPrecio: true,
+      categoria: { select: { slug: true, nombre: true } },
+      imagenes: {
+        where: { estado: "VISIBLE" },
+        orderBy: [{ orden: "asc" }, { creadoEn: "asc" }],
+        take: 1,
+        select: { identificador: true },
+      },
+    },
+  });
+}

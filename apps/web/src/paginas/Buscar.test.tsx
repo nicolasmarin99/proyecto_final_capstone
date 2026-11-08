@@ -31,7 +31,7 @@ const RESULTADO = {
       { id: 13123, nombre: "Providencia" },
     ],
     comunasRestantes: 2,
-    acreditado: true,
+    conCertificaciones: true,
   },
 };
 
@@ -44,7 +44,7 @@ const SERVICIO_PUBLICO = {
   unidadPrecio: null,
   categoria: { slug: "gasfiteria", nombre: "Gasfitería" },
   categoriaPersonalizada: null,
-  prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], credenciales: [] },
+  prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], conCertificaciones: false, certificaciones: [] },
 };
 
 function json(cuerpo: unknown, status = 200): Response {
@@ -187,7 +187,7 @@ describe("Resultados", () => {
     const tarjeta = await screen.findByRole("link", { name: "Gasfitería a domicilio" });
     expect(tarjeta).toHaveAttribute("href", "/servicios/s1");
     expect(tarjeta).toHaveAccessibleDescription(/a convenir/i);
-    expect(within(tarjeta).getByText("Certificación oficial")).toBeInTheDocument();
+    expect(within(tarjeta).getByText("Prestador con certificaciones")).toBeInTheDocument();
     expect(within(tarjeta).getByText("Atiende en Las Condes, Ñuñoa, Providencia y 2 más")).toBeInTheDocument();
 
     fireEvent.click(tarjeta);

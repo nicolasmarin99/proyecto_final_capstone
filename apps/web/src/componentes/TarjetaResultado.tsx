@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { ResultadoBusqueda } from "../api/cliente";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
+import { SelloCertificaciones } from "./Certificaciones";
 import { Icono } from "./iconos";
 
 /** «Las Condes, Ñuñoa, Providencia y 2 más». */
@@ -42,12 +43,7 @@ export function TarjetaResultado({ resultado }: { resultado: ResultadoBusqueda }
       <div className="flex flex-1 flex-col p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-hielo px-2.5 py-1 text-xs font-bold text-primario">{nombreCategoria(resultado)}</span>
-          {prestador.acreditado && (
-            <span className="flex items-center gap-1 rounded-full bg-exito-50 px-2.5 py-1 text-xs font-semibold text-exito-700">
-              <Icono nombre="escudo" tamano={14} grosor={2} />
-              Certificación oficial
-            </span>
-          )}
+          {prestador.conCertificaciones && <SelloCertificaciones />}
         </div>
 
         <h3 id={`titulo-${resultado.id}`} className="mt-3 font-titulos text-lg leading-snug font-bold text-noche group-hover:text-primario">{resultado.titulo}</h3>

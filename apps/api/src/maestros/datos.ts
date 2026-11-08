@@ -475,6 +475,17 @@ export const TIPOS_CREDENCIAL: {
     metodoVerificacion: "MANUAL",
     requiereVigencia: false,
   },
+  {
+    // Comodín para certificaciones que no están en la lista (un curso de
+    // trabajo en altura, una certificación de un fabricante): el prestador
+    // escribe el nombre y el emisor (credenciales.nombre_personalizado y
+    // emisor_personalizado) y un administrador la revisa a mano.
+    codigo: "OTRA",
+    nombre: "Otra certificación",
+    fuenteOficial: "Indicado por el prestador",
+    metodoVerificacion: "MANUAL",
+    requiereVigencia: false,
+  },
 ];
 
 /**

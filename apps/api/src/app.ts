@@ -9,6 +9,11 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
+import {
+  rutasCatalogoCertificaciones,
+  rutasCertificacionesAdmin,
+  rutasCertificacionesPrestador,
+} from "./modules/certificaciones/certificaciones.routes.js";
 import { rutasIdentidadAdmin, rutasIdentidadPrestador } from "./modules/identidad/identidad.routes.js";
 import { rutasImagenesAdmin } from "./modules/imagenes/imagenes.routes.js";
 import { rutasImagenesLocales } from "./modules/imagenes/imagenes.locales.js";
@@ -40,6 +45,9 @@ app.use("/admin/identidades", rutasIdentidadAdmin);
 app.use("/admin/imagenes", rutasImagenesAdmin);
 app.use("/admin/reportes", rutasReportesAdmin);
 app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
+app.use("/prestadores/yo/certificaciones", rutasCertificacionesPrestador);
+app.use("/admin/certificaciones", rutasCertificacionesAdmin);
+app.use("/certificaciones", rutasCatalogoCertificaciones);
 app.use("/admin", rutasAdmin);
 app.use("/servicios", rutasServicios);
 app.use("/prestadores", rutasPrestadores);

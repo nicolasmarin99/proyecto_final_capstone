@@ -389,7 +389,7 @@ describe("GET /servicios/:id (público)", () => {
     return { prestador, id: String(body.servicio.id) };
   }
 
-  it("se ve sin sesión, con el prestador, sus comunas y sus credenciales verificadas", async () => {
+  it("se ve sin sesión, con el prestador, sus comunas y sus certificaciones públicas (sin la cédula)", async () => {
     const { prestador, id } = await servicioConCredenciales();
 
     const respuesta = await request(app).get(`/servicios/${id}`);
@@ -403,18 +403,17 @@ describe("GET /servicios/:id (público)", () => {
       "Las Condes",
       "Santiago",
     ]);
-    expect(respuesta.body.servicio.prestador.credenciales).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ tipo: "Cédula de identidad", acreditacion: "REVISADA_POR_LOCALCL" }),
-        expect.objectContaining({
-          tipo: "Instalador de gas autorizado (SEC)",
-          emisor: "Superintendencia de Electricidad y Combustibles",
-          acreditacion: "REGISTRO_OFICIAL",
-          verificadaEn: "2026-10-01T12:00:00.000Z",
-        }),
-      ]),
-    );
-    expect(respuesta.body.servicio.prestador.credenciales).toHaveLength(2);
+    // La cédula es requisito para publicar, no una certificación: no sale.
+    expect(respuesta.body.servicio.prestador.conCertificaciones).toBe(true);
+    expect(respuesta.body.servicio.prestador.certificaciones).toEqual([
+      {
+        nombre: "Instalador de gas autorizado (SEC)",
+        emisor: "Superintendencia de Electricidad y Combustibles",
+        acreditacion: "REGISTRO_OFICIAL",
+        verificadaEn: "2026-10-01T12:00:00.000Z",
+        vigenteHasta: null,
+      },
+    ]);
   });
 
   it("la vista pública no incluye teléfono, correo ni RUT", async () => {

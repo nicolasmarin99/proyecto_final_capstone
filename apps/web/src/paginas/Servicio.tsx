@@ -3,14 +3,12 @@ import { Link, useParams } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
-import { Icono } from "../componentes/iconos";
+import { ListaCertificaciones, SelloCertificaciones } from "../componentes/Certificaciones";
 import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { ReportarServicio } from "../componentes/ReportarServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
-
-const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "long" });
 
 /** Mensaje inicial de WhatsApp: dice desde dónde y por qué servicio escribe. */
 function mensajeInicial(servicio: ServicioPublico): string {
@@ -126,8 +124,26 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                   {servicio.titulo}
                 </h1>
                 <p className="mt-2 text-texto-suave">
-                  Ofrecido por <span className="font-semibold text-noche">{servicio.prestador.nombre}</span>
+                  Ofrecido por{" "}
+                  <Link
+                    to={`/prestadores/${servicio.prestador.id}`}
+                    className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
+                  >
+                    {servicio.prestador.nombre}
+                  </Link>
                 </p>
+                {servicio.prestador.conCertificaciones && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <SelloCertificaciones />
+                    {/* Un ancla común: baja a la sección de esta misma página. */}
+                    <a
+                      href="#certificaciones"
+                      className="text-sm font-semibold text-primario underline decoration-cielo decoration-2 underline-offset-2 hover:text-noche"
+                    >
+                      Ver certificaciones
+                    </a>
+                  </div>
+                )}
                 <p className="mt-4 inline-block rounded-chico bg-hielo px-4 py-2 font-titulos text-lg font-bold text-noche">
                   {textoPrecio(servicio)}
                 </p>
@@ -148,40 +164,21 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                   </ul>
                 </section>
 
-                <section className="mt-8">
-                  <h2 className="font-titulos text-lg font-bold">Credenciales verificadas</h2>
-                  {servicio.prestador.credenciales.length === 0 ? (
-                    <p className="mt-2 text-sm text-texto-suave">Este prestador todavía no tiene credenciales verificadas.</p>
+                <section id="certificaciones" aria-labelledby="titulo-certificaciones" className="mt-8 scroll-mt-6">
+                  <h2 id="titulo-certificaciones" className="font-titulos text-lg font-bold">
+                    Certificaciones
+                  </h2>
+                  {servicio.prestador.certificaciones.length === 0 ? (
+                    <p className="mt-2 text-sm text-texto-suave">Este prestador todavía no tiene certificaciones aprobadas.</p>
                   ) : (
-                    <ul aria-label="Credenciales verificadas" className="mt-3 space-y-3">
-                      {servicio.prestador.credenciales.map((credencial) => {
-                        const oficial = credencial.acreditacion === "REGISTRO_OFICIAL";
-                        return (
-                          <li key={`${credencial.tipo}-${credencial.verificadaEn ?? ""}`} className="flex gap-3 rounded-medio border border-borde p-4">
-                            <span
-                              aria-hidden="true"
-                              className={`flex size-9 shrink-0 items-center justify-center rounded-chico ${
-                                oficial ? "bg-primario text-blanco" : "bg-hielo text-primario"
-                              }`}
-                            >
-                              <Icono nombre="escudo" tamano={20} grosor={2} />
-                            </span>
-                            <span className="min-w-0 text-sm">
-                              <span className="block font-semibold text-noche">{credencial.tipo}</span>
-                              <span className="block text-texto-suave">{credencial.emisor}</span>
-                              {/* La distinción va en texto, no solo en el color del ícono. */}
-                              <span className={`mt-1 block font-medium ${oficial ? "text-primario" : "text-texto-suave"}`}>
-                                {oficial
-                                  ? "Acreditada con el registro oficial del organismo"
-                                  : "Documento revisado por LocalCL (no consultado en un registro oficial)"}
-                                {credencial.verificadaEn ? ` · ${fecha.format(new Date(credencial.verificadaEn))}` : ""}
-                              </span>
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <ListaCertificaciones certificaciones={servicio.prestador.certificaciones} />
                   )}
+                  <Link
+                    to={`/prestadores/${servicio.prestador.id}`}
+                    className="mt-4 inline-block text-sm font-semibold text-primario underline decoration-cielo decoration-2 underline-offset-2 hover:text-noche"
+                  >
+                    Ver el perfil de {servicio.prestador.nombre}
+                  </Link>
                 </section>
 
                 <section className="mt-8 border-t border-borde pt-6">

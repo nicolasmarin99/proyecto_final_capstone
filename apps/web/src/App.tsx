@@ -9,6 +9,7 @@ import PaginaEstado from "./paginas/Estado";
 import PaginaIniciarSesion from "./paginas/IniciarSesion";
 import PaginaInicio from "./paginas/Inicio";
 import PaginaPerfil from "./paginas/Perfil";
+import PaginaPrestador from "./paginas/Prestador";
 import PaginaRecuperarCuenta from "./paginas/RecuperarCuenta";
 import PaginaRegistro from "./paginas/Registro";
 import PaginaRegistroPrestador from "./paginas/RegistroPrestador";
@@ -17,6 +18,7 @@ import PaginaRevisaTuCorreo from "./paginas/RevisaTuCorreo";
 import PaginaServicio from "./paginas/Servicio";
 import PaginaVerificarCorreo from "./paginas/VerificarCorreo";
 import PaginaEditorServicio from "./paginas/mi/EditorServicio";
+import PaginaMisCertificaciones from "./paginas/mi/MisCertificaciones";
 import PaginaMiIdentidad from "./paginas/mi/MiIdentidad";
 import PaginaMiPerfil from "./paginas/mi/MiPerfil";
 import PaginaMisServicios from "./paginas/mi/MisServicios";
@@ -30,6 +32,7 @@ export default function App() {
         <Route path="/buscar" element={<PaginaBuscar />} />
         {/* Pública: la ve cualquiera. Solo el contacto exige sesión. */}
         <Route path="/servicios/:id" element={<PaginaServicio />} />
+        <Route path="/prestadores/:id" element={<PaginaPrestador />} />
         <Route path="/estado" element={<PaginaEstado />} />
         <Route path="/registro" element={<PaginaRegistro />} />
         <Route path="/registro-prestador" element={<PaginaRegistroPrestador />} />
@@ -70,6 +73,7 @@ export default function App() {
           <Route index element={<Navigate to="/mi/perfil" replace />} />
           <Route path="perfil" element={<PaginaMiPerfil />} />
           <Route path="identidad" element={<PaginaMiIdentidad />} />
+          <Route path="certificaciones" element={<PaginaMisCertificaciones />} />
           <Route path="servicios" element={<PaginaMisServicios />} />
           <Route path="servicios/nuevo" element={<PaginaEditorServicio />} />
           <Route path="servicios/:id/editar" element={<PaginaEditorServicio />} />

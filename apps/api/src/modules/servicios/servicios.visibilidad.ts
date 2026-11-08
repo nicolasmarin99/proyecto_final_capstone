@@ -62,3 +62,12 @@ export async function contarServiciosVisiblesDe(prestadorId: string): Promise<nu
     SELECT count(*)::int AS total FROM servicios s WHERE s.prestador_id = ${prestadorId} AND ${condicionServicioVisible}`;
   return fila?.total ?? 0;
 }
+
+/** Ids de los servicios visibles de un prestador, los más recientes primero (para su perfil público). */
+export async function serviciosVisiblesDe(prestadorId: string): Promise<string[]> {
+  const filas = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT s.id FROM servicios s
+     WHERE s.prestador_id = ${prestadorId} AND ${condicionServicioVisible}
+     ORDER BY s.creado_en DESC, s.id DESC`;
+  return filas.map((fila) => fila.id);
+}

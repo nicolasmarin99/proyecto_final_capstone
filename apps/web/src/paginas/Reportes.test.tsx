@@ -20,7 +20,7 @@ const SERVICIO = {
   categoria: { slug: "gasfiteria", nombre: "Gasfitería" },
   categoriaPersonalizada: null,
   imagenes: [],
-  prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], credenciales: [] },
+  prestador: { id: "perfil-1", nombre: "Pedro Soto", comunas: [], conCertificaciones: false, certificaciones: [] },
 };
 
 const HACE_TRES_DIAS = 3 * 24 * 60;
