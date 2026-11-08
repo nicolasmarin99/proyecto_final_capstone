@@ -442,6 +442,11 @@ model Credencial {
   estado                 EstadoCredencial    @default(PENDIENTE)
   /// Número de registro, folio o certificado tal como lo emite la fuente.
   identificadorDocumento String              @map("identificador_documento")
+  /// Solo con el tipo «Otra certificación» (OTRA): el nombre y el emisor que
+  /// escribe el prestador, porque no están en el catálogo. Nulos en el resto
+  /// (lo impone la API; un CHECK exige que vayan los dos o ninguno).
+  nombrePersonalizado    String?             @map("nombre_personalizado")
+  emisorPersonalizado    String?             @map("emisor_personalizado")
   vigenteHasta           DateTime?           @map("vigente_hasta") @db.Date
   /// Método con que efectivamente se verificó (nulo mientras está pendiente).
   metodo                 MetodoVerificacion?

@@ -15,6 +15,7 @@ import {
   listarServiciosDe,
 } from "./servicios.repository.js";
 import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
+import { certificacionesPublicasDe } from "../certificaciones/certificaciones.publicas.js";
 import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
 import { esServicioVisible, serviciosVisiblesEntre } from "./servicios.visibilidad.js";
 
@@ -247,6 +248,7 @@ export async function publico(id: string) {
 
   const servicio = await buscarServicioPublico(id);
   if (!servicio) throw servicioNoVisible();
+  const certificaciones = await certificacionesPublicasDe(servicio.prestador.id);
 
   return {
     id: servicio.id,
@@ -267,14 +269,11 @@ export async function publico(id: string) {
       comunas: servicio.prestador.comunasAtencion
         .map(({ comuna }) => ({ id: comuna.id, nombre: comuna.nombre, region: comuna.region.nombre }))
         .sort((a, b) => ordenEspanol.compare(a.nombre, b.nombre)),
-      credenciales: servicio.prestador.credenciales.map((credencial) => ({
-        tipo: credencial.tipo.nombre,
-        emisor: credencial.tipo.fuenteOficial,
-        verificadaEn: credencial.fechaConsulta,
-        // La distinción que importa para confiar: contrastada contra el
-        // registro del organismo, o revisada a mano por el equipo.
-        acreditacion: credencial.metodo === "AUTOMATICO" ? "REGISTRO_OFICIAL" : "REVISADA_POR_LOCALCL",
-      })),
+      // Las certificaciones aprobadas y vigentes, sin la cédula: la misma
+      // regla que el sello del buscador y el perfil público. Solo nombre,
+      // emisor, fecha de verificación y vigencia; nunca el documento ni su número.
+      conCertificaciones: certificaciones.length > 0,
+      certificaciones,
     },
   };
 }
@@ -311,7 +310,7 @@ export function consultaPorPrefijos(texto: string | undefined): string | null {
  * Búsqueda pública: solo servicios PUBLICADOS de prestadores con la
  * identidad verificada. Como en publico(), la respuesta se arma campo por
  * campo: del prestador salen su nombre, hasta tres comunas y si tiene
- * credenciales acreditadas. Nunca teléfono, correo ni RUT.
+ * certificaciones públicas. Nunca teléfono, correo ni RUT.
  */
 export async function buscar(filtros: FiltrosBusqueda) {
   const filas = await buscarServiciosPublicados({
@@ -344,7 +343,7 @@ export async function buscar(filtros: FiltrosBusqueda) {
           nombre: fila.prestadorNombre,
           comunas,
           comunasRestantes: Math.max(0, fila.totalComunas - comunas.length),
-          acreditado: fila.acreditado,
+          conCertificaciones: fila.conCertificaciones,
         },
       };
     }),

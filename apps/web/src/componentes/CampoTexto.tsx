@@ -5,7 +5,7 @@ import { clasesControl, MensajeCampo, mensajeVisible } from "./MensajeCampo";
 interface Props {
   id: string;
   etiqueta: string;
-  tipo?: "text" | "email" | "password" | "tel" | "number";
+  tipo?: "text" | "email" | "password" | "tel" | "number" | "date";
   autoComplete: string;
   valor: string;
   alCambiar(valor: string): void;

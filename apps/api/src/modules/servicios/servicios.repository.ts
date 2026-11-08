@@ -1,6 +1,7 @@
 import { prisma } from "../../db.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
 import { seleccionImagen } from "../imagenes/imagenes.repository.js";
+import { prestadorConCertificaciones } from "../certificaciones/certificaciones.publicas.js";
 import { condicionServicioVisible } from "./servicios.visibilidad.js";
 
 /** Lo que ve el dueño de su servicio. */
@@ -102,9 +103,8 @@ export async function listarServiciosDe(prestadorId: string) {
  * misma regla que el buscador.
  *
  * La selección enumera campo por campo lo que puede salir. Del prestador:
- * solo su nombre, sus comunas y sus credenciales verificadas. Nunca su
- * teléfono, su correo ni su RUT, y de las credenciales nunca el
- * identificador del documento (para la cédula, es el RUT).
+ * solo su nombre y sus comunas. Nunca su teléfono, su correo ni su RUT.
+ * Sus certificaciones salen aparte, con la regla de certificaciones.publicas.ts.
  */
 export async function buscarServicioPublico(id: string) {
   return prisma.servicio.findUnique({
@@ -132,15 +132,6 @@ export async function buscarServicioPublico(id: string) {
           comunasAtencion: {
             select: { comuna: { select: { id: true, nombre: true, region: { select: { nombre: true } } } } },
           },
-          credenciales: {
-            where: { estado: "VERIFICADA" },
-            orderBy: { fechaConsulta: "desc" },
-            select: {
-              metodo: true,
-              fechaConsulta: true,
-              tipo: { select: { nombre: true, fuenteOficial: true } },
-            },
-          },
         },
       },
     },
@@ -160,7 +151,8 @@ export interface FilaBusqueda {
   prestadorNombre: string;
   comunas: { id: number; nombre: string }[] | null;
   totalComunas: number;
-  acreditado: boolean;
+  /** Tiene al menos una certificación pública (certificaciones.publicas.ts). */
+  conCertificaciones: boolean;
   /** La primera imagen visible, para la miniatura; null si no tiene. */
   imagenIdentificador: string | null;
   total: number;
@@ -211,13 +203,9 @@ export async function buscarServiciosPublicados(p: ParametrosBusqueda): Promise<
       )                          AS comunas,
       (SELECT count(*)::int FROM prestadores_comunas pc WHERE pc.prestador_id = p.id) AS "totalComunas",
 
-      -- Al menos una credencial vigente contrastada con el registro oficial
-      -- (método AUTOMATICO). La revisada a mano no cuenta para este sello.
-      EXISTS (SELECT 1
-                FROM credenciales cr
-               WHERE cr.prestador_id = p.id
-                 AND cr.estado = 'VERIFICADA'
-                 AND cr.metodo = 'AUTOMATICO') AS acreditado,
+      -- Sello «Prestador con certificaciones»: la misma regla que su perfil
+      -- público y la página del servicio (certificaciones.publicas.ts).
+      ${prestadorConCertificaciones} AS "conCertificaciones",
 
       -- La miniatura: la primera imagen VISIBLE de la galería, si hay.
       -- Una oculta por moderación nunca llega a la búsqueda.

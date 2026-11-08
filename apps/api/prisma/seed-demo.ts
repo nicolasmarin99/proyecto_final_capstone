@@ -67,6 +67,12 @@ interface PrestadorDemo {
   identidad: boolean;
   /** Código de un tipo de credencial verificado contra el registro oficial. */
   credencialOficial?: string;
+  /**
+   * «Otra certificación» aprobada a mano por el administrador de prueba. Las
+   * pendientes no se siembran: su documento vive en el almacenamiento de la
+   * API, y en desarrollo ese almacenamiento está en memoria.
+   */
+  certificacionRevisada?: { nombre: string; emisor: string; identificador: string };
   comunaBase: string;
   comunas: string[];
   descripcion: string;
@@ -196,6 +202,7 @@ const PRESTADORES: PrestadorDemo[] = [
     rut: 18456123,
     telefono: "+56944445555",
     identidad: true,
+    certificacionRevisada: { nombre: "Técnico en climatización y refrigeración", emisor: "INACAP", identificador: "INACAP-CLIM-2021-118" },
     comunaBase: "Vitacura",
     comunas: ["Vitacura", "Lo Barnechea", "Las Condes", "Providencia"],
     descripcion: "Banquetería para eventos familiares y empresas, y pintura de interiores.",
@@ -399,6 +406,33 @@ async function sembrarReportes(idsPorTitulo: Map<string, string>, hashContrasena
   return creados;
 }
 
+/** Aprobada por admin@localcl.cl (el CHECK exige saber quién la revisó). Sin ese usuario, se omite. */
+async function sembrarCertificacionRevisada(prestadorId: string, datos: { nombre: string; emisor: string; identificador: string }) {
+  const administrador = await prisma.usuario.findUnique({ where: { correo: "admin@localcl.cl" }, select: { id: true } });
+  if (!administrador) {
+    console.log("Sin admin@localcl.cl: se omite la certificación revisada a mano de la demostración.");
+    return;
+  }
+  const tipo = await prisma.tipoCredencial.findUniqueOrThrow({ where: { codigo: "OTRA" } });
+  const existente = await prisma.credencial.findFirst({ where: { prestadorId, tipoId: tipo.id, nombrePersonalizado: datos.nombre } });
+  if (existente) return;
+
+  await prisma.credencial.create({
+    data: {
+      prestadorId,
+      tipoId: tipo.id,
+      estado: "VERIFICADA",
+      metodo: "MANUAL",
+      fechaConsulta: new Date(),
+      verificadoPorId: administrador.id,
+      fuente: "Revisión manual del documento por un administrador",
+      identificadorDocumento: datos.identificador,
+      nombrePersonalizado: datos.nombre,
+      emisorPersonalizado: datos.emisor,
+    },
+  });
+}
+
 async function main() {
   const hashContrasena = await hash(CONTRASENA);
   let servicios = 0;
@@ -447,6 +481,10 @@ async function main() {
           },
         });
       }
+    }
+
+    if (demo.certificacionRevisada) {
+      await sembrarCertificacionRevisada(perfil.id, demo.certificacionRevisada);
     }
 
     // Los servicios de demostración se rehacen desde cero en cada corrida.

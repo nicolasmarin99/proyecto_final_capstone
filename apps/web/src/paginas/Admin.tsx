@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { clasesBoton } from "../componentes/Boton";
+import { ColaCertificaciones } from "../componentes/ColaCertificaciones";
 import { ColaIdentidades } from "../componentes/ColaIdentidades";
 import { ColaReportes } from "../componentes/ColaReportes";
 import { ModeracionImagenes } from "../componentes/ModeracionImagenes";
@@ -75,6 +76,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
             */}
             <ColaReportes cliente={cliente} />
             <ColaIdentidades cliente={cliente} />
+            <ColaCertificaciones cliente={cliente} />
             <ModeracionImagenes cliente={cliente} />
           </>
         )}

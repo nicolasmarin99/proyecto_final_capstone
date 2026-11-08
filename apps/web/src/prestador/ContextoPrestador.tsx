@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { EstadoIdentidad, PerfilPrestador, RequisitoPendiente } from "../api/cliente";
+import type { Certificacion, EstadoIdentidad, PerfilPrestador, RequisitoPendiente } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 
 export interface EstadoPrestador {
@@ -11,6 +11,8 @@ export interface EstadoPrestador {
   identidad: EstadoIdentidad | null | undefined;
   totalServicios: number;
   publicados: number;
+  /** Las certificaciones propias; undefined si no se pudieron consultar. */
+  certificaciones: Certificacion[] | undefined;
   /** Lo que la API dice que falta para publicar (identidad, comunas). */
   requisitos: RequisitoPendiente[];
   /** Vuelve a consultar todo. Se llama después de cambiar perfil, identidad o servicios. */
@@ -19,7 +21,7 @@ export interface EstadoPrestador {
 
 const Contexto = createContext<EstadoPrestador | null>(null);
 
-const VACIO = { perfil: null, identidad: null, totalServicios: 0, publicados: 0, requisitos: [] };
+const VACIO = { perfil: null, identidad: null, totalServicios: 0, publicados: 0, certificaciones: [], requisitos: [] };
 
 /**
  * Estado del prestador que comparten el encabezado, el lateral del área y
@@ -45,15 +47,19 @@ export function ProveedorEstadoPrestador({ children }: { children: ReactNode }) 
     const perfilLeido = perfil.status === "fulfilled" ? perfil.value : null;
 
     // Sin perfil, /servicios/mios responde 409: no tiene sentido preguntar.
-    const servicios = perfilLeido
-      ? await cliente.listarMisServicios().catch(() => null)
-      : null;
+    const [servicios, certificaciones] = perfilLeido
+      ? await Promise.all([
+          cliente.listarMisServicios().catch(() => null),
+          cliente.listarMisCertificaciones().catch(() => undefined),
+        ])
+      : [null, []];
 
     setDatos({
       perfil: perfilLeido,
       identidad: identidad.status === "fulfilled" ? identidad.value.identidad : undefined,
       totalServicios: servicios?.servicios.length ?? 0,
       publicados: servicios?.servicios.filter((servicio) => servicio.estado === "PUBLICADO").length ?? 0,
+      certificaciones,
       requisitos: servicios?.requisitosPendientes ?? [],
     });
     setCargando(false);

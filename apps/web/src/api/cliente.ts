@@ -140,10 +140,12 @@ export interface DatosServicio extends Precio {
   estado: "PUBLICADO" | "PAUSADO";
 }
 
-export interface CredencialPublica {
-  tipo: string;
+/** Lo que el público ve de una certificación aprobada y vigente. Nunca el documento ni su número. */
+export interface CertificacionPublica {
+  nombre: string;
   emisor: string;
   verificadaEn: string | null;
+  vigenteHasta: string | null;
   /** Contrastada contra el registro del organismo, o revisada a mano por LocalCL. */
   acreditacion: "REGISTRO_OFICIAL" | "REVISADA_POR_LOCALCL";
 }
@@ -158,7 +160,9 @@ export interface ServicioPublico extends Precio {
     id: string;
     nombre: string;
     comunas: { id: number; nombre: string; region: string }[];
-    credenciales: CredencialPublica[];
+    /** Tiene al menos una certificación aprobada y vigente: el sello «Prestador con certificaciones». */
+    conCertificaciones: boolean;
+    certificaciones: CertificacionPublica[];
   };
   /** Solo las visibles, en el orden que eligió el prestador. La primera es la portada. */
   imagenes: ImagenPublica[];
@@ -187,9 +191,29 @@ export interface ResultadoBusqueda extends Precio {
     /** Hasta tres; si se filtró por comuna, esa va primero. */
     comunas: { id: number; nombre: string }[];
     comunasRestantes: number;
-    /** Tiene al menos una credencial contrastada con un registro oficial. */
-    acreditado: boolean;
+    /** Tiene al menos una certificación aprobada y vigente. */
+    conCertificaciones: boolean;
   };
+}
+
+/** Un servicio en el perfil público del prestador. */
+export interface ServicioDelPrestador extends Precio {
+  id: string;
+  titulo: string;
+  categoria: Categoria;
+  categoriaPersonalizada: string | null;
+  imagen: string | null;
+}
+
+/** /prestadores/:id: nunca teléfono, correo ni RUT. */
+export interface PrestadorPublico {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  comunas: { id: number; nombre: string; region: string }[];
+  conCertificaciones: boolean;
+  certificaciones: CertificacionPublica[];
+  servicios: ServicioDelPrestador[];
 }
 
 export interface PaginaBusqueda {
@@ -266,6 +290,48 @@ export interface IdentidadEnCola extends EstadoIdentidad {
 
 export interface ColaIdentidades {
   identidades: IdentidadEnCola[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+}
+
+/** Un tipo del catálogo del formulario de certificaciones. */
+export interface TipoCertificacion {
+  codigo: string;
+  nombre: string;
+  emisor: string;
+  requiereVigencia: boolean;
+}
+
+/** Una certificación, como la ven su dueño y el administrador. */
+export interface Certificacion {
+  id: string;
+  tipo: string;
+  nombre: string;
+  emisor: string;
+  identificador: string;
+  vigenteHasta: string | null;
+  estado: EstadoVerificacion;
+  motivoRechazo: string | null;
+  enviadaEn: string;
+  revisadaEn: string | null;
+}
+
+export interface DatosCertificacion {
+  tipo: string;
+  identificador: string;
+  /** AAAA-MM-DD, o vacío. */
+  vigenteHasta: string;
+  nombre: string;
+  emisor: string;
+}
+
+export interface CertificacionEnCola extends Certificacion {
+  prestador: { id: string; nombre: string; rut: string | null };
+}
+
+export interface ColaCertificaciones {
+  certificaciones: CertificacionEnCola[];
   pagina: number;
   porPagina: number;
   total: number;
@@ -603,10 +669,10 @@ function leerResultadoServicio(valor: unknown): ResultadoServicio | null {
   return servicio ? { servicio, requisitosPendientes: leerLista(valor.requisitosPendientes, leerRequisito) } : null;
 }
 
-function leerCredencialPublica(valor: unknown): CredencialPublica | null {
+function leerCertificacionPublica(valor: unknown): CertificacionPublica | null {
   if (
     !esObjeto(valor) ||
-    typeof valor.tipo !== "string" ||
+    typeof valor.nombre !== "string" ||
     typeof valor.emisor !== "string" ||
     (valor.acreditacion !== "REGISTRO_OFICIAL" && valor.acreditacion !== "REVISADA_POR_LOCALCL")
   ) {
@@ -614,9 +680,10 @@ function leerCredencialPublica(valor: unknown): CredencialPublica | null {
   }
 
   return {
-    tipo: valor.tipo,
+    nombre: valor.nombre,
     emisor: valor.emisor,
     verificadaEn: typeof valor.verificadaEn === "string" ? valor.verificadaEn : null,
+    vigenteHasta: typeof valor.vigenteHasta === "string" ? valor.vigenteHasta : null,
     acreditacion: valor.acreditacion,
   };
 }
@@ -634,7 +701,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
   if (!esObjeto(valor) || !esObjeto(valor.prestador)) return null;
   const categoria = leerCategoria(valor.categoria);
   const { id, titulo, descripcion } = valor;
-  const { id: idPrestador, nombre, comunas, credenciales } = valor.prestador;
+  const { id: idPrestador, nombre, comunas, conCertificaciones, certificaciones } = valor.prestador;
 
   if (
     typeof id !== "string" ||
@@ -659,7 +726,8 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
       id: idPrestador,
       nombre,
       comunas: leerLista(comunas, leerComunaPublica),
-      credenciales: leerLista(credenciales, leerCredencialPublica),
+      conCertificaciones: conCertificaciones === true,
+      certificaciones: leerLista(certificaciones, leerCertificacionPublica),
     },
   };
 }
@@ -673,7 +741,7 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
   if (!esObjeto(valor) || !esObjeto(valor.prestador)) return null;
   const categoria = leerCategoria(valor.categoria);
   const { id, titulo } = valor;
-  const { nombre, comunas, comunasRestantes, acreditado } = valor.prestador;
+  const { nombre, comunas, comunasRestantes, conCertificaciones } = valor.prestador;
 
   if (typeof id !== "string" || typeof titulo !== "string" || typeof nombre !== "string" || !categoria) {
     return null;
@@ -690,9 +758,85 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
       nombre,
       comunas: leerLista(comunas, leerComunaResumida),
       comunasRestantes: typeof comunasRestantes === "number" ? comunasRestantes : 0,
-      acreditado: acreditado === true,
+      conCertificaciones: conCertificaciones === true,
     },
   };
+}
+
+function leerServicioDelPrestador(valor: unknown): ServicioDelPrestador | null {
+  if (!esObjeto(valor)) return null;
+  const categoria = leerCategoria(valor.categoria);
+  if (typeof valor.id !== "string" || typeof valor.titulo !== "string" || !categoria) return null;
+
+  return {
+    id: valor.id,
+    titulo: valor.titulo,
+    categoria,
+    categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
+    ...leerPrecio(valor),
+    imagen: typeof valor.imagen === "string" ? valor.imagen : null,
+  };
+}
+
+function leerPrestadorPublico(valor: unknown): PrestadorPublico | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.nombre !== "string") return null;
+
+  return {
+    id: valor.id,
+    nombre: valor.nombre,
+    descripcion: typeof valor.descripcion === "string" ? valor.descripcion : null,
+    comunas: leerLista(valor.comunas, leerComunaPublica),
+    conCertificaciones: valor.conCertificaciones === true,
+    certificaciones: leerLista(valor.certificaciones, leerCertificacionPublica),
+    servicios: leerLista(valor.servicios, leerServicioDelPrestador),
+  };
+}
+
+function leerTipoCertificacion(valor: unknown): TipoCertificacion | null {
+  return esObjeto(valor) &&
+    typeof valor.codigo === "string" &&
+    typeof valor.nombre === "string" &&
+    typeof valor.emisor === "string" &&
+    typeof valor.requiereVigencia === "boolean"
+    ? { codigo: valor.codigo, nombre: valor.nombre, emisor: valor.emisor, requiereVigencia: valor.requiereVigencia }
+    : null;
+}
+
+function leerCertificacion(valor: unknown): Certificacion | null {
+  if (
+    !esObjeto(valor) ||
+    !esEstadoVerificacion(valor.estado) ||
+    typeof valor.id !== "string" ||
+    typeof valor.tipo !== "string" ||
+    typeof valor.nombre !== "string" ||
+    typeof valor.emisor !== "string" ||
+    typeof valor.identificador !== "string" ||
+    typeof valor.enviadaEn !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: valor.id,
+    tipo: valor.tipo,
+    nombre: valor.nombre,
+    emisor: valor.emisor,
+    identificador: valor.identificador,
+    vigenteHasta: typeof valor.vigenteHasta === "string" ? valor.vigenteHasta : null,
+    estado: valor.estado,
+    motivoRechazo: typeof valor.motivoRechazo === "string" ? valor.motivoRechazo : null,
+    enviadaEn: valor.enviadaEn,
+    revisadaEn: typeof valor.revisadaEn === "string" ? valor.revisadaEn : null,
+  };
+}
+
+function leerCertificacionEnCola(valor: unknown): CertificacionEnCola | null {
+  const certificacion = leerCertificacion(valor);
+  if (!certificacion || !esObjeto(valor) || !esObjeto(valor.prestador)) return null;
+  const { id, nombre, rut } = valor.prestador;
+  if (typeof id !== "string" || typeof nombre !== "string") return null;
+
+  return { ...certificacion, prestador: { id, nombre, rut: typeof rut === "string" ? rut : null } };
 }
 
 /** Arma la consulta de GET /servicios con solo los filtros presentes. */
@@ -1095,6 +1239,88 @@ export function crearClienteApi() {
         cuerpo: { motivo },
         autenticada: true,
       });
+    },
+
+    /** Catálogo del formulario. Público. */
+    async listarTiposCertificacion(): Promise<TipoCertificacion[]> {
+      const cuerpo = await peticion("/certificaciones/tipos");
+      if (!esObjeto(cuerpo) || !Array.isArray(cuerpo.tipos)) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return leerLista(cuerpo.tipos, leerTipoCertificacion);
+    },
+
+    async listarMisCertificaciones(): Promise<Certificacion[]> {
+      const cuerpo = await peticion("/prestadores/yo/certificaciones", { autenticada: true });
+      if (!esObjeto(cuerpo) || !Array.isArray(cuerpo.certificaciones)) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return leerLista(cuerpo.certificaciones, leerCertificacion);
+    },
+
+    /** Envía la certificación con su documento. El estado (PENDIENTE) lo fija el servidor. */
+    async subirCertificacion(datos: DatosCertificacion, archivo: File): Promise<Certificacion> {
+      const formulario = new FormData();
+      for (const [campo, valor] of Object.entries(datos)) {
+        if (valor.trim() !== "") formulario.append(campo, valor);
+      }
+      formulario.append("documento", archivo);
+
+      const cuerpo = await peticion("/prestadores/yo/certificaciones", { metodo: "POST", formulario, autenticada: true });
+      const certificacion = esObjeto(cuerpo) ? leerCertificacion(cuerpo.certificacion) : null;
+      if (!certificacion) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return certificacion;
+    },
+
+    async listarCertificacionesPendientes(pagina: number, porPagina: number): Promise<ColaCertificaciones> {
+      const consulta = new URLSearchParams({ estado: "PENDIENTE", pagina: String(pagina), porPagina: String(porPagina) });
+      const cuerpo = await peticion(`/admin/certificaciones?${consulta.toString()}`, { autenticada: true });
+
+      if (
+        !esObjeto(cuerpo) ||
+        !Array.isArray(cuerpo.certificaciones) ||
+        typeof cuerpo.total !== "number" ||
+        typeof cuerpo.pagina !== "number" ||
+        typeof cuerpo.porPagina !== "number"
+      ) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return {
+        certificaciones: leerLista(cuerpo.certificaciones, leerCertificacionEnCola),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
+    },
+
+    /** URL firmada de corta duración, como la de la cédula: se usa y se descarta. */
+    async obtenerDocumentoCertificacion(id: string): Promise<{ url: string; expiraEn: string }> {
+      const cuerpo = await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/documento`, { autenticada: true });
+
+      if (!esObjeto(cuerpo) || typeof cuerpo.url !== "string" || typeof cuerpo.expiraEn !== "string") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      return { url: cuerpo.url, expiraEn: cuerpo.expiraEn };
+    },
+
+    async aprobarCertificacion(id: string): Promise<void> {
+      await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/aprobar`, { metodo: "PATCH", autenticada: true });
+    },
+
+    async rechazarCertificacion(id: string, motivo: string): Promise<void> {
+      await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/rechazar`, {
+        metodo: "PATCH",
+        cuerpo: { motivo },
+        autenticada: true,
+      });
+    },
+
+    /** Perfil público de un prestador: sin sesión. */
+    async obtenerPrestadorPublico(id: string): Promise<PrestadorPublico> {
+      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(id)}/publico`);
+      const prestador = esObjeto(cuerpo) ? leerPrestadorPublico(cuerpo.prestador) : null;
+      if (!prestador) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return prestador;
     },
 
     async listarCategorias(): Promise<Categoria[]> {

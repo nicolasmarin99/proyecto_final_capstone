@@ -20,7 +20,16 @@ const CLASES_TONO: Record<Tono, string> = {
   revision: "bg-hielo text-primario",
 };
 
-/** Las tres secciones del área, cada una con su estado en texto (el color solo no basta). */
+/** Estado de la sección de certificaciones: son opcionales, así que sin ninguna no queda «Pendiente». */
+function estadoCertificaciones(certificaciones: EstadoPrestador["certificaciones"]): Seccion["estado"] {
+  if (!certificaciones) return null;
+  const aprobadas = certificaciones.filter((certificacion) => certificacion.estado === "VERIFICADA").length;
+  if (aprobadas > 0) return { texto: `${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}`, tono: "listo" };
+  if (certificaciones.some((certificacion) => certificacion.estado === "PENDIENTE")) return { texto: "En revisión", tono: "revision" };
+  return { texto: "Opcional", tono: "revision" };
+}
+
+/** Las secciones del área, cada una con su estado en texto (el color solo no basta). */
 function seccionesDe(estado: EstadoPrestador | null): Seccion[] {
   const listo = estado !== null && !estado.cargando;
   const identidad = estado?.identidad;
@@ -55,6 +64,12 @@ function seccionesDe(estado: EstadoPrestador | null): Seccion[] {
               ? { texto: "Rechazada", tono: "pendiente" }
               : { texto: "Pendiente", tono: "pendiente" }
         : null,
+    },
+    {
+      ruta: "/mi/certificaciones",
+      texto: "Certificaciones",
+      icono: "llave",
+      estado: listo ? estadoCertificaciones(estado.certificaciones) : null,
     },
   ];
 }

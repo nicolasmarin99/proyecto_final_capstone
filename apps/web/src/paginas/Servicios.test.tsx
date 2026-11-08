@@ -30,7 +30,8 @@ interface ServicioDePrueba {
     id: string;
     nombre: string;
     comunas: { id: number; nombre: string; region: string }[];
-    credenciales: { tipo: string; emisor: string; verificadaEn: string; acreditacion: string }[];
+    conCertificaciones: boolean;
+    certificaciones: { nombre: string; emisor: string; verificadaEn: string; vigenteHasta: string | null; acreditacion: string }[];
   };
 }
 
@@ -49,17 +50,20 @@ const SERVICIO_PUBLICO: ServicioDePrueba = {
       { id: 13114, nombre: "Las Condes", region: "Metropolitana de Santiago" },
       { id: 13101, nombre: "Santiago", region: "Metropolitana de Santiago" },
     ],
-    credenciales: [
+    conCertificaciones: true,
+    certificaciones: [
       {
-        tipo: "Instalador de gas autorizado (SEC)",
+        nombre: "Instalador de gas autorizado (SEC)",
         emisor: "Superintendencia de Electricidad y Combustibles",
         verificadaEn: "2026-10-01T12:00:00.000Z",
+        vigenteHasta: "2030-12-31T00:00:00.000Z",
         acreditacion: "REGISTRO_OFICIAL",
       },
       {
-        tipo: "Cédula de identidad",
-        emisor: "Servicio de Registro Civil e Identificación",
+        nombre: "Técnico en climatización",
+        emisor: "INACAP",
         verificadaEn: "2026-10-02T12:00:00.000Z",
+        vigenteHasta: null,
         acreditacion: "REVISADA_POR_LOCALCL",
       },
     ],
@@ -233,16 +237,35 @@ describe("Página pública del servicio", () => {
     expect(await screen.findByText(/a convenir/i)).toBeInTheDocument();
   });
 
-  it("distingue lo acreditado con el registro oficial de lo revisado por LocalCL", async () => {
+  it("muestra «Prestador con certificaciones», «Ver certificaciones» y cada una con su emisor y vigencia", async () => {
     simularApi({ usuario: null });
     renderizar("/servicios/s1");
 
-    const credenciales = await screen.findByRole("list", { name: /credenciales verificadas/i });
-    const [sec, cedula] = within(credenciales).getAllByRole("listitem");
+    expect(await screen.findByText("Prestador con certificaciones")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver certificaciones" })).toHaveAttribute("href", "#certificaciones");
+    expect(screen.getByRole("link", { name: "Pedro Soto" })).toHaveAttribute("href", "/prestadores/perfil-1");
+
+    const certificaciones = screen.getByRole("list", { name: "Certificaciones" });
+    const [sec, otra] = within(certificaciones).getAllByRole("listitem");
     expect(sec).toHaveTextContent(/instalador de gas/i);
     expect(sec).toHaveTextContent(/registro oficial/i);
-    expect(cedula).toHaveTextContent(/cédula de identidad/i);
-    expect(cedula).toHaveTextContent(/revisad[oa] por LocalCL/i);
+    expect(sec).toHaveTextContent(/vigente hasta el 31 de diciembre de 2030/i);
+    expect(otra).toHaveTextContent(/técnico en climatización/i);
+    expect(otra).toHaveTextContent(/INACAP/);
+    expect(otra).toHaveTextContent(/revisado y aprobado por LocalCL/i);
+    expect(otra).toHaveTextContent(/sin fecha de vencimiento/i);
+  });
+
+  it("sin certificaciones aprobadas no hay sello ni «Ver certificaciones»", async () => {
+    simularApi({
+      usuario: null,
+      servicioPublico: { ...SERVICIO_PUBLICO, prestador: { ...SERVICIO_PUBLICO.prestador, conCertificaciones: false, certificaciones: [] } },
+    });
+    renderizar("/servicios/s1");
+
+    expect(await screen.findByText(/todavía no tiene certificaciones aprobadas/i)).toBeInTheDocument();
+    expect(screen.queryByText("Prestador con certificaciones")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Ver certificaciones" })).not.toBeInTheDocument();
   });
 
   it("sin sesión no muestra el botón de WhatsApp y pide iniciar sesión", async () => {

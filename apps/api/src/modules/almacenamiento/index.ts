@@ -47,6 +47,22 @@ export function obtenerAlmacenamiento(): AlmacenamientoDocumentos {
   return instancia;
 }
 
+let instanciaCertificaciones: AlmacenamientoDocumentos | null = null;
+
+/**
+ * Documentos de certificaciones: el mismo contrato privado que la cédula
+ * (URL firmada que vence, se borran tras la revisión) y el mismo transporte,
+ * pero en una carpeta propia y con su propia instancia.
+ */
+export function obtenerAlmacenamientoCertificaciones(): AlmacenamientoDocumentos {
+  instanciaCertificaciones ??=
+    env.ALMACENAMIENTO_TRANSPORTE === "produccion"
+      ? new AlmacenamientoCloudinary(configurarCloudinary(), env.CLOUDINARY_CARPETA_CERTIFICACIONES)
+      : new AlmacenamientoEnMemoria();
+
+  return instanciaCertificaciones;
+}
+
 // ─── Imágenes públicas ─────────────────────────────────────────────────────
 
 /** Raíz de apps/api, tanto desde src/ como desde dist/. */

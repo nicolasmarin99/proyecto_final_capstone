@@ -50,6 +50,10 @@ const esquema = z.object({
   // quedan separados del resto de los recursos y se pueden auditar juntos.
   CLOUDINARY_CARPETA_IDENTIDADES: z.string().default("localcl/identidades"),
 
+  // Documentos que respaldan las certificaciones del prestador: privados como
+  // la cédula, pero en su propia carpeta, para que no se mezclen al auditar.
+  CLOUDINARY_CARPETA_CERTIFICACIONES: z.string().default("localcl/certificaciones"),
+
   // Fotos de trabajos de los servicios: PÚBLICAS y permanentes, en una
   // carpeta distinta de la de identidades.
   CLOUDINARY_CARPETA_SERVICIOS: z.string().default("localcl/servicios"),

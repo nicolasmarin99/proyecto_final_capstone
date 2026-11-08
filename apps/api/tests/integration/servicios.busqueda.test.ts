@@ -89,7 +89,7 @@ interface Resultado {
   categoria: { slug: string; nombre: string };
   precioDesde: number | null;
   aConvenir: boolean;
-  prestador: { nombre: string; comunas: { id: number; nombre: string }[]; comunasRestantes: number; acreditado: boolean };
+  prestador: { nombre: string; comunas: { id: number; nombre: string }[]; comunasRestantes: number; conCertificaciones: boolean };
 }
 
 async function buscar(parametros: Record<string, string | number> = {}) {
@@ -334,16 +334,20 @@ describe("GET /servicios: contenido de cada resultado", () => {
       categoria: { slug: "gasfiteria", nombre: "Gasfitería" },
       precioDesde: 25000,
       aConvenir: false,
-      prestador: { nombre: "Pedro Soto", comunasRestantes: 2, acreditado: false },
+      prestador: { nombre: "Pedro Soto", comunasRestantes: 2, conCertificaciones: false },
     });
     expect(resultado?.prestador.comunas).toHaveLength(3);
   });
 
-  it("marca acreditado solo con una credencial verificada contra el registro oficial", async () => {
+  it("marca «con certificaciones» con una aprobada y vigente, sea del registro o revisada a mano; nunca por la cédula", async () => {
     const conSec = await crearPrestador({ nombre: "Con SEC" });
-    const soloManual = await crearPrestador({ nombre: "Solo manual" });
+    const revisada = await crearPrestador({ nombre: "Revisada a mano" });
+    const soloIdentidad = await crearPrestador({ nombre: "Solo identidad" });
+    const vencida = await crearPrestador({ nombre: "Vencida" });
     await crearServicio(conSec.perfilId, { titulo: "Gasfitería certificada" });
-    await crearServicio(soloManual.perfilId, { titulo: "Gasfitería sin sello" });
+    await crearServicio(revisada.perfilId, { titulo: "Gasfitería revisada" });
+    await crearServicio(soloIdentidad.perfilId, { titulo: "Gasfitería sin sello" });
+    await crearServicio(vencida.perfilId, { titulo: "Gasfitería vencida" });
 
     const tipoSec = await prisma.tipoCredencial.findUniqueOrThrow({ where: { codigo: "SEC_INSTALADOR_GAS" } });
     const tipoIdentidad = await prisma.tipoCredencial.findUniqueOrThrow({ where: { codigo: "IDENTIDAD" } });
@@ -353,32 +357,26 @@ describe("GET /servicios: contenido de cada resultado", () => {
       data: { correo: "admin.busqueda@ejemplo.cl", nombre: "Admin", rol: "ADMINISTRADOR", correoVerificado: true },
     });
     const fechaConsulta = new Date("2026-10-01T12:00:00Z");
-    await prisma.credencial.create({
-      data: {
-        prestadorId: conSec.perfilId,
-        tipoId: tipoSec.id,
-        estado: "VERIFICADA",
-        metodo: "AUTOMATICO",
-        fechaConsulta,
-        identificadorDocumento: "SEC-123",
-      },
-    });
-    await prisma.credencial.create({
-      data: {
-        prestadorId: soloManual.perfilId,
-        tipoId: tipoIdentidad.id,
-        estado: "VERIFICADA",
-        metodo: "MANUAL",
-        fechaConsulta,
-        verificadoPorId: administrador.id,
-        identificadorDocumento: "11111111-1",
-      },
+    const manual = { estado: "VERIFICADA", metodo: "MANUAL", fechaConsulta, verificadoPorId: administrador.id } as const;
+    await prisma.credencial.createMany({
+      data: [
+        { prestadorId: conSec.perfilId, tipoId: tipoSec.id, estado: "VERIFICADA", metodo: "AUTOMATICO", fechaConsulta, identificadorDocumento: "SEC-123" },
+        { prestadorId: revisada.perfilId, tipoId: tipoSec.id, ...manual, identificadorDocumento: "SEC-456" },
+        { prestadorId: soloIdentidad.perfilId, tipoId: tipoIdentidad.id, ...manual, identificadorDocumento: "11111111-1" },
+        {
+          prestadorId: vencida.perfilId,
+          tipoId: tipoSec.id,
+          ...manual,
+          identificadorDocumento: "SEC-789",
+          vigenteHasta: new Date("2020-01-01T00:00:00Z"),
+        },
+      ],
     });
 
     const { resultados } = await buscar();
-    const sello = Object.fromEntries(resultados.map((resultado) => [resultado.prestador.nombre, resultado.prestador.acreditado]));
+    const sello = Object.fromEntries(resultados.map((resultado) => [resultado.prestador.nombre, resultado.prestador.conCertificaciones]));
 
-    expect(sello).toEqual({ "Con SEC": true, "Solo manual": false });
+    expect(sello).toEqual({ "Con SEC": true, "Revisada a mano": true, "Solo identidad": false, Vencida: false });
   });
 
   it("la respuesta no incluye teléfono, correo ni RUT", async () => {
