@@ -29,7 +29,12 @@ const VACIO: DatosCertificacion = { tipo: "", identificador: "", vigenteHasta: "
 type Clase = "CERTIFICACION" | "CURSO";
 type Campo = keyof DatosCertificacion | "documento";
 type Errores = Partial<Record<Campo, string>>;
-const CAMPOS: readonly Campo[] = ["tipo", "identificador", "vigenteHasta", "nombre", "emisor", "fechaTermino", "horas", "documento"];
+
+/** Los campos que el formulario muestra según lo que se está subiendo. */
+function camposVisibles(clase: Clase, otra: boolean): Campo[] {
+  if (clase === "CURSO") return ["nombre", "emisor", "fechaTermino", "horas", "identificador", "documento"];
+  return ["tipo", ...(otra ? (["nombre", "emisor"] as const) : []), "identificador", "vigenteHasta", "documento"];
+}
 
 /** Hoy en Chile como AAAA-MM-DD: la misma comparación que hace la API. */
 function hoyEnChile(): string {
@@ -278,16 +283,23 @@ export default function PaginaMisCertificaciones() {
       );
       void estado?.recargar();
     } catch (causa) {
+      // Cada error va bajo su campo, pero solo si ese campo está en pantalla:
+      // con «Curso» no se ve el selector de tipo, y un error colgado de un
+      // campo invisible no lo lee nadie. Esos se muestran junto al botón.
+      const enPantalla = camposVisibles(clase, otra);
       const delServidor: Errores = {};
+      const sinCampo: string[] = [];
       if (causa instanceof ErrorApi) {
         for (const detalle of causa.detalles) {
-          const campo = CAMPOS.find((candidato) => candidato === detalle.campo);
+          const campo = enPantalla.find((candidato) => candidato === detalle.campo);
           if (campo) delServidor[campo] = detalle.mensaje;
+          else sinCampo.push(detalle.mensaje);
         }
       }
-      if (Object.keys(delServidor).length > 0) {
-        setErrores(delServidor);
-      } else {
+      setErrores(delServidor);
+      if (sinCampo.length > 0) {
+        setErrorGeneral(sinCampo.join(" "));
+      } else if (Object.keys(delServidor).length === 0) {
         setErrorGeneral(causa instanceof ErrorApi ? causa.message : "No fue posible conectar con el servidor. Intenta de nuevo.");
       }
     } finally {
@@ -335,18 +347,7 @@ export default function PaginaMisCertificaciones() {
               </li>
             </ul>
 
-            {aviso && (
-              <p role="status" className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700">
-                {aviso}
-              </p>
-            )}
-            {errorGeneral && (
-              <p role="alert" className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700">
-                {errorGeneral}
-              </p>
-            )}
-
-            <form onSubmit={alEnviar} noValidate>
+            <form onSubmit={alEnviar} noValidate aria-labelledby="titulo-nueva">
               <SelectorClase clase={clase} alCambiar={cambiarClase} />
 
               {!curso && (
@@ -450,6 +451,21 @@ export default function PaginaMisCertificaciones() {
                 />
                 <MensajeCampo id={idMensajeArchivo} mensajes={mensajesArchivo} />
               </div>
+
+              {/*
+                Junto al botón, no arriba del formulario: en el celular, quien
+                acaba de tocar «Enviar» está mirando aquí abajo.
+              */}
+              {aviso && (
+                <p role="status" className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700">
+                  {aviso}
+                </p>
+              )}
+              {errorGeneral && (
+                <p role="alert" className="motion-safe:animate-aparecer-corto mt-6 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700">
+                  {errorGeneral}
+                </p>
+              )}
 
               <Boton type="submit" cargando={enviando} className="mt-6">
                 {enviando ? "Enviando…" : "Enviar a revisión"}
