@@ -441,13 +441,17 @@ model Credencial {
   tipo                   TipoCredencial      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
   estado                 EstadoCredencial    @default(PENDIENTE)
   /// Número de registro, folio o certificado tal como lo emite la fuente.
-  identificadorDocumento String              @map("identificador_documento")
+  /// Opcional solo para los cursos (lo impone la API).
+  identificadorDocumento String?             @map("identificador_documento")
   /// Solo con el tipo «Otra certificación» (OTRA): el nombre y el emisor que
   /// escribe el prestador, porque no están en el catálogo. Nulos en el resto
   /// (lo impone la API; un CHECK exige que vayan los dos o ninguno).
   nombrePersonalizado    String?             @map("nombre_personalizado")
   emisorPersonalizado    String?             @map("emisor_personalizado")
   vigenteHasta           DateTime?           @map("vigente_hasta") @db.Date
+  /// Solo cursos (tipo CURSO): cuándo lo terminó y cuántas horas duró.
+  fechaTermino           DateTime?           @map("fecha_termino") @db.Date
+  horas                  Int?
   /// Método con que efectivamente se verificó (nulo mientras está pendiente).
   metodo                 MetodoVerificacion?
   /// Fuente consultada al verificar, p. ej. la URL del registro público.

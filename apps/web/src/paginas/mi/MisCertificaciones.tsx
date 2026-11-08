@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   CODIGO_CERTIFICACION_OTRA,
+  CODIGO_CURSO,
+  HORAS_MAXIMAS_CURSO,
+  HORAS_MINIMAS_CURSO,
   LARGO_MAXIMO_IDENTIFICADOR_CERTIFICACION,
   LARGO_MAXIMO_NOMBRE_CERTIFICACION,
   LARGO_MINIMO_IDENTIFICADOR_CERTIFICACION,
@@ -14,55 +17,84 @@ import { CompletarPerfilPrimero, SeccionArea } from "../../componentes/AreaPrest
 import { Boton } from "../../componentes/Boton";
 import { CampoSelector } from "../../componentes/CampoSelector";
 import { CampoTexto } from "../../componentes/CampoTexto";
-import { formatearVigencia } from "../../componentes/Certificaciones";
+import { formatearDia } from "../../componentes/Certificaciones";
 import { Icono } from "../../componentes/iconos";
 import { MensajeCampo, mensajeVisible } from "../../componentes/MensajeCampo";
 import { useEstadoPrestador } from "../../prestador/ContextoPrestador";
 
 const MEGAS = TAMANO_MAXIMO_DOCUMENTO / (1024 * 1024);
 const TIPOS_PERMITIDOS: readonly string[] = TIPOS_DOCUMENTO_PERMITIDOS;
-const VACIO: DatosCertificacion = { tipo: "", identificador: "", vigenteHasta: "", nombre: "", emisor: "" };
+const VACIO: DatosCertificacion = { tipo: "", identificador: "", vigenteHasta: "", nombre: "", emisor: "", fechaTermino: "", horas: "" };
 
+type Clase = "CERTIFICACION" | "CURSO";
 type Campo = keyof DatosCertificacion | "documento";
 type Errores = Partial<Record<Campo, string>>;
-const CAMPOS: readonly Campo[] = ["tipo", "identificador", "vigenteHasta", "nombre", "emisor", "documento"];
+const CAMPOS: readonly Campo[] = ["tipo", "identificador", "vigenteHasta", "nombre", "emisor", "fechaTermino", "horas", "documento"];
 
 /** Hoy en Chile como AAAA-MM-DD: la misma comparación que hace la API. */
 function hoyEnChile(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date());
 }
 
+function largoFuera(valor: string, minimo: number, maximo: number): boolean {
+  const largo = valor.trim().length;
+  return largo < minimo || largo > maximo;
+}
+
 /**
  * Revisión en el navegador para avisar antes de gastar un envío. La API
  * vuelve a revisar todo, y el tipo del archivo lo decide por su contenido.
  */
-function revisar(datos: DatosCertificacion, tipo: TipoCertificacion | undefined, archivo: File | null): Errores {
+function revisar(clase: Clase, datos: DatosCertificacion, tipo: TipoCertificacion | undefined, archivo: File | null): Errores {
   const errores: Errores = {};
-  const otra = datos.tipo === CODIGO_CERTIFICACION_OTRA;
+  const curso = clase === "CURSO";
+  const nombrePropio = curso || datos.tipo === CODIGO_CERTIFICACION_OTRA;
 
-  if (!tipo) errores.tipo = "Elige el tipo de certificación.";
-  const identificador = datos.identificador.trim().length;
-  if (identificador < LARGO_MINIMO_IDENTIFICADOR_CERTIFICACION || identificador > LARGO_MAXIMO_IDENTIFICADOR_CERTIFICACION) {
+  if (!curso && !tipo) errores.tipo = "Elige el tipo de certificación.";
+  // El folio es obligatorio en una certificación; en un curso, solo se revisa si viene.
+  if (
+    (!curso || datos.identificador.trim() !== "") &&
+    largoFuera(datos.identificador, LARGO_MINIMO_IDENTIFICADOR_CERTIFICACION, LARGO_MAXIMO_IDENTIFICADOR_CERTIFICACION)
+  ) {
     errores.identificador = `Indica el número o folio (entre ${LARGO_MINIMO_IDENTIFICADOR_CERTIFICACION} y ${LARGO_MAXIMO_IDENTIFICADOR_CERTIFICACION} caracteres).`;
   }
-  if (tipo?.requiereVigencia && !datos.vigenteHasta) errores.vigenteHasta = "Esta certificación vence: indica hasta cuándo está vigente.";
-  if (datos.vigenteHasta && datos.vigenteHasta < hoyEnChile()) errores.vigenteHasta = "Esa certificación ya venció: sube una vigente.";
-  if (otra) {
-    for (const campo of ["nombre", "emisor"] as const) {
-      const largo = datos[campo].trim().length;
-      if (largo < LARGO_MINIMO_NOMBRE_CERTIFICACION || largo > LARGO_MAXIMO_NOMBRE_CERTIFICACION) {
-        errores[campo] =
-          campo === "nombre"
-            ? `Escribe el nombre de la certificación (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`
-            : `Escribe quién la emite (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`;
-      }
+  if (nombrePropio) {
+    if (largoFuera(datos.nombre, LARGO_MINIMO_NOMBRE_CERTIFICACION, LARGO_MAXIMO_NOMBRE_CERTIFICACION)) {
+      errores.nombre = curso
+        ? `Escribe el nombre del curso (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`
+        : `Escribe el nombre de la certificación (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`;
+    }
+    if (largoFuera(datos.emisor, LARGO_MINIMO_NOMBRE_CERTIFICACION, LARGO_MAXIMO_NOMBRE_CERTIFICACION)) {
+      errores.emisor = curso
+        ? `Escribe la institución que dictó el curso (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`
+        : `Escribe quién la emite (al menos ${LARGO_MINIMO_NOMBRE_CERTIFICACION} caracteres).`;
     }
   }
-  if (!archivo) errores.documento = "Adjunta la foto o el documento que acredita la certificación.";
+  if (curso) {
+    if (!datos.fechaTermino) errores.fechaTermino = "Indica cuándo terminaste el curso.";
+    else if (datos.fechaTermino > hoyEnChile()) errores.fechaTermino = "La fecha de término no puede ser futura.";
+    if (datos.horas.trim() !== "") {
+      const horas = Number(datos.horas);
+      if (!Number.isInteger(horas) || horas < HORAS_MINIMAS_CURSO || horas > HORAS_MAXIMAS_CURSO) {
+        errores.horas = `Indica las horas como un número entero entre ${HORAS_MINIMAS_CURSO} y ${HORAS_MAXIMAS_CURSO}.`;
+      }
+    }
+  } else {
+    if (tipo?.requiereVigencia && !datos.vigenteHasta) errores.vigenteHasta = "Esta certificación vence: indica hasta cuándo está vigente.";
+    if (datos.vigenteHasta && datos.vigenteHasta < hoyEnChile()) errores.vigenteHasta = "Esa certificación ya venció: sube una vigente.";
+  }
+  if (!archivo) errores.documento = curso ? "Adjunta el certificado o diploma del curso." : "Adjunta la foto o el documento que acredita la certificación.";
   else if (archivo.size > TAMANO_MAXIMO_DOCUMENTO) errores.documento = `El archivo supera los ${MEGAS} MB.`;
   else if (!TIPOS_PERMITIDOS.includes(archivo.type)) errores.documento = "El archivo debe ser JPG, PNG o PDF.";
 
   return errores;
+}
+
+/** Solo lo que corresponde a cada clase viaja a la API; el resto va vacío (y no se envía). */
+function datosAEnviar(clase: Clase, datos: DatosCertificacion): DatosCertificacion {
+  if (clase === "CURSO") return { ...datos, tipo: CODIGO_CURSO, vigenteHasta: "" };
+  const otra = datos.tipo === CODIGO_CERTIFICACION_OTRA;
+  return { ...datos, nombre: otra ? datos.nombre : "", emisor: otra ? datos.emisor : "", fechaTermino: "", horas: "" };
 }
 
 const ESTADOS: Partial<Record<EstadoVerificacion, { texto: string; clases: string }>> = {
@@ -74,8 +106,9 @@ const ESTADOS: Partial<Record<EstadoVerificacion, { texto: string; clases: strin
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium" });
 
-/** Una certificación propia, con su estado en texto (el color solo no basta). */
+/** Una certificación o curso propio, con su estado en texto (el color solo no basta). */
 function FilaCertificacion({ certificacion }: { certificacion: Certificacion }) {
+  const curso = certificacion.clase === "CURSO";
   // Aprobada pero ya vencida: el público no la ve, y el prestador tiene que saberlo.
   const vencida =
     certificacion.estado === "VERIFICADA" && certificacion.vigenteHasta !== null && certificacion.vigenteHasta.slice(0, 10) < hoyEnChile();
@@ -85,16 +118,28 @@ function FilaCertificacion({ certificacion }: { certificacion: Certificacion }) 
     <li className="rounded-medio border border-borde p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
+          <p className="text-xs font-bold tracking-[0.8px] text-primario uppercase">{curso ? "Curso" : "Certificación"}</p>
           <p className="font-semibold break-words text-noche">{certificacion.nombre}</p>
           <p className="text-sm break-words text-texto-suave">{certificacion.emisor}</p>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${estado.clases}`}>{estado.texto}</span>
       </div>
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-sm">
-        <dt className="text-texto-suave">Número</dt>
-        <dd className="break-all text-noche">{certificacion.identificador}</dd>
-        <dt className="text-texto-suave">Vigencia</dt>
-        <dd className="text-noche">{certificacion.vigenteHasta ? `Hasta el ${formatearVigencia(certificacion.vigenteHasta)}` : "Sin vencimiento"}</dd>
+        <dt className="text-texto-suave">{curso ? "Folio" : "Número"}</dt>
+        <dd className="break-all text-noche">{certificacion.identificador ?? "Sin folio"}</dd>
+        {curso ? (
+          <>
+            <dt className="text-texto-suave">Terminado</dt>
+            <dd className="text-noche">{certificacion.fechaTermino ? formatearDia(certificacion.fechaTermino) : "—"}</dd>
+            <dt className="text-texto-suave">Horas</dt>
+            <dd className="text-noche">{certificacion.horas ?? "No indicadas"}</dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-texto-suave">Vigencia</dt>
+            <dd className="text-noche">{certificacion.vigenteHasta ? `Hasta el ${formatearDia(certificacion.vigenteHasta)}` : "Sin vencimiento"}</dd>
+          </>
+        )}
         <dt className="text-texto-suave">Enviada</dt>
         <dd className="text-noche">{fecha.format(new Date(certificacion.enviadaEn))}</dd>
       </dl>
@@ -104,17 +149,56 @@ function FilaCertificacion({ certificacion }: { certificacion: Certificacion }) 
         </p>
       )}
       {certificacion.estado === "VERIFICADA" && !vencida && (
-        <p className="mt-3 text-sm text-exito-700">Se muestra en tu perfil público y en tus servicios.</p>
+        <p className="mt-3 text-sm text-exito-700">
+          {curso ? "Se muestra en la sección «Cursos» de tu perfil y tus servicios." : "Se muestra en tu perfil público y en tus servicios."}
+        </p>
       )}
     </li>
   );
 }
 
+/** Elección entre certificación y curso: dos opciones de radio con aspecto de tarjeta. */
+function SelectorClase({ clase, alCambiar }: { clase: Clase; alCambiar(clase: Clase): void }) {
+  const opciones: { valor: Clase; texto: string; ayuda: string }[] = [
+    { valor: "CERTIFICACION", texto: "Certificación", ayuda: "Licencias y certificaciones de oficio (SEC, ChileValora…)" },
+    { valor: "CURSO", texto: "Curso", ayuda: "Cursos y capacitaciones que hayas terminado" },
+  ];
+
+  return (
+    <fieldset className="mt-5">
+      <legend className="text-sm font-bold text-noche">¿Qué quieres subir?</legend>
+      <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+        {opciones.map((opcion) => (
+          <label
+            key={opcion.valor}
+            className={`flex min-h-12 cursor-pointer gap-3 rounded-chico border px-4 py-3 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primario ${
+              clase === opcion.valor ? "border-primario bg-hielo" : "border-borde-fuerte bg-niebla hover:border-primario"
+            }`}
+          >
+            <input
+              type="radio"
+              name="clase"
+              value={opcion.valor}
+              checked={clase === opcion.valor}
+              onChange={() => alCambiar(opcion.valor)}
+              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primario"
+            />
+            <span>
+              <span className="block font-semibold text-noche">{opcion.texto}</span>
+              <span className="block text-texto-suave">{opcion.ayuda}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 /**
- * /mi/certificaciones: el prestador sube una certificación (formulario y
- * documento) y sigue su revisión. Un administrador la aprueba o rechaza; si
- * la aprueba, su perfil y sus servicios muestran «Prestador con
- * certificaciones».
+ * /mi/certificaciones: el prestador sube una certificación o un curso
+ * (formulario y documento) y sigue su revisión. Un administrador lo aprueba
+ * o lo rechaza. Una certificación aprobada enciende «Prestador con
+ * certificaciones»; un curso aprobado aparece en la sección «Cursos».
  */
 export default function PaginaMisCertificaciones() {
   const { cliente } = useAuth();
@@ -124,6 +208,7 @@ export default function PaginaMisCertificaciones() {
   const [tipos, setTipos] = useState<TipoCertificacion[] | null>(null);
   const [certificaciones, setCertificaciones] = useState<Certificacion[] | null>(null);
   const [errorCarga, setErrorCarga] = useState(false);
+  const [clase, setClase] = useState<Clase>("CERTIFICACION");
   const [datos, setDatos] = useState<DatosCertificacion>(VACIO);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [errores, setErrores] = useState<Errores>({});
@@ -152,8 +237,11 @@ export default function PaginaMisCertificaciones() {
     };
   }, [cliente, tienePerfil]);
 
-  const tipo = tipos?.find((candidato) => candidato.codigo === datos.tipo);
-  const otra = datos.tipo === CODIGO_CERTIFICACION_OTRA;
+  const curso = clase === "CURSO";
+  // El curso tiene su propia opción arriba: no se repite en la lista de certificaciones.
+  const tiposCertificacion = (tipos ?? []).filter((opcion) => opcion.codigo !== CODIGO_CURSO);
+  const tipo = curso ? undefined : tiposCertificacion.find((candidato) => candidato.codigo === datos.tipo);
+  const otra = !curso && datos.tipo === CODIGO_CERTIFICACION_OTRA;
 
   function cambiar(campo: keyof DatosCertificacion, valor: string) {
     setDatos((actual) => ({ ...actual, [campo]: valor }));
@@ -161,23 +249,33 @@ export default function PaginaMisCertificaciones() {
     setAviso(null);
   }
 
+  function cambiarClase(nueva: Clase) {
+    setClase(nueva);
+    setErrores({});
+    setErrorGeneral(null);
+    setAviso(null);
+  }
+
   async function alEnviar(evento: FormEvent) {
     evento.preventDefault();
     setErrorGeneral(null);
     setAviso(null);
-    const problemas = revisar(datos, tipo, archivo);
+    const problemas = revisar(clase, datos, tipo, archivo);
     setErrores(problemas);
     if (Object.keys(problemas).length > 0 || !archivo) return;
 
     setEnviando(true);
     try {
-      // Nombre y emisor solo viajan con «Otra»: el resto los pone el catálogo.
-      const enviada = await cliente.subirCertificacion(otra ? datos : { ...datos, nombre: "", emisor: "" }, archivo);
+      const enviada = await cliente.subirCertificacion(datosAEnviar(clase, datos), archivo);
       setCertificaciones((actuales) => [enviada, ...(actuales ?? [])]);
       setDatos(VACIO);
       setArchivo(null);
       if (archivoRef.current) archivoRef.current.value = "";
-      setAviso("Certificación enviada. Un administrador la revisará y verás el resultado aquí.");
+      setAviso(
+        curso
+          ? "Curso enviado. Un administrador lo revisará y verás el resultado aquí."
+          : "Certificación enviada. Un administrador la revisará y verás el resultado aquí.",
+      );
       void estado?.recargar();
     } catch (causa) {
       const delServidor: Errores = {};
@@ -198,28 +296,33 @@ export default function PaginaMisCertificaciones() {
   }
 
   const idMensajeArchivo = `${idArchivo}-mensaje`;
-  const mensajesArchivo = { error: errores.documento, ayuda: "Una foto del certificado o el PDF. Que se lean bien tu nombre y el número." };
+  const mensajesArchivo = {
+    error: errores.documento,
+    ayuda: curso
+      ? "Una foto del certificado o diploma, o el PDF. Que se lean tu nombre y el del curso."
+      : "Una foto del certificado o el PDF. Que se lean bien tu nombre y el número.",
+  };
 
   return (
     <SeccionArea
-      titulo="Certificaciones"
-      bajada="Sube tus certificaciones de oficio. Cuando un administrador las apruebe, tu perfil y tus servicios mostrarán «Prestador con certificaciones»."
+      titulo="Certificaciones y cursos"
+      bajada="Sube tus certificaciones de oficio y los cursos que hayas hecho. Cuando un administrador apruebe una certificación, tu perfil y tus servicios mostrarán «Prestador con certificaciones»; los cursos aprobados aparecen en su propia sección."
     >
       {estado === null || estado.cargando ? (
         <p className="mt-6 text-sm text-texto-suave">Revisando tu perfil…</p>
       ) : estado.perfil === null ? (
-        <CompletarPerfilPrimero motivo="Necesitamos tus datos de prestador antes de revisar tus certificaciones." />
+        <CompletarPerfilPrimero motivo="Necesitamos tus datos de prestador antes de revisar tus certificaciones y cursos." />
       ) : errorCarga ? (
         <p role="alert" className="mt-6 text-sm text-error-700">
-          No fue posible cargar tus certificaciones. Recarga la página para intentarlo de nuevo.
+          No fue posible cargar tus certificaciones y cursos. Recarga la página para intentarlo de nuevo.
         </p>
       ) : tipos === null || certificaciones === null ? (
-        <p className="mt-6 text-sm text-texto-suave">Cargando tus certificaciones…</p>
+        <p className="mt-6 text-sm text-texto-suave">Cargando tus certificaciones y cursos…</p>
       ) : (
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section aria-labelledby="titulo-nueva">
             <h2 id="titulo-nueva" className="font-titulos text-lg font-bold text-noche">
-              Nueva certificación
+              Nuevo envío
             </h2>
             <ul className="mt-2 space-y-1.5 text-sm text-texto-suave">
               <li className="flex gap-2">
@@ -228,7 +331,7 @@ export default function PaginaMisCertificaciones() {
               </li>
               <li className="flex gap-2">
                 <Icono nombre="escudo" tamano={18} className="mt-0.5 shrink-0 text-primario" />
-                El público ve el nombre, quién la emite y su vigencia. Nunca el documento ni el número.
+                El público ve el nombre, quién lo emite y sus fechas. Nunca el documento ni el número.
               </li>
             </ul>
 
@@ -244,61 +347,92 @@ export default function PaginaMisCertificaciones() {
             )}
 
             <form onSubmit={alEnviar} noValidate>
-              <CampoSelector
-                id="certificacion-tipo"
-                etiqueta="Tipo de certificación"
-                valor={datos.tipo}
-                alCambiar={(valor) => cambiar("tipo", valor)}
-                vacio="Elige una"
-                opciones={tipos.map((opcion) => ({ valor: opcion.codigo, texto: opcion.nombre }))}
-                error={errores.tipo}
-                ayuda={tipo && !otra ? `Emite: ${tipo.emisor}` : "¿No está en la lista? Elige «Otra certificación»."}
-              />
-              {otra && (
+              <SelectorClase clase={clase} alCambiar={cambiarClase} />
+
+              {!curso && (
+                <CampoSelector
+                  id="certificacion-tipo"
+                  etiqueta="Tipo de certificación"
+                  valor={datos.tipo}
+                  alCambiar={(valor) => cambiar("tipo", valor)}
+                  vacio="Elige una"
+                  opciones={tiposCertificacion.map((opcion) => ({ valor: opcion.codigo, texto: opcion.nombre }))}
+                  error={errores.tipo}
+                  ayuda={tipo && !otra ? `Emite: ${tipo.emisor}` : "¿No está en la lista? Elige «Otra certificación»."}
+                />
+              )}
+              {(curso || otra) && (
                 <>
                   <CampoTexto
                     id="certificacion-nombre"
-                    etiqueta="Nombre de la certificación"
+                    etiqueta={curso ? "Nombre del curso" : "Nombre de la certificación"}
                     autoComplete="off"
                     valor={datos.nombre}
                     alCambiar={(valor) => cambiar("nombre", valor)}
                     error={errores.nombre}
-                    ayuda="Por ejemplo: Técnico en climatización."
+                    ayuda={curso ? "Por ejemplo: Instalaciones eléctricas domiciliarias." : "Por ejemplo: Técnico en climatización."}
                   />
                   <CampoTexto
                     id="certificacion-emisor"
-                    etiqueta="Quién la emite"
+                    etiqueta={curso ? "Institución" : "Quién la emite"}
                     autoComplete="off"
                     valor={datos.emisor}
                     alCambiar={(valor) => cambiar("emisor", valor)}
                     error={errores.emisor}
-                    ayuda="La institución u organismo: INACAP, un OTEC, una municipalidad…"
+                    ayuda={curso ? "Quién dictó el curso: INACAP, un OTEC, una municipalidad…" : "La institución u organismo: INACAP, un OTEC, una municipalidad…"}
+                  />
+                </>
+              )}
+              {curso && (
+                <>
+                  <CampoTexto
+                    id="certificacion-termino"
+                    etiqueta="Fecha de término"
+                    tipo="date"
+                    autoComplete="off"
+                    valor={datos.fechaTermino}
+                    alCambiar={(valor) => cambiar("fechaTermino", valor)}
+                    error={errores.fechaTermino}
+                    ayuda="Cuándo terminaste el curso."
+                  />
+                  <CampoTexto
+                    id="certificacion-horas"
+                    etiqueta="Horas (opcional)"
+                    tipo="number"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    valor={datos.horas}
+                    alCambiar={(valor) => cambiar("horas", valor)}
+                    error={errores.horas}
+                    ayuda="La duración que indica el certificado."
                   />
                 </>
               )}
               <CampoTexto
                 id="certificacion-identificador"
-                etiqueta="Número, folio o código"
+                etiqueta={curso ? "Folio o código (opcional)" : "Número, folio o código"}
                 autoComplete="off"
                 valor={datos.identificador}
                 alCambiar={(valor) => cambiar("identificador", valor)}
                 error={errores.identificador}
-                ayuda="El que aparece en el certificado. Solo lo ve el administrador."
+                ayuda={curso ? "Si el certificado trae uno. Solo lo ve el administrador." : "El que aparece en el certificado. Solo lo ve el administrador."}
               />
-              <CampoTexto
-                id="certificacion-vigencia"
-                etiqueta={tipo?.requiereVigencia ? "Vigente hasta" : "Vigente hasta (opcional)"}
-                tipo="date"
-                autoComplete="off"
-                valor={datos.vigenteHasta}
-                alCambiar={(valor) => cambiar("vigenteHasta", valor)}
-                error={errores.vigenteHasta}
-                ayuda={tipo?.requiereVigencia ? "Esta certificación vence: la fecha es obligatoria." : "Déjalo vacío si no vence."}
-              />
+              {!curso && (
+                <CampoTexto
+                  id="certificacion-vigencia"
+                  etiqueta={tipo?.requiereVigencia ? "Vigente hasta" : "Vigente hasta (opcional)"}
+                  tipo="date"
+                  autoComplete="off"
+                  valor={datos.vigenteHasta}
+                  alCambiar={(valor) => cambiar("vigenteHasta", valor)}
+                  error={errores.vigenteHasta}
+                  ayuda={tipo?.requiereVigencia ? "Esta certificación vence: la fecha es obligatoria." : "Déjalo vacío si no vence."}
+                />
+              )}
 
               <div className="mt-5">
                 <label htmlFor={idArchivo} className="block text-sm font-bold text-noche">
-                  Documento que la acredita (JPG, PNG o PDF, hasta {MEGAS} MB)
+                  {curso ? "Certificado del curso" : "Documento que la acredita"} (JPG, PNG o PDF, hasta {MEGAS} MB)
                 </label>
                 <input
                   ref={archivoRef}
@@ -325,12 +459,12 @@ export default function PaginaMisCertificaciones() {
 
           <section aria-labelledby="titulo-mias">
             <h2 id="titulo-mias" className="font-titulos text-lg font-bold text-noche">
-              Mis certificaciones
+              Mis certificaciones y cursos
             </h2>
             {certificaciones.length === 0 ? (
-              <p className="mt-3 rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">Todavía no has enviado certificaciones.</p>
+              <p className="mt-3 rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">Todavía no has enviado certificaciones ni cursos.</p>
             ) : (
-              <ul aria-label="Mis certificaciones" className="mt-3 space-y-3">
+              <ul aria-label="Mis certificaciones y cursos" className="mt-3 space-y-3">
                 {certificaciones.map((certificacion) => (
                   <FilaCertificacion key={certificacion.id} certificacion={certificacion} />
                 ))}

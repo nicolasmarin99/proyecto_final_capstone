@@ -1,13 +1,13 @@
-import type { CertificacionPublica } from "../api/cliente";
+import type { CertificacionPublica, CursoPublico } from "../api/cliente";
 import { Icono } from "./iconos";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "long" });
-// La vigencia es un día del calendario (AAAA-MM-DD a medianoche UTC): se
+// Vigencia y término son días del calendario (AAAA-MM-DD a medianoche UTC): se
 // formatea en UTC para que en Chile no se lea como el día anterior.
 const fechaVigencia = new Intl.DateTimeFormat("es-CL", { dateStyle: "long", timeZone: "UTC" });
 
-export function formatearVigencia(vigenteHasta: string): string {
-  return fechaVigencia.format(new Date(vigenteHasta));
+export function formatearDia(dia: string): string {
+  return fechaVigencia.format(new Date(dia));
 }
 
 /**
@@ -60,12 +60,40 @@ export function ListaCertificaciones({ certificaciones }: { certificaciones: Cer
                 {certificacion.verificadaEn ? ` · ${fecha.format(new Date(certificacion.verificadaEn))}` : ""}
               </span>
               <span className="mt-0.5 block text-texto-suave">
-                {certificacion.vigenteHasta ? `Vigente hasta el ${formatearVigencia(certificacion.vigenteHasta)}` : "Sin fecha de vencimiento"}
+                {certificacion.vigenteHasta ? `Vigente hasta el ${formatearDia(certificacion.vigenteHasta)}` : "Sin fecha de vencimiento"}
               </span>
             </span>
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+/**
+ * Los cursos aprobados de un prestador: nombre, institución, cuándo lo
+ * terminó y cuántas horas duró. Van aparte de las certificaciones y no
+ * encienden el sello. Nunca el documento ni el folio.
+ */
+export function ListaCursos({ cursos }: { cursos: CursoPublico[] }) {
+  return (
+    <ul aria-label="Cursos" className="mt-3 space-y-3">
+      {cursos.map((curso) => (
+        <li key={`${curso.nombre}-${curso.fechaTermino ?? ""}`} className="flex gap-3 rounded-medio border border-borde bg-blanco p-4">
+          <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-chico bg-hielo text-primario">
+            <Icono nombre="llave" tamano={20} grosor={2} />
+          </span>
+          <span className="min-w-0 text-sm">
+            <span className="block font-semibold break-words text-noche">{curso.nombre}</span>
+            <span className="block break-words text-texto-suave">{curso.institucion}</span>
+            <span className="mt-1 block text-texto-suave">
+              {curso.fechaTermino ? `Terminado el ${formatearDia(curso.fechaTermino)}` : "Terminado"}
+              {curso.horas ? ` · ${curso.horas} ${curso.horas === 1 ? "hora" : "horas"}` : ""}
+            </span>
+            <span className="mt-0.5 block font-medium text-texto-suave">Documento revisado y aprobado por LocalCL</span>
+          </span>
+        </li>
+      ))}
     </ul>
   );
 }

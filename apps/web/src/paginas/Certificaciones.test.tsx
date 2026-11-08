@@ -24,16 +24,20 @@ const PERFIL = {
 const TIPOS = [
   { codigo: "SEC_INSTALADOR_GAS", nombre: "Instalador de gas autorizado (SEC)", emisor: "Superintendencia de Electricidad y Combustibles", requiereVigencia: true },
   { codigo: "OTRA", nombre: "Otra certificación", emisor: "Indicado por el prestador", requiereVigencia: false },
+  { codigo: "CURSO", nombre: "Curso", emisor: "Institución indicada por el prestador", requiereVigencia: false },
 ];
 
 function certificacion(estado: string, extra: object = {}) {
   return {
     id: "c1",
+    clase: "CERTIFICACION",
     tipo: "SEC_INSTALADOR_GAS",
     nombre: "Instalador de gas autorizado (SEC)",
     emisor: "Superintendencia de Electricidad y Combustibles",
     identificador: "SEC-2024-001",
     vigenteHasta: "2030-12-31T00:00:00.000Z",
+    fechaTermino: null,
+    horas: null,
     estado,
     motivoRechazo: null,
     enviadaEn: "2026-10-10T12:00:00.000Z",
@@ -55,6 +59,15 @@ const PRESTADOR_PUBLICO = {
       verificadaEn: "2026-10-11T12:00:00.000Z",
       vigenteHasta: "2030-12-31T00:00:00.000Z",
       acreditacion: "REVISADA_POR_LOCALCL",
+    },
+  ],
+  cursos: [
+    {
+      nombre: "Instalaciones eléctricas domiciliarias",
+      institucion: "INACAP",
+      fechaTermino: "2025-03-15T00:00:00.000Z",
+      horas: 120,
+      verificadaEn: "2026-10-12T12:00:00.000Z",
     },
   ],
   servicios: [
@@ -184,7 +197,7 @@ describe("Certificaciones del prestador (/mi/certificaciones)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(/un administrador la revisará/i);
-    const lista = screen.getByRole("list", { name: "Mis certificaciones" });
+    const lista = screen.getByRole("list", { name: "Mis certificaciones y cursos" });
     expect(within(lista).getByText("En revisión")).toBeInTheDocument();
 
     const [llamada] = llamadas("POST", /\/api\/prestadores\/yo\/certificaciones$/);
@@ -250,7 +263,7 @@ describe("Certificaciones del prestador (/mi/certificaciones)", () => {
     simularApi({ propias: [certificacion("RECHAZADA", { motivoRechazo: "El folio no coincide con el registro de la SEC." })] });
     renderizar("/mi/certificaciones");
 
-    const lista = await screen.findByRole("list", { name: "Mis certificaciones" });
+    const lista = await screen.findByRole("list", { name: "Mis certificaciones y cursos" });
     expect(within(lista).getByText("Rechazada")).toBeInTheDocument();
     expect(within(lista).getByText(/el folio no coincide/i)).toBeInTheDocument();
   });
@@ -261,7 +274,7 @@ describe("Cola de certificaciones del administrador", () => {
     simularApi({ usuario: admin, cola: [certificacion("PENDIENTE")] });
     renderizar("/admin");
 
-    const seccion = await screen.findByRole("region", { name: "Certificaciones" });
+    const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
     const solicitud = await within(seccion).findByRole("article", { name: "Instalador de gas autorizado (SEC)" });
     expect(within(solicitud).getByText("SEC-2024-001")).toBeInTheDocument();
     expect(within(solicitud).getByText("12.345.678-5")).toBeInTheDocument();
@@ -273,14 +286,14 @@ describe("Cola de certificaciones del administrador", () => {
     fireEvent.click(within(solicitud).getByRole("button", { name: "Aprobar" }));
     expect(await within(seccion).findByRole("status")).toHaveTextContent(/aprobada\. el documento fue eliminado/i);
     expect(llamadas("PATCH", /\/api\/admin\/certificaciones\/c1\/aprobar$/)).toHaveLength(1);
-    expect(await within(seccion).findByText(/no hay certificaciones pendientes/i)).toBeInTheDocument();
+    expect(await within(seccion).findByText(/no hay certificaciones ni cursos pendientes/i)).toBeInTheDocument();
   });
 
   it("rechazar exige un motivo y lo envía", async () => {
     simularApi({ usuario: admin, cola: [certificacion("PENDIENTE")] });
     renderizar("/admin");
 
-    const seccion = await screen.findByRole("region", { name: "Certificaciones" });
+    const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
     fireEvent.click(await within(seccion).findByRole("button", { name: "Rechazar" }));
     fireEvent.click(within(seccion).getByRole("button", { name: "Confirmar rechazo" }));
     expect(await within(seccion).findByText(/indica el motivo del rechazo/i)).toBeInTheDocument();
@@ -325,5 +338,107 @@ describe("Perfil público del prestador (/prestadores/:id)", () => {
     renderizar("/prestadores/perfil-1");
 
     expect(await screen.findByText(/no existe o no tiene servicios publicados/i)).toBeInTheDocument();
+  });
+});
+
+describe("Cursos", () => {
+  it("el prestador elige «Curso»: pide nombre, institución y fecha de término; folio y horas opcionales", async () => {
+    simularApi({ respuestaSubida: json({ certificacion: certificacion("PENDIENTE", {
+  clase: "CURSO",
+  tipo: "CURSO",
+  nombre: "Instalaciones eléctricas domiciliarias",
+  emisor: "INACAP",
+  identificador: null,
+  vigenteHasta: null,
+  fechaTermino: "2025-03-15T00:00:00.000Z",
+  horas: 120,
+}) }, 201) });
+    renderizar("/mi/certificaciones");
+
+    fireEvent.click(await screen.findByRole("radio", { name: /curso/i }));
+    // Un curso no tiene tipo de catálogo ni vigencia.
+    expect(screen.queryByLabelText("Tipo de certificación")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/vigente hasta/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
+    await waitFor(() => expect(screen.getByLabelText("Nombre del curso")).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getByLabelText("Institución")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Fecha de término")).toHaveAttribute("aria-invalid", "true");
+    // El folio es opcional en un curso: vacío no es un error.
+    expect(screen.getByLabelText("Folio o código (opcional)")).not.toHaveAttribute("aria-invalid");
+    expect(llamadas("POST", /certificaciones$/)).toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText("Nombre del curso"), { target: { value: "Instalaciones eléctricas domiciliarias" } });
+    fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "INACAP" } });
+    fireEvent.change(screen.getByLabelText("Fecha de término"), { target: { value: "2025-03-15" } });
+    fireEvent.change(screen.getByLabelText("Horas (opcional)"), { target: { value: "120" } });
+    fireEvent.change(screen.getByLabelText(/certificado del curso/i), { target: { files: [archivo()] } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/curso enviado/i);
+    const lista = screen.getByRole("list", { name: "Mis certificaciones y cursos" });
+    expect(within(lista).getByText("Curso")).toBeInTheDocument();
+    expect(within(lista).getByText("Sin folio")).toBeInTheDocument();
+
+    const formulario = llamadas("POST", /\/api\/prestadores\/yo\/certificaciones$/)[0]?.[1]?.body as FormData;
+    expect(formulario.get("tipo")).toBe("CURSO");
+    expect(formulario.get("nombre")).toBe("Instalaciones eléctricas domiciliarias");
+    expect(formulario.get("emisor")).toBe("INACAP");
+    expect(formulario.get("fechaTermino")).toBe("2025-03-15");
+    expect(formulario.get("horas")).toBe("120");
+    expect(formulario.has("identificador")).toBe(false);
+    expect(formulario.has("vigenteHasta")).toBe(false);
+  });
+
+  it("la lista de tipos de certificación no repite «Curso»", async () => {
+    simularApi();
+    renderizar("/mi/certificaciones");
+
+    const selector = await screen.findByLabelText("Tipo de certificación");
+    expect(within(selector).queryByRole("option", { name: "Curso" })).not.toBeInTheDocument();
+    expect(within(selector).getByRole("option", { name: "Otra certificación" })).toBeInTheDocument();
+  });
+
+  it("el administrador ve un curso con su institución, fecha y horas", async () => {
+    simularApi({ usuario: admin, cola: [certificacion("PENDIENTE", {
+  clase: "CURSO",
+  tipo: "CURSO",
+  nombre: "Instalaciones eléctricas domiciliarias",
+  emisor: "INACAP",
+  identificador: null,
+  vigenteHasta: null,
+  fechaTermino: "2025-03-15T00:00:00.000Z",
+  horas: 120,
+})] });
+    renderizar("/admin");
+
+    const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
+    const solicitud = await within(seccion).findByRole("article", { name: "Instalaciones eléctricas domiciliarias" });
+    expect(within(solicitud).getByText("Curso")).toBeInTheDocument();
+    expect(within(solicitud).getByText("Sin folio")).toBeInTheDocument();
+    expect(within(solicitud).getByText("15 de marzo de 2025")).toBeInTheDocument();
+    expect(within(solicitud).getByText("120")).toBeInTheDocument();
+
+    fireEvent.click(within(solicitud).getByRole("button", { name: "Aprobar" }));
+    expect(await within(seccion).findByRole("status")).toHaveTextContent(/curso «instalaciones eléctricas domiciliarias» de pedro soto aprobado/i);
+  });
+
+  it("el perfil público muestra la sección «Cursos» aparte de las certificaciones", async () => {
+    simularApi({ usuario: null });
+    renderizar("/prestadores/perfil-1");
+
+    const cursos = await screen.findByRole("list", { name: "Cursos" });
+    expect(within(cursos).getByText("Instalaciones eléctricas domiciliarias")).toBeInTheDocument();
+    expect(within(cursos).getByText("INACAP")).toBeInTheDocument();
+    expect(within(cursos).getByText(/terminado el 15 de marzo de 2025 · 120 horas/i)).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Certificaciones" })).queryByText(/instalaciones eléctricas/i)).not.toBeInTheDocument();
+  });
+
+  it("solo con cursos no hay sello de certificaciones", async () => {
+    simularApi({ usuario: null, publico: json({ prestador: { ...PRESTADOR_PUBLICO, conCertificaciones: false, certificaciones: [] } }) });
+    renderizar("/prestadores/perfil-1");
+
+    expect(await screen.findByRole("list", { name: "Cursos" })).toBeInTheDocument();
+    expect(screen.queryByText("Prestador con certificaciones")).not.toBeInTheDocument();
   });
 });

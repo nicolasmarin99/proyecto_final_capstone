@@ -73,6 +73,8 @@ interface PrestadorDemo {
    * API, y en desarrollo ese almacenamiento está en memoria.
    */
   certificacionRevisada?: { nombre: string; emisor: string; identificador: string };
+  /** Curso aprobado a mano: se muestra en «Cursos» y no enciende el sello. */
+  cursoRevisado?: { nombre: string; institucion: string; fechaTermino: string; horas: number | null };
   comunaBase: string;
   comunas: string[];
   descripcion: string;
@@ -161,6 +163,7 @@ const PRESTADORES: PrestadorDemo[] = [
   },
   {
     correo: "demo.jorge@localcl.cl",
+    cursoRevisado: { nombre: "Cerrajería y sistemas de seguridad", institucion: "OTEC Capacita Chile", fechaTermino: "2024-08-30", horas: 80 },
     nombre: "Jorge Ramírez",
     rut: 12987654,
     telefono: "+56933334444",
@@ -433,6 +436,38 @@ async function sembrarCertificacionRevisada(prestadorId: string, datos: { nombre
   });
 }
 
+/** Igual que la certificación revisada, con el tipo CURSO: sin folio ni vigencia, con fecha de término y horas. */
+async function sembrarCursoRevisado(
+  prestadorId: string,
+  datos: { nombre: string; institucion: string; fechaTermino: string; horas: number | null },
+) {
+  const administrador = await prisma.usuario.findUnique({ where: { correo: "admin@localcl.cl" }, select: { id: true } });
+  if (!administrador) {
+    console.log("Sin admin@localcl.cl: se omite el curso revisado a mano de la demostración.");
+    return;
+  }
+  const tipo = await prisma.tipoCredencial.findUniqueOrThrow({ where: { codigo: "CURSO" } });
+  const existente = await prisma.credencial.findFirst({ where: { prestadorId, tipoId: tipo.id, nombrePersonalizado: datos.nombre } });
+  if (existente) return;
+
+  await prisma.credencial.create({
+    data: {
+      prestadorId,
+      tipoId: tipo.id,
+      estado: "VERIFICADA",
+      metodo: "MANUAL",
+      fechaConsulta: new Date(),
+      verificadoPorId: administrador.id,
+      fuente: "Revisión manual del documento por un administrador",
+      identificadorDocumento: null,
+      nombrePersonalizado: datos.nombre,
+      emisorPersonalizado: datos.institucion,
+      fechaTermino: new Date(`${datos.fechaTermino}T00:00:00Z`),
+      horas: datos.horas,
+    },
+  });
+}
+
 async function main() {
   const hashContrasena = await hash(CONTRASENA);
   let servicios = 0;
@@ -485,6 +520,9 @@ async function main() {
 
     if (demo.certificacionRevisada) {
       await sembrarCertificacionRevisada(perfil.id, demo.certificacionRevisada);
+    }
+    if (demo.cursoRevisado) {
+      await sembrarCursoRevisado(perfil.id, demo.cursoRevisado);
     }
 
     // Los servicios de demostración se rehacen desde cero en cada corrida.

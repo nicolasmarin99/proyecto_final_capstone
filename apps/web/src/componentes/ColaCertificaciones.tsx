@@ -3,7 +3,7 @@ import { formatearRut, LARGO_MAXIMO_MOTIVO_RECHAZO_CERTIFICACION, LARGO_MINIMO_M
 import { ErrorApi, type CertificacionEnCola, type ClienteApi } from "../api/cliente";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
-import { formatearVigencia } from "./Certificaciones";
+import { formatearDia } from "./Certificaciones";
 
 const POR_PAGINA = 10;
 
@@ -39,6 +39,8 @@ function SolicitudCertificacion({
   const [ocupado, setOcupado] = useState<"documento" | "aprobar" | "rechazar" | null>(null);
 
   const { nombre, rut } = solicitud.prestador;
+  const curso = solicitud.clase === "CURSO";
+  const queEs = curso ? "Curso" : "Certificación";
 
   async function verDocumento() {
     setError(null);
@@ -58,7 +60,7 @@ function SolicitudCertificacion({
     setOcupado("aprobar");
     try {
       await cliente.aprobarCertificacion(solicitud.id);
-      alResolver(solicitud.id, `Certificación «${solicitud.nombre}» de ${nombre} aprobada. El documento fue eliminado.`);
+      alResolver(solicitud.id, `${queEs} «${solicitud.nombre}» de ${nombre} ${curso ? "aprobado" : "aprobada"}. El documento fue eliminado.`);
     } catch (causa) {
       setError(mensajeDeError(causa, "No fue posible aprobar la certificación."));
       setOcupado(null);
@@ -75,7 +77,7 @@ function SolicitudCertificacion({
     setOcupado("rechazar");
     try {
       await cliente.rechazarCertificacion(solicitud.id, motivo.trim());
-      alResolver(solicitud.id, `Certificación «${solicitud.nombre}» de ${nombre} rechazada. El documento fue eliminado.`);
+      alResolver(solicitud.id, `${queEs} «${solicitud.nombre}» de ${nombre} ${curso ? "rechazado" : "rechazada"}. El documento fue eliminado.`);
     } catch (causa) {
       if (causa instanceof ErrorApi && causa.mensajeDe("motivo")) {
         setErrorMotivo(causa.mensajeDe("motivo"));
@@ -99,15 +101,28 @@ function SolicitudCertificacion({
         <dd className="font-medium break-words text-noche">{nombre}</dd>
         <dt className="text-texto-suave">RUT de la cuenta</dt>
         <dd className="text-noche">{rut ? formatearRut(rut) : "No informado"}</dd>
-        <dt className="text-texto-suave">Emisor</dt>
+        <dt className="text-texto-suave">Clase</dt>
+        <dd className="font-medium text-noche">{curso ? "Curso" : "Certificación"}</dd>
+        <dt className="text-texto-suave">{curso ? "Institución" : "Emisor"}</dt>
         <dd className="break-words text-noche">
           {solicitud.emisor}
-          {solicitud.tipo === "OTRA" && <span className="text-texto-suave"> (indicado por el prestador)</span>}
+          {(curso || solicitud.tipo === "OTRA") && <span className="text-texto-suave"> (indicado por el prestador)</span>}
         </dd>
-        <dt className="text-texto-suave">Número</dt>
-        <dd className="font-medium break-all text-noche">{solicitud.identificador}</dd>
-        <dt className="text-texto-suave">Vigencia</dt>
-        <dd className="text-noche">{solicitud.vigenteHasta ? `Hasta el ${formatearVigencia(solicitud.vigenteHasta)}` : "Sin vencimiento"}</dd>
+        <dt className="text-texto-suave">{curso ? "Folio" : "Número"}</dt>
+        <dd className="font-medium break-all text-noche">{solicitud.identificador ?? "Sin folio"}</dd>
+        {curso ? (
+          <>
+            <dt className="text-texto-suave">Terminado</dt>
+            <dd className="text-noche">{solicitud.fechaTermino ? formatearDia(solicitud.fechaTermino) : "—"}</dd>
+            <dt className="text-texto-suave">Horas</dt>
+            <dd className="text-noche">{solicitud.horas ?? "No indicadas"}</dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-texto-suave">Vigencia</dt>
+            <dd className="text-noche">{solicitud.vigenteHasta ? `Hasta el ${formatearDia(solicitud.vigenteHasta)}` : "Sin vencimiento"}</dd>
+          </>
+        )}
       </dl>
 
       {documento ? (
@@ -234,12 +249,13 @@ export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
   return (
     <section aria-labelledby={idTitulo} className="mt-8 border-t border-borde pt-6">
       <h2 id={idTitulo} className="font-titulos text-lg font-bold text-noche">
-        Certificaciones
+        Certificaciones y cursos
       </h2>
       <p className="mt-1 text-sm text-texto-suave">
         Compara el documento con lo que declaró el prestador y, si puedes, con el registro del emisor. Al
-        aprobar, su perfil y sus servicios muestran «Prestador con certificaciones». Al aprobar o
-        rechazar, el documento se elimina del almacenamiento.
+        aprobar una certificación, su perfil y sus servicios muestran «Prestador con certificaciones»; un
+        curso aprobado aparece en su sección «Cursos». Al aprobar o rechazar, el documento se elimina del
+        almacenamiento.
       </p>
 
       {aviso && (
@@ -257,7 +273,7 @@ export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
       {!error && solicitudes === null && <p className="mt-4 text-sm text-texto-suave">Cargando las certificaciones…</p>}
 
       {solicitudes?.length === 0 && !error && (
-        <p className="mt-4 rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">No hay certificaciones pendientes de revisión.</p>
+        <p className="mt-4 rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">No hay certificaciones ni cursos pendientes de revisión.</p>
       )}
 
       {solicitudes && solicitudes.length > 0 && (

@@ -8,7 +8,9 @@ import { Prisma } from "../../generated/prisma/client.js";
   - un administrador la aprobó (estado VERIFICADA);
   - no venció (sin fecha de vigencia, o vigente hasta hoy inclusive);
   - no es la cédula de identidad (tipo IDENTIDAD): verificar quién eres es
-    requisito para publicar, no una certificación de oficio.
+    requisito para publicar, no una certificación de oficio;
+  - no es un curso (tipo CURSO): los cursos aprobados se muestran aparte
+    (cursosPublicosDe) y no encienden el sello.
 
   La usan el buscador (sello «Prestador con certificaciones» en la tarjeta),
   la página del servicio y el perfil público del prestador. Es SQL por la
@@ -23,7 +25,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 export const condicionCertificacionPublica = Prisma.sql`(
   cr.estado = 'VERIFICADA'
   AND (cr.vigente_hasta IS NULL OR cr.vigente_hasta >= CURRENT_DATE)
-  AND cr.tipo_id <> (SELECT id FROM tipos_credencial WHERE codigo = 'IDENTIDAD')
+  AND cr.tipo_id NOT IN (SELECT id FROM tipos_credencial WHERE codigo IN ('IDENTIDAD', 'CURSO'))
 )`;
 
 /** ¿El prestador tiene alguna certificación pública? Para usar dentro de otra consulta (alias de perfil `p`). */
@@ -65,3 +67,31 @@ export async function certificacionesPublicasDe(prestadorId: string): Promise<Ce
   }));
 }
 
+export interface CursoPublico {
+  nombre: string;
+  institucion: string;
+  fechaTermino: Date | null;
+  horas: number | null;
+  verificadaEn: Date | null;
+}
+
+/**
+ * Los cursos aprobados de un prestador, del más reciente al más antiguo.
+ * Un curso no vence: basta con que un administrador lo haya aprobado. Igual
+ * que las certificaciones, nunca sale el documento ni el folio.
+ */
+export async function cursosPublicosDe(prestadorId: string): Promise<CursoPublico[]> {
+  return prisma.$queryRaw<CursoPublico[]>`
+    SELECT
+      cr.nombre_personalizado AS nombre,
+      cr.emisor_personalizado AS institucion,
+      cr.fecha_termino        AS "fechaTermino",
+      cr.horas                AS horas,
+      cr.fecha_consulta       AS "verificadaEn"
+    FROM credenciales cr
+    JOIN tipos_credencial t ON t.id = cr.tipo_id
+    WHERE cr.prestador_id = ${prestadorId}
+      AND cr.estado = 'VERIFICADA'
+      AND t.codigo = 'CURSO'
+    ORDER BY cr.fecha_termino DESC NULLS LAST, cr.id`;
+}

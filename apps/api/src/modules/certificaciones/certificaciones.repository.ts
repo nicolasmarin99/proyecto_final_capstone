@@ -11,6 +11,8 @@ const seleccionPropia = {
   estado: true,
   identificadorDocumento: true,
   vigenteHasta: true,
+  fechaTermino: true,
+  horas: true,
   nombrePersonalizado: true,
   emisorPersonalizado: true,
   motivoRechazo: true,
@@ -38,8 +40,10 @@ interface DatosEnvio {
   id: string;
   prestadorId: string;
   tipoId: string;
-  identificador: string;
+  identificador: string | null;
   vigenteHasta: Date | null;
+  fechaTermino: Date | null;
+  horas: number | null;
   nombre: string | null;
   emisor: string | null;
   autorId: string;
@@ -55,7 +59,7 @@ function mismaCertificacion(prestadorId: string, tipoId: string, nombre: string 
   };
 }
 
-async function revisar(cliente: Pick<typeof prisma, "credencial">, datos: Omit<DatosEnvio, "id" | "identificador" | "vigenteHasta" | "emisor" | "autorId">): Promise<ResultadoEnvio> {
+async function revisar(cliente: Pick<typeof prisma, "credencial">, datos: Omit<DatosEnvio, "id" | "identificador" | "vigenteHasta" | "fechaTermino" | "horas" | "emisor" | "autorId">): Promise<ResultadoEnvio> {
   const pendiente = await cliente.credencial.findFirst({
     where: { ...mismaCertificacion(datos.prestadorId, datos.tipoId, datos.nombre), estado: "PENDIENTE" },
     select: { id: true },
@@ -69,7 +73,7 @@ async function revisar(cliente: Pick<typeof prisma, "credencial">, datos: Omit<D
 }
 
 /** Revisión previa, fuera de transacción: evita subir un archivo que igual se rechazaría. */
-export async function revisarEnvio(datos: Omit<DatosEnvio, "id" | "identificador" | "vigenteHasta" | "emisor" | "autorId">) {
+export async function revisarEnvio(datos: Omit<DatosEnvio, "id" | "identificador" | "vigenteHasta" | "fechaTermino" | "horas" | "emisor" | "autorId">) {
   return revisar(prisma, datos);
 }
 
@@ -93,6 +97,8 @@ export async function registrarEnvio(datos: DatosEnvio) {
           tipoId: datos.tipoId,
           identificadorDocumento: datos.identificador,
           vigenteHasta: datos.vigenteHasta,
+          fechaTermino: datos.fechaTermino,
+          horas: datos.horas,
           nombrePersonalizado: datos.nombre,
           emisorPersonalizado: datos.emisor,
         },

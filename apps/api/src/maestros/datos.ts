@@ -486,6 +486,17 @@ export const TIPOS_CREDENCIAL: {
     metodoVerificacion: "MANUAL",
     requiereVigencia: false,
   },
+  {
+    // Cursos realizados: el prestador escribe el nombre del curso y la
+    // institución (nombre_personalizado y emisor_personalizado), cuándo lo
+    // terminó y cuántas horas duró. Un administrador lo revisa a mano. Se
+    // muestran aparte y no encienden el sello de certificaciones.
+    codigo: "CURSO",
+    nombre: "Curso",
+    fuenteOficial: "Institución indicada por el prestador",
+    metodoVerificacion: "MANUAL",
+    requiereVigencia: false,
+  },
 ];
 
 /**
