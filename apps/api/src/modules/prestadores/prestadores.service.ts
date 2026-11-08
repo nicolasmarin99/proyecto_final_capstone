@@ -1,5 +1,5 @@
 import { ErrorHttp } from "../../shared/errores.js";
-import { certificacionesPublicasDe } from "../certificaciones/certificaciones.publicas.js";
+import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { urlMiniatura } from "../imagenes/imagenes.urls.js";
 import { contarServiciosVisiblesDe, esServicioVisible, serviciosVisiblesDe } from "../servicios/servicios.visibilidad.js";
 import { existeComuna } from "../territorio/territorio.repository.js";
@@ -136,17 +136,19 @@ function prestadorNoEncontrado(): ErrorHttp {
  *   que el buscador y el contacto). Si no, el mismo 404 que un id que no
  *   existe: no se puede distinguir quién tiene cuenta.
  * - Se arma campo por campo: nombre, descripción, comunas, certificaciones
- *   públicas (solo nombre, emisor, fecha de verificación y vigencia) y sus
+ *   públicas (solo nombre, emisor, fecha de verificación y vigencia), cursos
+ *   aprobados (nombre, institución, fecha de término y horas) y sus
  *   servicios visibles. Nunca teléfono, correo, RUT, documentos ni números.
  */
 export async function obtenerPerfilPublico(prestadorId: string) {
   const ids = await serviciosVisiblesDe(prestadorId);
   if (ids.length === 0) throw prestadorNoEncontrado();
 
-  const [prestador, servicios, certificaciones] = await Promise.all([
+  const [prestador, servicios, certificaciones, cursos] = await Promise.all([
     buscarPrestadorPublico(prestadorId),
     buscarServiciosParaPerfil(ids),
     certificacionesPublicasDe(prestadorId),
+    cursosPublicosDe(prestadorId),
   ]);
   if (!prestador) throw prestadorNoEncontrado();
 
@@ -162,6 +164,7 @@ export async function obtenerPerfilPublico(prestadorId: string) {
       .sort((a, b) => ordenEspanol.compare(a.nombre, b.nombre)),
     conCertificaciones: certificaciones.length > 0,
     certificaciones,
+    cursos,
     servicios: ids.flatMap((id) => {
       const servicio = porId.get(id);
       if (!servicio) return [];

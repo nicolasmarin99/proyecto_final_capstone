@@ -87,6 +87,8 @@ interface Campos {
   vigenteHasta?: string;
   nombre?: string;
   emisor?: string;
+  fechaTermino?: string;
+  horas?: string;
 }
 
 function subir(
@@ -532,5 +534,107 @@ describe("GET /prestadores/:id/publico", () => {
     expect(busqueda.body.resultados).toEqual([
       expect.objectContaining({ id: servicio.id, prestador: expect.objectContaining({ conCertificaciones: true }) }),
     ]);
+  });
+});
+
+describe("Cursos", () => {
+  const CURSO = { tipo: "CURSO", nombre: "Instalaciones eléctricas domiciliarias", emisor: "INACAP", fechaTermino: "2025-03-15", horas: "120" };
+
+  it("se sube sin folio ni vigencia: queda PENDIENTE como curso, con fecha de término y horas", async () => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await subir(prestador.token, { ...CURSO, vigenteHasta: "2031-01-01" });
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.certificacion).toMatchObject({
+      clase: "CURSO",
+      tipo: "CURSO",
+      nombre: "Instalaciones eléctricas domiciliarias",
+      emisor: "INACAP",
+      identificador: null,
+      fechaTermino: "2025-03-15T00:00:00.000Z",
+      horas: 120,
+      // Un curso no vence: la vigencia se descarta.
+      vigenteHasta: null,
+      estado: "PENDIENTE",
+    });
+    expect(almacenamiento().existe(respuesta.body.certificacion.id)).toBe(true);
+  });
+
+  it.each([
+    ["sin nombre", { ...CURSO, nombre: "" }, "nombre"],
+    ["sin institución", { ...CURSO, emisor: "" }, "emisor"],
+    ["sin fecha de término", { ...CURSO, fechaTermino: "" }, "fechaTermino"],
+    ["con fecha de término futura", { ...CURSO, fechaTermino: "2099-01-01" }, "fechaTermino"],
+    ["con horas fuera de rango", { ...CURSO, horas: "0" }, "horas"],
+    ["con horas que no son un número", { ...CURSO, horas: "muchas" }, "horas"],
+  ])("400 %s", async (_caso, campos, campo) => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await subir(prestador.token, campos);
+
+    expect(respuesta.status).toBe(400);
+    expect(detalleDe(respuesta.body, campo)).toBeDefined();
+    expect(almacenamiento().cantidad).toBe(0);
+  });
+
+  it("fecha de término y horas solo se guardan en un curso", async () => {
+    const prestador = await crearPrestador();
+
+    const respuesta = await subir(prestador.token, {
+      tipo: "SEC_INSTALADOR_GAS",
+      identificador: "SEC-2024-001",
+      vigenteHasta: VIGENTE,
+      fechaTermino: "2025-03-15",
+      horas: "40",
+    });
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.certificacion).toMatchObject({ clase: "CERTIFICACION", fechaTermino: null, horas: null });
+  });
+
+  it("409 si el mismo curso ya está en revisión", async () => {
+    const prestador = await crearPrestador();
+
+    expect((await subir(prestador.token, CURSO)).status).toBe(201);
+    expect((await subir(prestador.token, { ...CURSO, nombre: "instalaciones ELÉCTRICAS domiciliarias" })).status).toBe(409);
+  });
+
+  it("aprobado: aparece en «cursos» del perfil y del servicio, sin folio y sin encender el sello", async () => {
+    const prestador = await crearPrestador();
+    await certificacionAprobada(prestador, { ...CURSO, identificador: "FOLIO-CURSO-99" });
+    const servicio = await prisma.servicio.findFirstOrThrow({ where: { prestadorId: prestador.perfilId } });
+
+    const perfil = await perfilPublico(prestador.perfilId);
+    expect(perfil.body.prestador).toMatchObject({
+      conCertificaciones: false,
+      certificaciones: [],
+      cursos: [
+        {
+          nombre: "Instalaciones eléctricas domiciliarias",
+          institucion: "INACAP",
+          fechaTermino: "2025-03-15T00:00:00.000Z",
+          horas: 120,
+          verificadaEn: expect.any(String),
+        },
+      ],
+    });
+    expect(perfil.text).not.toContain("FOLIO-CURSO-99");
+
+    const pagina = await request(app).get(`/servicios/${servicio.id}`);
+    expect(pagina.body.servicio.prestador).toMatchObject({ conCertificaciones: false, cursos: [expect.objectContaining({ institucion: "INACAP" })] });
+
+    const busqueda = await request(app).get("/servicios");
+    expect(busqueda.body.resultados[0].prestador.conCertificaciones).toBe(false);
+  });
+
+  it("pendiente o rechazado no se muestra", async () => {
+    const prestador = await crearPrestador();
+    const administrador = await crearAdministrador();
+    await subir(prestador.token, CURSO);
+    const { body } = await subir(prestador.token, { ...CURSO, nombre: "Curso de soldadura" });
+    await rechazar(administrador.token, body.certificacion.id);
+
+    expect((await perfilPublico(prestador.perfilId)).body.prestador.cursos).toEqual([]);
   });
 });

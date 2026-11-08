@@ -15,7 +15,7 @@ import {
   listarServiciosDe,
 } from "./servicios.repository.js";
 import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
-import { certificacionesPublicasDe } from "../certificaciones/certificaciones.publicas.js";
+import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
 import { esServicioVisible, serviciosVisiblesEntre } from "./servicios.visibilidad.js";
 
@@ -248,7 +248,10 @@ export async function publico(id: string) {
 
   const servicio = await buscarServicioPublico(id);
   if (!servicio) throw servicioNoVisible();
-  const certificaciones = await certificacionesPublicasDe(servicio.prestador.id);
+  const [certificaciones, cursos] = await Promise.all([
+    certificacionesPublicasDe(servicio.prestador.id),
+    cursosPublicosDe(servicio.prestador.id),
+  ]);
 
   return {
     id: servicio.id,
@@ -274,6 +277,8 @@ export async function publico(id: string) {
       // emisor, fecha de verificación y vigencia; nunca el documento ni su número.
       conCertificaciones: certificaciones.length > 0,
       certificaciones,
+      // Los cursos aprobados, aparte: no encienden el sello.
+      cursos,
     },
   };
 }

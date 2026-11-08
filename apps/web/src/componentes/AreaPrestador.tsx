@@ -67,7 +67,7 @@ function seccionesDe(estado: EstadoPrestador | null): Seccion[] {
     },
     {
       ruta: "/mi/certificaciones",
-      texto: "Certificaciones",
+      texto: "Certificaciones y cursos",
       icono: "llave",
       estado: listo ? estadoCertificaciones(estado.certificaciones) : null,
     },
