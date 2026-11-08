@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
-import { ListaCertificaciones, SelloCertificaciones } from "../componentes/Certificaciones";
+import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
 import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { ReportarServicio } from "../componentes/ReportarServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
@@ -172,6 +172,12 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                     <p className="mt-2 text-sm text-texto-suave">Este prestador todavía no tiene certificaciones aprobadas.</p>
                   ) : (
                     <ListaCertificaciones certificaciones={servicio.prestador.certificaciones} />
+                  )}
+                  {servicio.prestador.cursos.length > 0 && (
+                    <>
+                      <h3 className="mt-6 font-titulos text-base font-bold">Cursos</h3>
+                      <ListaCursos cursos={servicio.prestador.cursos} />
+                    </>
                   )}
                   <Link
                     to={`/prestadores/${servicio.prestador.id}`}

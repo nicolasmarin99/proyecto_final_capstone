@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { CODIGO_CERTIFICACION_OTRA, MAXIMO_CERTIFICACIONES_POR_DIA } from "@localcl/shared";
+import { CODIGO_CERTIFICACION_OTRA, CODIGO_CURSO, MAXIMO_CERTIFICACIONES_POR_DIA } from "@localcl/shared";
 import type { EstadoCredencial } from "../../generated/prisma/client.js";
 import { ErrorHttp } from "../../shared/errores.js";
 import { DocumentoNoEncontrado, obtenerAlmacenamientoCertificaciones } from "../almacenamiento/index.js";
@@ -50,11 +50,15 @@ function errorDeEnvio(resultado: Exclude<ResultadoEnvio, "permitido">): ErrorHtt
 function vista(certificacion: Awaited<ReturnType<typeof certificacionesDe>>[number]) {
   return {
     id: certificacion.id,
+    // Certificación o curso: la web los muestra por separado.
+    clase: certificacion.tipo.codigo === CODIGO_CURSO ? ("CURSO" as const) : ("CERTIFICACION" as const),
     tipo: certificacion.tipo.codigo,
     nombre: certificacion.nombrePersonalizado ?? certificacion.tipo.nombre,
     emisor: certificacion.emisorPersonalizado ?? certificacion.tipo.fuenteOficial,
     identificador: certificacion.identificadorDocumento,
     vigenteHasta: certificacion.vigenteHasta,
+    fechaTermino: certificacion.fechaTermino,
+    horas: certificacion.horas,
     estado: certificacion.estado,
     motivoRechazo: certificacion.motivoRechazo,
     enviadaEn: certificacion.creadoEn,
@@ -109,8 +113,8 @@ export async function enviar(usuarioId: string, datos: DatosCertificacion, conte
   const clave = {
     prestadorId: perfil.id,
     tipoId: tipo.id,
-    // Solo OTRA tiene nombre propio (el esquema lo descarta en el resto).
-    nombre: tipo.codigo === CODIGO_CERTIFICACION_OTRA ? datos.nombre : null,
+    // Solo OTRA y CURSO tienen nombre propio (el esquema lo descarta en el resto).
+    nombre: tipo.codigo === CODIGO_CERTIFICACION_OTRA || tipo.codigo === CODIGO_CURSO ? datos.nombre : null,
     limite: { maximo: MAXIMO_CERTIFICACIONES_POR_DIA, desde: new Date(Date.now() - VENTANA_MS) },
   };
   const previa = await revisarEnvio(clave);
@@ -126,6 +130,8 @@ export async function enviar(usuarioId: string, datos: DatosCertificacion, conte
       id,
       identificador: datos.identificador,
       vigenteHasta: datos.vigenteHasta,
+      fechaTermino: datos.fechaTermino,
+      horas: datos.horas,
       emisor: clave.nombre === null ? null : datos.emisor,
       autorId: usuarioId,
     });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi, type PrestadorPublico } from "../api/cliente";
-import { ListaCertificaciones, SelloCertificaciones } from "../componentes/Certificaciones";
+import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
 import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
@@ -118,6 +118,16 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
                     </>
                   )}
                 </section>
+
+                {prestador.cursos.length > 0 && (
+                  <section aria-labelledby="titulo-cursos" className="mt-8">
+                    <h2 id="titulo-cursos" className="font-titulos text-lg font-bold">
+                      Cursos
+                    </h2>
+                    <p className="mt-1 text-sm text-texto-suave">Cursos y capacitaciones que terminó, con el certificado revisado por LocalCL.</p>
+                    <ListaCursos cursos={prestador.cursos} />
+                  </section>
+                )}
 
                 <section aria-labelledby="titulo-servicios" className="mt-8 border-t border-borde pt-6">
                   <h2 id="titulo-servicios" className="font-titulos text-lg font-bold">

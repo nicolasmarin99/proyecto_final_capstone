@@ -140,6 +140,15 @@ export interface DatosServicio extends Precio {
   estado: "PUBLICADO" | "PAUSADO";
 }
 
+/** Un curso aprobado, como lo ve el público. Nunca el documento ni el folio. */
+export interface CursoPublico {
+  nombre: string;
+  institucion: string;
+  fechaTermino: string | null;
+  horas: number | null;
+  verificadaEn: string | null;
+}
+
 /** Lo que el público ve de una certificación aprobada y vigente. Nunca el documento ni su número. */
 export interface CertificacionPublica {
   nombre: string;
@@ -163,6 +172,8 @@ export interface ServicioPublico extends Precio {
     /** Tiene al menos una certificación aprobada y vigente: el sello «Prestador con certificaciones». */
     conCertificaciones: boolean;
     certificaciones: CertificacionPublica[];
+    /** Cursos aprobados: se muestran aparte y no encienden el sello. */
+    cursos: CursoPublico[];
   };
   /** Solo las visibles, en el orden que eligió el prestador. La primera es la portada. */
   imagenes: ImagenPublica[];
@@ -213,6 +224,7 @@ export interface PrestadorPublico {
   comunas: { id: number; nombre: string; region: string }[];
   conCertificaciones: boolean;
   certificaciones: CertificacionPublica[];
+  cursos: CursoPublico[];
   servicios: ServicioDelPrestador[];
 }
 
@@ -306,11 +318,18 @@ export interface TipoCertificacion {
 /** Una certificación, como la ven su dueño y el administrador. */
 export interface Certificacion {
   id: string;
+  /** Certificación o curso: se muestran por separado. */
+  clase: "CERTIFICACION" | "CURSO";
   tipo: string;
   nombre: string;
+  /** En un curso, la institución que lo dictó. */
   emisor: string;
-  identificador: string;
+  /** Folio o número; un curso puede no tenerlo. */
+  identificador: string | null;
   vigenteHasta: string | null;
+  /** Solo cursos. */
+  fechaTermino: string | null;
+  horas: number | null;
   estado: EstadoVerificacion;
   motivoRechazo: string | null;
   enviadaEn: string;
@@ -324,6 +343,9 @@ export interface DatosCertificacion {
   vigenteHasta: string;
   nombre: string;
   emisor: string;
+  /** Solo cursos: AAAA-MM-DD y horas, o vacíos. */
+  fechaTermino: string;
+  horas: string;
 }
 
 export interface CertificacionEnCola extends Certificacion {
@@ -688,6 +710,18 @@ function leerCertificacionPublica(valor: unknown): CertificacionPublica | null {
   };
 }
 
+function leerCursoPublico(valor: unknown): CursoPublico | null {
+  if (!esObjeto(valor) || typeof valor.nombre !== "string" || typeof valor.institucion !== "string") return null;
+
+  return {
+    nombre: valor.nombre,
+    institucion: valor.institucion,
+    fechaTermino: typeof valor.fechaTermino === "string" ? valor.fechaTermino : null,
+    horas: typeof valor.horas === "number" ? valor.horas : null,
+    verificadaEn: typeof valor.verificadaEn === "string" ? valor.verificadaEn : null,
+  };
+}
+
 function leerComunaPublica(valor: unknown): { id: number; nombre: string; region: string } | null {
   return esObjeto(valor) &&
     typeof valor.id === "number" &&
@@ -701,7 +735,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
   if (!esObjeto(valor) || !esObjeto(valor.prestador)) return null;
   const categoria = leerCategoria(valor.categoria);
   const { id, titulo, descripcion } = valor;
-  const { id: idPrestador, nombre, comunas, conCertificaciones, certificaciones } = valor.prestador;
+  const { id: idPrestador, nombre, comunas, conCertificaciones, certificaciones, cursos } = valor.prestador;
 
   if (
     typeof id !== "string" ||
@@ -728,6 +762,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
       comunas: leerLista(comunas, leerComunaPublica),
       conCertificaciones: conCertificaciones === true,
       certificaciones: leerLista(certificaciones, leerCertificacionPublica),
+      cursos: leerLista(cursos, leerCursoPublico),
     },
   };
 }
@@ -788,6 +823,7 @@ function leerPrestadorPublico(valor: unknown): PrestadorPublico | null {
     comunas: leerLista(valor.comunas, leerComunaPublica),
     conCertificaciones: valor.conCertificaciones === true,
     certificaciones: leerLista(valor.certificaciones, leerCertificacionPublica),
+    cursos: leerLista(valor.cursos, leerCursoPublico),
     servicios: leerLista(valor.servicios, leerServicioDelPrestador),
   };
 }
@@ -810,7 +846,6 @@ function leerCertificacion(valor: unknown): Certificacion | null {
     typeof valor.tipo !== "string" ||
     typeof valor.nombre !== "string" ||
     typeof valor.emisor !== "string" ||
-    typeof valor.identificador !== "string" ||
     typeof valor.enviadaEn !== "string"
   ) {
     return null;
@@ -818,11 +853,14 @@ function leerCertificacion(valor: unknown): Certificacion | null {
 
   return {
     id: valor.id,
+    clase: valor.clase === "CURSO" ? "CURSO" : "CERTIFICACION",
     tipo: valor.tipo,
     nombre: valor.nombre,
     emisor: valor.emisor,
-    identificador: valor.identificador,
+    identificador: typeof valor.identificador === "string" ? valor.identificador : null,
     vigenteHasta: typeof valor.vigenteHasta === "string" ? valor.vigenteHasta : null,
+    fechaTermino: typeof valor.fechaTermino === "string" ? valor.fechaTermino : null,
+    horas: typeof valor.horas === "number" ? valor.horas : null,
     estado: valor.estado,
     motivoRechazo: typeof valor.motivoRechazo === "string" ? valor.motivoRechazo : null,
     enviadaEn: valor.enviadaEn,
@@ -1256,7 +1294,7 @@ export function crearClienteApi() {
       return leerLista(cuerpo.certificaciones, leerCertificacion);
     },
 
-    /** Envía la certificación con su documento. El estado (PENDIENTE) lo fija el servidor. */
+    /** Envía la certificación o el curso con su documento. El estado (PENDIENTE) lo fija el servidor. */
     async subirCertificacion(datos: DatosCertificacion, archivo: File): Promise<Certificacion> {
       const formulario = new FormData();
       for (const [campo, valor] of Object.entries(datos)) {

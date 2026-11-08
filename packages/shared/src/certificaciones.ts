@@ -6,6 +6,17 @@
 /** Tipo comodín: el prestador escribe el nombre y el emisor. */
 export const CODIGO_CERTIFICACION_OTRA = "OTRA";
 
+/**
+ * Tipo de los cursos: el prestador escribe el nombre del curso y la
+ * institución, cuándo lo terminó y, si quiere, cuántas horas duró. No vence
+ * y el folio es opcional. No enciende el sello «Prestador con certificaciones».
+ */
+export const CODIGO_CURSO = "CURSO";
+
+/** Horas de un curso (mismos límites que el CHECK de la base). */
+export const HORAS_MINIMAS_CURSO = 1;
+export const HORAS_MAXIMAS_CURSO = 5000;
+
 /** Número de registro, folio o código del certificado. */
 export const LARGO_MINIMO_IDENTIFICADOR_CERTIFICACION = 3;
 export const LARGO_MAXIMO_IDENTIFICADOR_CERTIFICACION = 60;
