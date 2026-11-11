@@ -92,7 +92,15 @@ export async function enviar(usuarioId: string, datos: DatosCertificacion, conte
   }
 
   const tipo = (await tiposCertificables()).find((candidato) => candidato.codigo === datos.tipo);
-  if (!tipo) throw errorCampo("tipo", "Elige un tipo de certificación de la lista.");
+  if (!tipo) {
+    // Un curso no se elige de la lista: si falta CURSO, es el catálogo de la
+    // base el que está incompleto (no se cargó seed:maestros), no un error
+    // de quien envía. Sin campo, para que la web lo muestre junto al botón.
+    if (datos.tipo === CODIGO_CURSO) {
+      throw new ErrorHttp(503, "CURSOS_NO_DISPONIBLES", "Todavía no se pueden subir cursos. Inténtalo más tarde o sube una certificación.");
+    }
+    throw errorCampo("tipo", "Elige un tipo de certificación de la lista.");
+  }
   if (tipo.requiereVigencia && !datos.vigenteHasta) {
     throw errorCampo("vigenteHasta", "Esta certificación vence: indica hasta cuándo está vigente.");
   }

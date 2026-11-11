@@ -245,6 +245,9 @@ export default function PaginaMisCertificaciones() {
   const curso = clase === "CURSO";
   // El curso tiene su propia opción arriba: no se repite en la lista de certificaciones.
   const tiposCertificacion = (tipos ?? []).filter((opcion) => opcion.codigo !== CODIGO_CURSO);
+  // Solo se ofrece «Curso» si el servidor lo tiene en su catálogo: si no, la
+  // API rechazaría el envío (pasa en una base sin seed:maestros).
+  const cursosDisponibles = (tipos ?? []).some((opcion) => opcion.codigo === CODIGO_CURSO);
   const tipo = curso ? undefined : tiposCertificacion.find((candidato) => candidato.codigo === datos.tipo);
   const otra = !curso && datos.tipo === CODIGO_CERTIFICACION_OTRA;
 
@@ -348,7 +351,7 @@ export default function PaginaMisCertificaciones() {
             </ul>
 
             <form onSubmit={alEnviar} noValidate aria-labelledby="titulo-nueva">
-              <SelectorClase clase={clase} alCambiar={cambiarClase} />
+              {cursosDisponibles && <SelectorClase clase={clase} alCambiar={cambiarClase} />}
 
               {!curso && (
                 <CampoSelector
