@@ -540,6 +540,24 @@ describe("GET /prestadores/:id/publico", () => {
 describe("Cursos", () => {
   const CURSO = { tipo: "CURSO", nombre: "Instalaciones eléctricas domiciliarias", emisor: "INACAP", fechaTermino: "2025-03-15", horas: "120" };
 
+  it("si el catálogo todavía no tiene el tipo CURSO, responde 503 con un mensaje de cursos, sin campo", async () => {
+    // Lo que pasa en una base donde no se corrió seed:maestros.
+    await prisma.tipoCredencial.update({ where: { codigo: "CURSO" }, data: { activo: false } });
+    try {
+      const prestador = await crearPrestador();
+
+      const respuesta = await subir(prestador.token, CURSO);
+
+      expect(respuesta.status).toBe(503);
+      expect(respuesta.body.error.codigo).toBe("CURSOS_NO_DISPONIBLES");
+      expect(respuesta.body.error.mensaje).toMatch(/cursos/i);
+      expect(respuesta.body.error.mensaje).not.toMatch(/tipo de certificación/i);
+      expect(almacenamiento().cantidad).toBe(0);
+    } finally {
+      await prisma.tipoCredencial.update({ where: { codigo: "CURSO" }, data: { activo: true } });
+    }
+  });
+
   it("se sube sin folio ni vigencia: queda PENDIENTE como curso, con fecha de término y horas", async () => {
     const prestador = await crearPrestador();
 

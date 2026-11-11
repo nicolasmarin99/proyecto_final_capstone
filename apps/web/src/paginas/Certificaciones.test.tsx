@@ -94,9 +94,10 @@ interface Escenario {
   respuestaSubida?: Response;
   cola?: ReturnType<typeof certificacion>[];
   publico?: Response;
+  tipos?: typeof TIPOS;
 }
 
-function simularApi({ usuario = prestador, propias = [], respuestaSubida, cola = [], publico }: Escenario = {}) {
+function simularApi({ usuario = prestador, propias = [], respuestaSubida, cola = [], publico, tipos = TIPOS }: Escenario = {}) {
   const resueltas = new Set<string>();
 
   vi.mocked(fetch).mockImplementation(async (entrada, opciones) => {
@@ -110,7 +111,7 @@ function simularApi({ usuario = prestador, propias = [], respuestaSubida, cola =
     if (url === "/api/prestadores/yo") return json({ perfil: PERFIL });
     if (url === "/api/prestadores/yo/identidad") return json({ identidad: null, cargasDisponibles: 3 });
     if (url === "/api/servicios/mios") return json({ servicios: [], requisitosPendientes: [] });
-    if (url === "/api/certificaciones/tipos") return json({ tipos: TIPOS });
+    if (url === "/api/certificaciones/tipos") return json({ tipos });
     if (url === "/api/prestadores/yo/certificaciones" && metodo === "POST") {
       return respuestaSubida ?? json({ certificacion: certificacion("PENDIENTE", { id: "nueva" }) }, 201);
     }
@@ -485,5 +486,17 @@ describe("Mensajes del envío", () => {
 
     const formulario = screen.getByRole("form", { name: "Nuevo envío" });
     expect(await within(formulario).findByRole("status")).toHaveTextContent(/curso enviado/i);
+  });
+});
+
+describe("Catálogo sin cursos", () => {
+  it("si el servidor todavía no tiene el tipo «Curso», el formulario no lo ofrece", async () => {
+    simularApi({ tipos: TIPOS.filter((tipo) => tipo.codigo !== "CURSO") });
+    renderizar("/mi/certificaciones");
+
+    // El formulario de certificación sigue disponible...
+    expect(await screen.findByLabelText("Tipo de certificación")).toBeInTheDocument();
+    // ...pero no se puede elegir algo que el servidor rechazaría.
+    expect(screen.queryByRole("radio", { name: /curso/i })).not.toBeInTheDocument();
   });
 });
