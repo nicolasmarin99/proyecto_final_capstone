@@ -10,6 +10,7 @@ import { z } from "zod";
 /** Ids de la URL. Sin exigir formato UUID: un id con otra forma no existe (404). */
 export const esquemaIdServicio = z.object({ id: z.string().min(1).max(64) });
 export const esquemaServicioAdmin = z.object({ servicioId: z.string().min(1).max(64) });
+export const esquemaValoracionAdmin = z.object({ valoracionId: z.string().min(1).max(64) });
 
 /**
  * POST /servicios/:id/reportes — { motivo, comentario? }

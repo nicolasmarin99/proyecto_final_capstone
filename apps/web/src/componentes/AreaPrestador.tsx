@@ -71,6 +71,13 @@ function seccionesDe(estado: EstadoPrestador | null): Seccion[] {
       icono: "llave",
       estado: listo ? estadoCertificaciones(estado.certificaciones) : null,
     },
+    {
+      ruta: "/mi/valoraciones",
+      texto: "Valoraciones",
+      icono: "estrella",
+      // Sin etiqueta de estado: no hay nada que completar, solo revisar.
+      estado: null,
+    },
   ];
 }
 

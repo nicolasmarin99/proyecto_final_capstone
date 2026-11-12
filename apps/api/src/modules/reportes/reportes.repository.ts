@@ -89,26 +89,38 @@ export async function reporteAbiertoDe(denuncianteId: string, servicioId: string
 }
 
 export interface FilaCola {
-  servicioId: string;
-  titulo: string;
-  estadoServicio: string;
+  /** Qué se reportó: un servicio (reportes de usuarios) o una valoración (objeción de su prestador). */
+  tipo: "SERVICIO" | "VALORACION";
+  /** Id del servicio o de la valoración. */
+  id: string;
+  /** Título del servicio; null en una valoración. */
+  titulo: string | null;
+  /** Estado del servicio o de la valoración. */
+  estadoObjeto: string;
   prestador: string;
   personas: number;
   reportes: number;
   motivoFrecuente: MotivoDenuncia;
   primerReporte: Date;
   resueltoEn: Date | null;
+  /** Solo valoraciones: lo valorado y el comentario de la objeción. */
+  calificacion: number | null;
+  comentario: string | null;
+  detalleObjecion: string | null;
+  editadaEn: Date | null;
   total: number;
 }
 
 /**
- * Cola de reportes AGRUPADA POR SERVICIO.
+ * Cola de reportes: servicios AGRUPADOS POR SERVICIO y valoraciones
+ * objetadas, en una sola lista.
  *
  * - personas: personas DISTINTAS que lo reportaron (no reportes): diez
  *   reportes de la misma persona, a lo largo del tiempo, siguen siendo una.
+ *   Una valoración tiene a lo más una objeción (la de su prestador).
  * - motivoFrecuente: el motivo que más se repite (mode()).
  * - Orden: primero los de prioridad alta (umbral o más personas), después
- *   los que llevan más tiempo esperando; el id desempata.
+ *   los que llevan más tiempo esperando; el tipo y el id desempatan.
  *
  * Nunca selecciona quién reportó: ni el id ni el nombre salen de aquí.
  * Consulta fija con todos los valores como parámetros ($queryRaw).
@@ -119,33 +131,66 @@ export async function colaAgrupada(filtro: {
   limite: number;
   desplazamiento: number;
 }): Promise<FilaCola[]> {
+  const enEstado = Prisma.sql`(
+    (${filtro.estado}::text = 'pendientes' AND d.estado IN ('ABIERTA', 'EN_REVISION'))
+    OR
+    (${filtro.estado}::text = 'resueltos' AND d.estado IN ('RESUELTA', 'DESESTIMADA'))
+  )`;
+
   return prisma.$queryRaw<FilaCola[]>`
-    SELECT
-      s.id                                                   AS "servicioId",
-      s.titulo,
-      s.estado::text                                         AS "estadoServicio",
-      u.nombre                                               AS prestador,
-      count(DISTINCT d.denunciante_id)::int                  AS personas,
-      count(*)::int                                          AS reportes,
-      mode() WITHIN GROUP (ORDER BY d.motivo)::text          AS "motivoFrecuente",
-      min(d.creado_en)                                       AS "primerReporte",
-      max(d.resuelta_en)                                     AS "resueltoEn",
-      count(*) OVER ()::int                                  AS total
-    FROM denuncias d
-    JOIN servicios s           ON s.id = d.servicio_id
-    JOIN perfiles_prestador p  ON p.id = s.prestador_id
-    JOIN usuarios u            ON u.id = p.usuario_id
-    WHERE d.servicio_id IS NOT NULL
-      AND (
-        (${filtro.estado}::text = 'pendientes' AND d.estado IN ('ABIERTA', 'EN_REVISION'))
-        OR
-        (${filtro.estado}::text = 'resueltos' AND d.estado IN ('RESUELTA', 'DESESTIMADA'))
-      )
-    GROUP BY s.id, s.titulo, s.estado, u.nombre
+    WITH casos AS (
+      SELECT
+        'SERVICIO'                                           AS tipo,
+        s.id                                                 AS id,
+        s.titulo                                             AS titulo,
+        s.estado::text                                       AS "estadoObjeto",
+        u.nombre                                             AS prestador,
+        count(DISTINCT d.denunciante_id)::int                AS personas,
+        count(*)::int                                        AS reportes,
+        mode() WITHIN GROUP (ORDER BY d.motivo)::text        AS "motivoFrecuente",
+        min(d.creado_en)                                     AS "primerReporte",
+        max(d.resuelta_en)                                   AS "resueltoEn",
+        NULL::int                                            AS calificacion,
+        NULL::text                                           AS comentario,
+        NULL::text                                           AS "detalleObjecion",
+        NULL::timestamp(3)                                   AS "editadaEn"
+      FROM denuncias d
+      JOIN servicios s           ON s.id = d.servicio_id
+      JOIN perfiles_prestador p  ON p.id = s.prestador_id
+      JOIN usuarios u            ON u.id = p.usuario_id
+      WHERE d.servicio_id IS NOT NULL AND ${enEstado}
+      GROUP BY s.id, s.titulo, s.estado, u.nombre
+
+      UNION ALL
+
+      SELECT
+        'VALORACION',
+        v.id,
+        NULL,
+        v.estado::text,
+        u.nombre,
+        1,
+        1,
+        d.motivo::text,
+        d.creado_en,
+        d.resuelta_en,
+        v.calificacion,
+        v.comentario,
+        d.detalle,
+        v.editada_en
+      FROM denuncias d
+      JOIN valoraciones v        ON v.id = d.valoracion_id
+      JOIN perfiles_prestador p  ON p.id = v.prestador_id
+      JOIN usuarios u            ON u.id = p.usuario_id
+      WHERE d.valoracion_id IS NOT NULL AND ${enEstado}
+    )
+    SELECT casos.*, count(*) OVER ()::int AS total
+    FROM casos
     ORDER BY
-      (count(DISTINCT d.denunciante_id) >= ${filtro.umbralPrioridad}::int) DESC,
-      min(d.creado_en) ASC,
-      s.id
+      (personas >= ${filtro.umbralPrioridad}::int) DESC,
+      "primerReporte" ASC,
+      tipo,
+      id
     LIMIT ${filtro.limite}::int OFFSET ${filtro.desplazamiento}::int
   `;
 }
@@ -184,17 +229,22 @@ export async function detalleReportes(servicioId: string) {
   return { servicio, denuncias, decisiones, personas: porPersona.length };
 }
 
-/** La última decisión de cada servicio pedido (para la cola de resueltos). */
-export async function ultimasDecisiones(servicioIds: string[]) {
-  if (servicioIds.length === 0) return new Map<string, { accion: AccionReporte; motivo: string; creadoEn: Date }>();
+type UltimaDecision = { accion: AccionReporte; motivo: string; creadoEn: Date };
+
+/** La última decisión de cada servicio y de cada valoración pedidos (para la cola de resueltos). */
+export async function ultimasDecisiones(servicioIds: string[], valoracionIds: string[]) {
+  const porObjeto = new Map<string, UltimaDecision>();
+  if (servicioIds.length === 0 && valoracionIds.length === 0) return porObjeto;
   const filas = await prisma.decisionReporte.findMany({
-    where: { servicioId: { in: servicioIds } },
+    where: { OR: [{ servicioId: { in: servicioIds } }, { valoracionId: { in: valoracionIds } }] },
     orderBy: { creadoEn: "desc" },
-    select: { servicioId: true, accion: true, motivo: true, creadoEn: true },
+    select: { servicioId: true, valoracionId: true, accion: true, motivo: true, creadoEn: true },
   });
-  const porServicio = new Map<string, { accion: AccionReporte; motivo: string; creadoEn: Date }>();
-  for (const fila of filas) if (!porServicio.has(fila.servicioId)) porServicio.set(fila.servicioId, fila);
-  return porServicio;
+  for (const fila of filas) {
+    const clave = fila.servicioId ?? fila.valoracionId;
+    if (clave && !porObjeto.has(clave)) porObjeto.set(clave, fila);
+  }
+  return porObjeto;
 }
 
 /** Motivo con que se ocultó cada servicio (la última decisión OCULTAR_SERVICIO), para su dueño. */
@@ -206,7 +256,7 @@ export async function motivosDeOcultamiento(servicioIds: string[]) {
     select: { servicioId: true, motivo: true, creadoEn: true },
   });
   const porServicio = new Map<string, { motivo: string; creadoEn: Date }>();
-  for (const fila of filas) if (!porServicio.has(fila.servicioId)) porServicio.set(fila.servicioId, fila);
+  for (const fila of filas) if (fila.servicioId && !porServicio.has(fila.servicioId)) porServicio.set(fila.servicioId, fila);
   return porServicio;
 }
 
@@ -253,6 +303,60 @@ export async function registrarDecision(datos: {
     await tx.decisionReporte.create({
       data: {
         servicioId: datos.servicioId,
+        accion: datos.accion,
+        motivo: datos.motivo,
+        reportesCerrados: count,
+        administradorId: datos.administradorId,
+      },
+    });
+    return "hecho";
+  });
+}
+
+export type ResultadoDecisionValoracion = "hecho" | "sin_valoracion" | "sin_pendientes" | "ya_oculta";
+
+/**
+ * Decisión sobre una valoración objetada, todo o nada, como la de un
+ * servicio:
+ * 1. bloquea la valoración (dos administradores no deciden a la vez);
+ * 2. cierra su objeción abierta, con el motivo y quién decidió;
+ * 3. si la acción es ocultar, pasa la valoración a OCULTA (sale del
+ *    promedio, del conteo y de la lista pública);
+ * 4. inserta la decisión en la bitácora (solo inserción).
+ *
+ * Es el ÚNICO camino por el que una valoración deja de estar publicada, y
+ * solo lo llama un administrador.
+ */
+export async function registrarDecisionValoracion(datos: {
+  valoracionId: string;
+  administradorId: string;
+  accion: "DESESTIMAR" | "OCULTAR_VALORACION";
+  motivo: string;
+}): Promise<ResultadoDecisionValoracion> {
+  return prisma.$transaction(async (tx) => {
+    const [valoracion] = await tx.$queryRaw<{ estado: string }[]>`
+      SELECT estado::text AS estado FROM valoraciones WHERE id = ${datos.valoracionId} FOR UPDATE`;
+    if (!valoracion) return "sin_valoracion";
+    if (datos.accion === "OCULTAR_VALORACION" && valoracion.estado === "OCULTA") return "ya_oculta";
+
+    const { count } = await tx.denuncia.updateMany({
+      where: { valoracionId: datos.valoracionId, estado: { in: [...ABIERTAS] } },
+      data: {
+        estado: datos.accion === "DESESTIMAR" ? "DESESTIMADA" : "RESUELTA",
+        resolucion: datos.motivo,
+        resueltaPorId: datos.administradorId,
+        resueltaEn: new Date(),
+      },
+    });
+    if (datos.accion === "DESESTIMAR" && count === 0) return "sin_pendientes";
+
+    if (datos.accion === "OCULTAR_VALORACION") {
+      await tx.valoracion.update({ where: { id: datos.valoracionId }, data: { estado: "OCULTA" } });
+    }
+
+    await tx.decisionReporte.create({
+      data: {
+        valoracionId: datos.valoracionId,
         accion: datos.accion,
         motivo: datos.motivo,
         reportesCerrados: count,

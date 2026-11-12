@@ -8,6 +8,7 @@ import {
   crearReporte,
   detalleReportes,
   registrarDecision,
+  registrarDecisionValoracion,
   reporteAbiertoDe,
   retirarReporte,
   ultimasDecisiones,
@@ -95,7 +96,10 @@ export async function miReporte(usuarioId: string, servicioId: string) {
 
 // ─── Administración ────────────────────────────────────────────────────────
 
-/** La cola agrupada por servicio. Nunca incluye quién reportó. */
+/**
+ * La cola: servicios reportados (agrupados por servicio) y valoraciones
+ * objetadas, en una sola lista. Nunca incluye quién reportó.
+ */
 export async function cola(filtros: FiltrosCola) {
   const filas = await colaAgrupada({
     estado: filtros.estado,
@@ -103,14 +107,19 @@ export async function cola(filtros: FiltrosCola) {
     limite: filtros.porPagina,
     desplazamiento: (filtros.pagina - 1) * filtros.porPagina,
   });
-  const decisiones = filtros.estado === "resueltos" ? await ultimasDecisiones(filas.map((fila) => fila.servicioId)) : new Map();
+  const decisiones =
+    filtros.estado === "resueltos"
+      ? await ultimasDecisiones(
+          filas.filter((fila) => fila.tipo === "SERVICIO").map((fila) => fila.id),
+          filas.filter((fila) => fila.tipo === "VALORACION").map((fila) => fila.id),
+        )
+      : new Map<string, { accion: AccionReporte; motivo: string; creadoEn: Date }>();
   const ahora = Date.now();
 
   return {
-    servicios: filas.map((fila) => {
-      const decision = decisiones.get(fila.servicioId);
-      return {
-        servicio: { id: fila.servicioId, titulo: fila.titulo, estado: fila.estadoServicio, prestador: fila.prestador },
+    casos: filas.map((fila) => {
+      const decision = decisiones.get(fila.id);
+      const comun = {
         personas: fila.personas,
         reportes: fila.reportes,
         motivoFrecuente: fila.motivoFrecuente,
@@ -119,6 +128,28 @@ export async function cola(filtros: FiltrosCola) {
         // Cuánto lleva esperando una decisión (solo en pendientes).
         esperaMinutos: filtros.estado === "pendientes" ? Math.max(0, Math.floor((ahora - fila.primerReporte.getTime()) / 60_000)) : null,
         decision: decision ? { accion: decision.accion, motivo: decision.motivo, decididaEn: decision.creadoEn } : null,
+      };
+      if (fila.tipo === "VALORACION") {
+        return {
+          tipo: "VALORACION" as const,
+          // Lo que el administrador necesita para decidir: el texto, la
+          // calificación y la objeción. Del cliente, nada.
+          valoracion: {
+            id: fila.id,
+            calificacion: fila.calificacion,
+            comentario: fila.comentario,
+            estado: fila.estadoObjeto,
+            editada: fila.editadaEn !== null,
+            prestador: fila.prestador,
+          },
+          objecion: { motivo: fila.motivoFrecuente, comentario: fila.detalleObjecion },
+          ...comun,
+        };
+      }
+      return {
+        tipo: "SERVICIO" as const,
+        servicio: { id: fila.id, titulo: fila.titulo, estado: fila.estadoObjeto, prestador: fila.prestador },
+        ...comun,
       };
     }),
     pagina: filtros.pagina,
@@ -183,3 +214,30 @@ export async function decidir(servicioId: string, administradorId: string, accio
 
   return detalle(servicioId);
 }
+
+/**
+ * Desestima la objeción u oculta la valoración. Siempre un administrador,
+ * siempre con motivo, siempre en la bitácora. Es la única forma de que una
+ * valoración deje de estar publicada.
+ */
+export async function decidirValoracion(
+  valoracionId: string,
+  administradorId: string,
+  accion: "DESESTIMAR" | "OCULTAR_VALORACION",
+  motivo: string,
+) {
+  const resultado = await registrarDecisionValoracion({ valoracionId, administradorId, accion, motivo });
+
+  if (resultado === "sin_valoracion") {
+    throw new ErrorHttp(404, "VALORACION_NO_ENCONTRADA", "Esa valoración no existe.");
+  }
+  if (resultado === "sin_pendientes") {
+    throw new ErrorHttp(409, "SIN_OBJECION_PENDIENTE", "Esta valoración no tiene una objeción pendiente que desestimar.");
+  }
+  if (resultado === "ya_oculta") {
+    throw new ErrorHttp(409, "VALORACION_YA_OCULTA", "Esta valoración ya estaba oculta.");
+  }
+
+  return { valoracion: { id: valoracionId, estado: accion === "OCULTAR_VALORACION" ? "OCULTA" : "PUBLICADA" }, accion, motivo };
+}
+

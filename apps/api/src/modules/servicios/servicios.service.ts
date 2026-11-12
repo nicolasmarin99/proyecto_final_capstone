@@ -17,6 +17,7 @@ import {
 import { identificadoresDeServicio } from "../imagenes/imagenes.repository.js";
 import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
+import { resumenCorto, resumenDe } from "../valoraciones/valoraciones.resumen.js";
 import { esServicioVisible, serviciosVisiblesEntre } from "./servicios.visibilidad.js";
 
 /**
@@ -248,9 +249,10 @@ export async function publico(id: string) {
 
   const servicio = await buscarServicioPublico(id);
   if (!servicio) throw servicioNoVisible();
-  const [certificaciones, cursos] = await Promise.all([
+  const [certificaciones, cursos, valoraciones] = await Promise.all([
     certificacionesPublicasDe(servicio.prestador.id),
     cursosPublicosDe(servicio.prestador.id),
+    resumenDe(servicio.prestador.id),
   ]);
 
   return {
@@ -279,6 +281,8 @@ export async function publico(id: string) {
       certificaciones,
       // Los cursos aprobados, aparte: no encienden el sello.
       cursos,
+      // Junto al nombre: conteo y, con 3 o más publicadas, promedio y distribución.
+      valoraciones,
     },
   };
 }
@@ -349,6 +353,7 @@ export async function buscar(filtros: FiltrosBusqueda) {
           comunas,
           comunasRestantes: Math.max(0, fila.totalComunas - comunas.length),
           conCertificaciones: fila.conCertificaciones,
+          valoraciones: resumenCorto(fila.valoracionesCantidad, fila.valoracionesSuma),
         },
       };
     }),

@@ -3,6 +3,7 @@ import { Rol } from "../../generated/prisma/client.js";
 import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
+import { rutasValoracionesPrestador } from "../valoraciones/valoraciones.routes.js";
 import { contacto, definirComunas, guardarYo, obtenerYo, perfilPublico } from "./prestadores.controller.js";
 
 export const rutasPrestadores = Router();
@@ -27,3 +28,6 @@ rutasPrestadores.get(
 // Perfil público: sin sesión, como la página del servicio. Va después de
 // /yo para que «yo» nunca se lea como un id.
 rutasPrestadores.get("/:id/publico", perfilPublico);
+
+// Valoraciones: /prestadores/:id/valoraciones (ver valoraciones.routes.ts).
+rutasPrestadores.use("/:id/valoraciones", rutasValoracionesPrestador);

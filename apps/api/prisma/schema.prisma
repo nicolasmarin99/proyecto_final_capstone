@@ -586,11 +586,15 @@ model Valoracion {
   calificacion  Int
   comentario    String?
   estado        EstadoValoracion @default(PUBLICADA)
+  /// Cuándo la editó su autor por última vez; nulo si nunca la editó.
+  /// No se usa actualizado_en porque también cambia con la moderación.
+  editadaEn     DateTime?        @map("editada_en")
   creadoEn      DateTime         @default(now()) @map("creado_en")
   actualizadoEn DateTime         @updatedAt @map("actualizado_en")
 
-  respuesta RespuestaValoracion?
-  denuncias Denuncia[]
+  respuesta  RespuestaValoracion?
+  denuncias  Denuncia[]
+  decisiones DecisionReporte[]
 
   @@unique([clienteId, prestadorId])
   @@index([prestadorId, estado])
@@ -621,6 +625,11 @@ enum MotivoDenuncia {
   DATOS_DE_CONTACTO_EN_LA_DESCRIPCION
   SERVICIO_ILEGAL_O_PELIGROSO
   SUPLANTACION_DE_IDENTIDAD
+  /// Motivos con que un prestador objeta una valoración recibida.
+  LENGUAJE_OFENSIVO
+  INFORMACION_FALSA
+  DATOS_PERSONALES_EXPUESTOS
+  NO_CORRESPONDE_A_UN_SERVICIO
   OTRO
 
   @@map("motivo_denuncia")
@@ -694,6 +703,8 @@ enum AccionReporte {
   DESESTIMAR
   /// Ocultó el servicio (estado OCULTO).
   OCULTAR_SERVICIO
+  /// Ocultó una valoración objetada (estado OCULTA).
+  OCULTAR_VALORACION
 
   @@map("accion_reporte")
 }
@@ -708,7 +719,11 @@ enum AccionReporte {
 /// decisión tiene que seguir constando aunque el servicio deje de existir.
 model DecisionReporte {
   id               String        @id @default(uuid())
-  servicioId       String        @map("servicio_id")
+  /// Sobre qué se decidió: un servicio o una valoración, exactamente uno
+  /// (CHECK decisiones_reporte_exactamente_un_objeto).
+  servicioId       String?       @map("servicio_id")
+  valoracionId     String?       @map("valoracion_id")
+  valoracion       Valoracion?   @relation(fields: [valoracionId], references: [id], onDelete: Restrict)
   accion           AccionReporte
   motivo           String
   /// Cuántos reportes abiertos cerró esta decisión.
@@ -718,6 +733,7 @@ model DecisionReporte {
   creadoEn         DateTime      @default(now()) @map("creado_en")
 
   @@index([servicioId, creadoEn])
+  @@index([valoracionId, creadoEn])
   @@index([administradorId, creadoEn])
   @@map("decisiones_reporte")
 }

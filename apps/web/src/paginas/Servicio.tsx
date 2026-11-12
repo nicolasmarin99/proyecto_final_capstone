@@ -4,10 +4,12 @@ import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "../componentes/Boton";
 import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
+import { FormularioValoracion } from "../componentes/FormularioValoracion";
 import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { ReportarServicio } from "../componentes/ReportarServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
+import { ResumenEnLinea, ValoracionesDelPrestador } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 /** Mensaje inicial de WhatsApp: dice desde dónde y por qué servicio escribe. */
@@ -75,6 +77,8 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
   const { id = "" } = useParams();
   const { usuario } = useAuth();
   const [servicio, setServicio] = useState<ServicioPublico | null>(null);
+  // Sube cada vez que el cliente valora, edita o retira: la lista se recarga.
+  const [versionValoraciones, setVersionValoraciones] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,6 +136,10 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                     {servicio.prestador.nombre}
                   </Link>
                 </p>
+                {/* Junto al nombre: el resumen, que lleva a la lista de esta misma página. */}
+                <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">
+                  <ResumenEnLinea resumen={servicio.prestador.valoraciones} />
+                </a>
                 {servicio.prestador.conCertificaciones && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <SelloCertificaciones />
@@ -187,8 +195,19 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                   </Link>
                 </section>
 
-                <section className="mt-8 border-t border-borde pt-6">
-                  <h2 className="font-titulos text-lg font-bold">Contactar a {servicio.prestador.nombre}</h2>
+                <ValoracionesDelPrestador prestadorId={servicio.prestador.id} cliente={cliente} version={versionValoraciones} />
+                <FormularioValoracion
+                  prestadorId={servicio.prestador.id}
+                  nombrePrestador={servicio.prestador.nombre}
+                  servicioId={servicio.id}
+                  cliente={cliente}
+                  alCambiar={() => setVersionValoraciones((version) => version + 1)}
+                />
+
+                <section aria-labelledby="titulo-contacto" className="mt-8 border-t border-borde pt-6">
+                  <h2 id="titulo-contacto" className="font-titulos text-lg font-bold">
+                    Contactar a {servicio.prestador.nombre}
+                  </h2>
                   <div className="mt-3">
                     {usuario ? (
                       <BotonWhatsApp servicio={servicio} cliente={cliente} />

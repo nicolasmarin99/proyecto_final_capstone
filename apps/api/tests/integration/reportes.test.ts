@@ -211,7 +211,7 @@ describe("Retirar y consultar el propio reporte", () => {
 
     expect(retiro.status).toBe(204);
     expect((await prisma.denuncia.findFirstOrThrow({ where: { servicioId: prestador.servicioId } })).estado).toBe("RETIRADA");
-    expect((await cola(admin.token)).body.servicios).toHaveLength(0);
+    expect((await cola(admin.token)).body.casos).toHaveLength(0);
     const despues = await request(app).get(`/servicios/${prestador.servicioId}/reportes/mio`).set("Authorization", `Bearer ${cliente.token}`);
     expect(despues.body.reporte).toBeNull();
     // Se puede volver a reportar.
@@ -258,7 +258,7 @@ describe("GET /admin/reportes: la cola", () => {
     expect(pendientes.status).toBe(200);
     expect(pendientes.body.total).toBe(2);
     const porServicio = Object.fromEntries(
-      pendientes.body.servicios.map((fila: { servicio: { titulo: string }; personas: number }) => [fila.servicio.titulo, fila.personas]),
+      pendientes.body.casos.map((fila: { servicio: { titulo: string }; personas: number }) => [fila.servicio.titulo, fila.personas]),
     );
     expect(porServicio).toEqual({ "Servicio con dos personas": 2, "Servicio con una persona": 1 });
 
@@ -271,7 +271,7 @@ describe("GET /admin/reportes: la cola", () => {
     await reportar(cliente.token, conUna.servicioId);
     await decidir(admin.token, conUna.servicioId, "desestimar");
     const resueltos = await cola(admin.token, "resueltos");
-    const fila = resueltos.body.servicios.find((otra: { servicio: { id: string } }) => otra.servicio.id === conUna.servicioId);
+    const fila = resueltos.body.casos.find((otra: { servicio: { id: string } }) => otra.servicio.id === conUna.servicioId);
     expect(fila).toMatchObject({ personas: 2, reportes: 3 });
   });
 
@@ -285,11 +285,11 @@ describe("GET /admin/reportes: la cola", () => {
 
     const { body } = await cola(admin.token);
 
-    expect(body.servicios.map((fila: { servicio: { titulo: string }; prioridad: string }) => [fila.servicio.titulo, fila.prioridad])).toEqual([
+    expect(body.casos.map((fila: { servicio: { titulo: string }; prioridad: string }) => [fila.servicio.titulo, fila.prioridad])).toEqual([
       ["Reportado recién por tres", "ALTA"],
       ["Reportado hace tiempo por dos", "NORMAL"],
     ]);
-    const antiguoEnCola = body.servicios[1];
+    const antiguoEnCola = body.casos[1];
     expect(antiguoEnCola.esperaMinutos).toBeGreaterThanOrEqual(3 * 24 * 60 - 1);
     expect(antiguoEnCola).toMatchObject({ motivoFrecuente: "CONTENIDO_ENGANOSO", servicio: { prestador: antiguo.nombre } });
   });
@@ -302,7 +302,7 @@ describe("GET /admin/reportes: la cola", () => {
       await reportar(cliente.token, prestador.servicioId, { motivo });
     }
 
-    expect((await cola(admin.token)).body.servicios[0].motivoFrecuente).toBe("SUPLANTACION_DE_IDENTIDAD");
+    expect((await cola(admin.token)).body.casos[0].motivoFrecuente).toBe("SUPLANTACION_DE_IDENTIDAD");
   });
 
   it("un prestador o un cliente no pueden acceder a /admin/reportes: 403", async () => {
@@ -369,8 +369,8 @@ describe("Decisiones", () => {
     expect(await prisma.decisionReporte.findMany({ where: { servicioId: prestador.servicioId } })).toEqual([
       expect.objectContaining({ accion: "DESESTIMAR", motivo: "La descripción coincide con lo que ofrece.", administradorId: admin.id, reportesCerrados: 3 }),
     ]);
-    expect((await cola(admin.token)).body.servicios).toHaveLength(0);
-    expect((await cola(admin.token, "resueltos")).body.servicios[0]).toMatchObject({
+    expect((await cola(admin.token)).body.casos).toHaveLength(0);
+    expect((await cola(admin.token, "resueltos")).body.casos[0]).toMatchObject({
       decision: { accion: "DESESTIMAR", motivo: "La descripción coincide con lo que ofrece." },
     });
   });

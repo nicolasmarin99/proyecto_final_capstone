@@ -3,7 +3,17 @@ import { Rol } from "../../generated/prisma/client.js";
 import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
-import { crear, desestimar, listarCola, obtenerPropio, ocultar, retirarPropio, verDetalle } from "./reportes.controller.js";
+import {
+  crear,
+  desestimar,
+  desestimarObjecion,
+  listarCola,
+  obtenerPropio,
+  ocultar,
+  ocultarValoracion,
+  retirarPropio,
+  verDetalle,
+} from "./reportes.controller.js";
 
 // /servicios/:id/reportes — se monta dentro de las rutas de servicios.
 // Cualquier rol con sesión y correo confirmado puede reportar; las reglas
@@ -22,3 +32,7 @@ rutasReportesAdmin.get("/", listarCola);
 rutasReportesAdmin.get("/:servicioId", verDetalle);
 rutasReportesAdmin.patch("/:servicioId/desestimar", desestimar);
 rutasReportesAdmin.patch("/:servicioId/ocultar", ocultar);
+// Valoraciones objetadas por su prestador. Ocultar una valoración solo se
+// puede desde aquí: el router entero exige el rol ADMINISTRADOR.
+rutasReportesAdmin.patch("/valoraciones/:valoracionId/desestimar", desestimarObjecion);
+rutasReportesAdmin.patch("/valoraciones/:valoracionId/ocultar", ocultarValoracion);

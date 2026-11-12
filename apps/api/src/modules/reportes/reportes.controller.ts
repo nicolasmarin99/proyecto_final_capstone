@@ -1,7 +1,14 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaCola, esquemaDecision, esquemaIdServicio, esquemaReporte, esquemaServicioAdmin } from "./reportes.schema.js";
-import { cola, decidir, detalle, miReporte, reportar, retirar } from "./reportes.service.js";
+import {
+  esquemaCola,
+  esquemaDecision,
+  esquemaIdServicio,
+  esquemaReporte,
+  esquemaServicioAdmin,
+  esquemaValoracionAdmin,
+} from "./reportes.schema.js";
+import { cola, decidir, decidirValoracion, detalle, miReporte, reportar, retirar } from "./reportes.service.js";
 
 /** Sin try/catch: Express 5 entrega los rechazos al manejador central. El usuario sale del token. */
 function idDelUsuario(req: Request): string {
@@ -56,3 +63,18 @@ export async function ocultar(req: Request, res: Response) {
 
   res.status(200).json(await decidir(servicioId, idDelUsuario(req), "OCULTAR_SERVICIO", motivo));
 }
+
+export async function desestimarObjecion(req: Request, res: Response) {
+  const { valoracionId } = esquemaValoracionAdmin.parse(req.params);
+  const { motivo } = esquemaDecision.parse(req.body);
+
+  res.status(200).json(await decidirValoracion(valoracionId, idDelUsuario(req), "DESESTIMAR", motivo));
+}
+
+export async function ocultarValoracion(req: Request, res: Response) {
+  const { valoracionId } = esquemaValoracionAdmin.parse(req.params);
+  const { motivo } = esquemaDecision.parse(req.body);
+
+  res.status(200).json(await decidirValoracion(valoracionId, idDelUsuario(req), "OCULTAR_VALORACION", motivo));
+}
+
