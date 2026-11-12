@@ -5,6 +5,7 @@ import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../comp
 import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
+import { ResumenEnLinea, ValoracionesDelPrestador } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 /**
@@ -74,6 +75,9 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
                 <h1 className="mt-2 font-titulos text-[28px] leading-[1.15] font-bold tracking-[-0.5px] break-words md:text-[36px]">
                   {prestador.nombre}
                 </h1>
+                <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">
+                  <ResumenEnLinea resumen={prestador.valoraciones} />
+                </a>
                 {prestador.conCertificaciones && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <SelloCertificaciones tamano="normal" />
@@ -128,6 +132,9 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
                     <ListaCursos cursos={prestador.cursos} />
                   </section>
                 )}
+
+                {/* Resumen, distribución por estrella y la lista paginada. */}
+                <ValoracionesDelPrestador prestadorId={prestador.id} cliente={cliente} />
 
                 <section aria-labelledby="titulo-servicios" className="mt-8 border-t border-borde pt-6">
                   <h2 id="titulo-servicios" className="font-titulos text-lg font-bold">

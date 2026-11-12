@@ -21,6 +21,7 @@ import { rutasReportesAdmin } from "./modules/reportes/reportes.routes.js";
 import { rutasPrestadores } from "./modules/prestadores/prestadores.routes.js";
 import { rutasCategorias, rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { rutasComunas } from "./modules/territorio/territorio.routes.js";
+import { rutasValoraciones, rutasValoracionesRecibidas } from "./modules/valoraciones/valoraciones.routes.js";
 import { ErrorHttp } from "./shared/errores.js";
 
 export const app = express();
@@ -46,6 +47,8 @@ app.use("/admin/imagenes", rutasImagenesAdmin);
 app.use("/admin/reportes", rutasReportesAdmin);
 app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
 app.use("/prestadores/yo/certificaciones", rutasCertificacionesPrestador);
+app.use("/prestadores/yo/valoraciones", rutasValoracionesRecibidas);
+app.use("/valoraciones", rutasValoraciones);
 app.use("/admin/certificaciones", rutasCertificacionesAdmin);
 app.use("/certificaciones", rutasCatalogoCertificaciones);
 app.use("/admin", rutasAdmin);

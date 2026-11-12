@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import type { ResultadoBusqueda } from "../api/cliente";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 import { SelloCertificaciones } from "./Certificaciones";
+import { ResumenEnLinea } from "./Valoraciones";
 import { Icono } from "./iconos";
 
 /** «Las Condes, Ñuñoa, Providencia y 2 más». */
@@ -53,6 +54,9 @@ export function TarjetaResultado({ resultado }: { resultado: ResultadoBusqueda }
           <p className="mt-2 flex items-center gap-1.5 text-sm text-texto-suave">
             <Icono nombre="persona" tamano={16} className="shrink-0 text-primario" />
             {prestador.nombre}
+          </p>
+          <p className="mt-1">
+            <ResumenEnLinea resumen={prestador.valoraciones} tamano="chico" />
           </p>
           {prestador.comunas.length > 0 && (
             <p className="mt-1 flex items-start gap-1.5 text-sm text-texto-suave">

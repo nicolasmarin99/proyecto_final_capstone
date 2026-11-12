@@ -274,7 +274,9 @@ describe("Página pública del servicio", () => {
 
     await screen.findByRole("heading", { level: 1 });
     expect(screen.queryByRole("button", { name: /whatsapp/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /inicia sesión/i })).toHaveAttribute("href", "/iniciar-sesion");
+    // La página tiene dos «Inicia sesión» (contactar y valorar): este es el del contacto.
+    const contacto = screen.getByRole("region", { name: /contactar a/i });
+    expect(within(contacto).getByRole("link", { name: /inicia sesión/i })).toHaveAttribute("href", "/iniciar-sesion");
   });
 
   it("con sesión: registra el contacto y después abre wa.me con un mensaje sobre el servicio", async () => {

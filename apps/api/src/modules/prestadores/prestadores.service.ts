@@ -1,6 +1,7 @@
 import { ErrorHttp } from "../../shared/errores.js";
 import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { urlMiniatura } from "../imagenes/imagenes.urls.js";
+import { resumenDe } from "../valoraciones/valoraciones.resumen.js";
 import { contarServiciosVisiblesDe, esServicioVisible, serviciosVisiblesDe } from "../servicios/servicios.visibilidad.js";
 import { existeComuna } from "../territorio/territorio.repository.js";
 import {
@@ -144,11 +145,12 @@ export async function obtenerPerfilPublico(prestadorId: string) {
   const ids = await serviciosVisiblesDe(prestadorId);
   if (ids.length === 0) throw prestadorNoEncontrado();
 
-  const [prestador, servicios, certificaciones, cursos] = await Promise.all([
+  const [prestador, servicios, certificaciones, cursos, valoraciones] = await Promise.all([
     buscarPrestadorPublico(prestadorId),
     buscarServiciosParaPerfil(ids),
     certificacionesPublicasDe(prestadorId),
     cursosPublicosDe(prestadorId),
+    resumenDe(prestadorId),
   ]);
   if (!prestador) throw prestadorNoEncontrado();
 
@@ -165,6 +167,8 @@ export async function obtenerPerfilPublico(prestadorId: string) {
     conCertificaciones: certificaciones.length > 0,
     certificaciones,
     cursos,
+    // Conteo y, con 3 o más publicadas, promedio y distribución por estrella.
+    valoraciones,
     servicios: ids.flatMap((id) => {
       const servicio = porId.get(id);
       if (!servicio) return [];

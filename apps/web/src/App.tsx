@@ -22,6 +22,7 @@ import PaginaMisCertificaciones from "./paginas/mi/MisCertificaciones";
 import PaginaMiIdentidad from "./paginas/mi/MiIdentidad";
 import PaginaMiPerfil from "./paginas/mi/MiPerfil";
 import PaginaMisServicios from "./paginas/mi/MisServicios";
+import PaginaMisValoraciones from "./paginas/mi/MisValoraciones";
 
 export default function App() {
   return (
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="perfil" element={<PaginaMiPerfil />} />
           <Route path="identidad" element={<PaginaMiIdentidad />} />
           <Route path="certificaciones" element={<PaginaMisCertificaciones />} />
+          <Route path="valoraciones" element={<PaginaMisValoraciones />} />
           <Route path="servicios" element={<PaginaMisServicios />} />
           <Route path="servicios/nuevo" element={<PaginaEditorServicio />} />
           <Route path="servicios/:id/editar" element={<PaginaEditorServicio />} />

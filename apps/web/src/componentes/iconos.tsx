@@ -88,6 +88,7 @@ const trazos = {
     </>
   ),
   mas: <path d="M12 5v14M5 12h14" />,
+  estrella: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
 } satisfies Record<string, ReactNode>;
 
 export type NombreIcono = keyof typeof trazos;

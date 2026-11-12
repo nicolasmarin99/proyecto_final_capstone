@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import { LARGO_MAXIMO_MOTIVO_DECISION, LARGO_MINIMO_MOTIVO_DECISION, PERSONAS_PRIORIDAD_ALTA } from "@localcl/shared";
-import { ErrorApi, type ClienteApi, type DetalleReportes, type FilaColaReportes } from "../api/cliente";
+import { ErrorApi, type CasoCola, type CasoValoracion, type ClienteApi, type DetalleReportes } from "../api/cliente";
 import { MOTIVO_REPORTE, textoEspera } from "../servicios/reportes";
+import { MOTIVO_OBJECION } from "../servicios/valoraciones";
+import { Estrellas } from "./Valoraciones";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
 import { Icono } from "./iconos";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" });
 
-const NOMBRE_ACCION = { DESESTIMAR: "Desestimado", OCULTAR_SERVICIO: "Servicio ocultado" } as const;
+const NOMBRE_ACCION = { DESESTIMAR: "Desestimado", OCULTAR_SERVICIO: "Servicio ocultado", OCULTAR_VALORACION: "Valoración ocultada" } as const;
 
 type Accion = "desestimar" | "ocultar";
 
@@ -186,7 +188,128 @@ function DetalleCaso({
 }
 
 /**
- * Cola de reportes, agrupada por servicio. Los casos con
+ * Una valoración objetada por su prestador: el texto, la calificación y la
+ * objeción, y la decisión ahí mismo. Del cliente que la escribió no se
+ * muestra nada. Ocultarla solo se puede desde aquí, con motivo, y queda en
+ * la bitácora.
+ */
+function TarjetaValoracion({
+  caso,
+  pendiente,
+  cliente,
+  alDecidir,
+}: {
+  caso: CasoValoracion;
+  pendiente: boolean;
+  cliente: ClienteApi;
+  alDecidir(mensaje: string): void;
+}) {
+  const idMotivo = useId();
+  const [accion, setAccion] = useState<Accion | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [enviando, setEnviando] = useState(false);
+  const { valoracion, objecion } = caso;
+
+  async function confirmar() {
+    if (!accion) return;
+    const limpio = motivo.trim();
+    if (limpio.length < LARGO_MINIMO_MOTIVO_DECISION) {
+      setError(`Explica la decisión en al menos ${LARGO_MINIMO_MOTIVO_DECISION} caracteres.`);
+      return;
+    }
+    setEnviando(true);
+    try {
+      await cliente.decidirValoracion(valoracion.id, accion, limpio);
+      alDecidir(
+        accion === "ocultar"
+          ? `La valoración sobre ${valoracion.prestador} quedó oculta.`
+          : `La objeción de ${valoracion.prestador} quedó desestimada; la valoración sigue publicada.`,
+      );
+    } catch (causa) {
+      setError(causa instanceof ErrorApi ? (causa.mensajeDe("motivo") ?? causa.message) : "No fue posible registrar la decisión.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <article aria-label={`Valoración objetada por ${valoracion.prestador}`} className="rounded-medio border border-borde bg-blanco p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-bold tracking-[0.8px] text-primario uppercase">Valoración objetada</p>
+          <h3 className="font-titulos text-base font-bold text-noche">Sobre {valoracion.prestador}</h3>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <Estrellas valor={valoracion.calificacion} tamano={14} />
+          <span className="font-semibold text-noche">{valoracion.calificacion} de 5</span>
+        </span>
+      </div>
+
+      <blockquote className="mt-3 rounded-chico bg-niebla px-3 py-2 text-sm whitespace-pre-line text-noche">
+        {valoracion.comentario ? `«${valoracion.comentario}»` : "Sin comentario: solo estrellas."}
+        {valoracion.editada && <span className="mt-1 block text-xs text-texto-suave">Editada por su autor</span>}
+      </blockquote>
+
+      <dl className="mt-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-texto-suave">Motivo de la objeción</dt>
+          <dd className="font-semibold text-noche">{MOTIVO_OBJECION[objecion.motivo].texto}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-texto-suave">{pendiente ? "Esperando" : "Decisión"}</dt>
+          <dd className="font-semibold text-noche">
+            {pendiente && caso.esperaMinutos !== null ? textoEspera(caso.esperaMinutos) : caso.decision ? NOMBRE_ACCION[caso.decision.accion] : "—"}
+          </dd>
+        </div>
+      </dl>
+      {objecion.comentario && <p className="mt-2 text-sm text-noche">Dice el prestador: «{objecion.comentario}»</p>}
+      {!pendiente && caso.decision && <p className="mt-2 text-sm text-texto-suave">{caso.decision.motivo}</p>}
+
+      {pendiente &&
+        (accion ? (
+          <div className={`mt-3 rounded-medio border p-3 ${accion === "ocultar" ? "border-error-700/20 bg-error-50" : "border-borde bg-niebla"}`}>
+            <p className="text-sm font-semibold text-noche">
+              {accion === "ocultar"
+                ? "Ocultar la valoración: sale del perfil, del promedio y del conteo. El prestador verá el motivo."
+                : "Desestimar la objeción: la valoración sigue publicada y el prestador no podrá volver a objetarla."}
+            </p>
+            <CampoAreaTexto
+              id={idMotivo}
+              etiqueta="Motivo de la decisión"
+              valor={motivo}
+              alCambiar={(valor) => {
+                setMotivo(valor);
+                setError(undefined);
+              }}
+              minimo={LARGO_MINIMO_MOTIVO_DECISION}
+              maximo={LARGO_MAXIMO_MOTIVO_DECISION}
+              error={error}
+            />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Boton type="button" variante="secundario" disabled={enviando} onClick={() => setAccion(null)}>
+                Cancelar
+              </Boton>
+              <Boton type="button" cargando={enviando} onClick={() => void confirmar()}>
+                {accion === "ocultar" ? "Ocultar valoración" : "Desestimar objeción"}
+              </Boton>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Boton type="button" variante="secundario" onClick={() => setAccion("desestimar")}>
+              Desestimar objeción
+            </Boton>
+            <Boton type="button" onClick={() => setAccion("ocultar")}>
+              Ocultar valoración
+            </Boton>
+          </div>
+        ))}
+    </article>
+  );
+}
+
+/**
+ * Cola de reportes: servicios agrupados y valoraciones objetadas. Los casos con
  * PERSONAS_PRIORIDAD_ALTA o más personas distintas van primero y
  * destacados; dentro de cada prioridad, el que más espera va arriba.
  *
@@ -196,7 +319,7 @@ function DetalleCaso({
 export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
   const idTitulo = useId();
   const [estado, setEstado] = useState<"pendientes" | "resueltos">("pendientes");
-  const [filas, setFilas] = useState<FilaColaReportes[] | null>(null);
+  const [filas, setFilas] = useState<CasoCola[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -206,7 +329,7 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
     setError(null);
     try {
       const datos = await cliente.colaReportes({ estado });
-      setFilas(datos.servicios);
+      setFilas(datos.casos);
       setTotal(datos.total);
     } catch {
       setError("No fue posible cargar los reportes.");
@@ -262,10 +385,25 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
       {filas && filas.length > 0 && (
         <>
           <p className="mt-3 text-sm text-texto-suave">
-            {total === 1 ? "1 servicio" : `${total} servicios`} {estado === "pendientes" ? "esperando revisión" : "con reportes resueltos"}
+            {total === 1 ? "1 caso" : `${total} casos`} {estado === "pendientes" ? "esperando revisión" : "resueltos"}
           </p>
           <ul className="mt-3 space-y-3">
             {filas.map((fila) => {
+              if (fila.tipo === "VALORACION") {
+                return (
+                  <li key={`valoracion-${fila.valoracion.id}`}>
+                    <TarjetaValoracion
+                      caso={fila}
+                      pendiente={estado === "pendientes"}
+                      cliente={cliente}
+                      alDecidir={(mensaje) => {
+                        setAviso(mensaje);
+                        void cargar();
+                      }}
+                    />
+                  </li>
+                );
+              }
               const alta = estado === "pendientes" && fila.prioridad === "ALTA";
               const expandido = abierto === fila.servicio.id;
               return (

@@ -60,8 +60,9 @@ function simularApi({ usuario = CLIENTE, miReporte = null, respuestaReporte }: E
     if (url.startsWith("/api/admin/imagenes")) return json({ imagenes: [], pagina: 1, porPagina: 20, total: 0 });
     if (url === "/api/admin/reportes?estado=pendientes") {
       return json({
-        servicios: [
+        casos: [
           {
+            tipo: "SERVICIO",
             servicio: { id: "s1", titulo: "Gasfitería a domicilio", estado: "PUBLICADO", prestador: "Pedro Soto" },
             personas: 4,
             reportes: 4,
@@ -72,6 +73,7 @@ function simularApi({ usuario = CLIENTE, miReporte = null, respuestaReporte }: E
             decision: null,
           },
           {
+            tipo: "SERVICIO",
             servicio: { id: "s2", titulo: "Muebles de cocina", estado: "PUBLICADO", prestador: "Jorge Ramírez" },
             personas: 1,
             reportes: 1,
@@ -87,7 +89,7 @@ function simularApi({ usuario = CLIENTE, miReporte = null, respuestaReporte }: E
         total: 2,
       });
     }
-    if (url === "/api/admin/reportes?estado=resueltos") return json({ servicios: [], pagina: 1, porPagina: 20, total: 0 });
+    if (url === "/api/admin/reportes?estado=resueltos") return json({ casos: [], pagina: 1, porPagina: 20, total: 0 });
     if (url === "/api/admin/reportes/s1" || /\/api\/admin\/reportes\/s1\/(desestimar|ocultar)$/.test(url)) {
       const oculto = url.endsWith("/ocultar");
       return json({

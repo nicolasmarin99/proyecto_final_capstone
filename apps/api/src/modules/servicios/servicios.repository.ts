@@ -2,6 +2,7 @@ import { prisma } from "../../db.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
 import { seleccionImagen } from "../imagenes/imagenes.repository.js";
 import { prestadorConCertificaciones } from "../certificaciones/certificaciones.publicas.js";
+import { columnasResumen } from "../valoraciones/valoraciones.resumen.js";
 import { condicionServicioVisible } from "./servicios.visibilidad.js";
 
 /** Lo que ve el dueño de su servicio. */
@@ -153,6 +154,9 @@ export interface FilaBusqueda {
   totalComunas: number;
   /** Tiene al menos una certificación pública (certificaciones.publicas.ts). */
   conCertificaciones: boolean;
+  /** Valoraciones publicadas del prestador y la suma de sus estrellas (valoraciones.resumen.ts). */
+  valoracionesCantidad: number;
+  valoracionesSuma: number;
   /** La primera imagen visible, para la miniatura; null si no tiene. */
   imagenIdentificador: string | null;
   total: number;
@@ -206,6 +210,10 @@ export async function buscarServiciosPublicados(p: ParametrosBusqueda): Promise<
       -- Sello «Prestador con certificaciones»: la misma regla que su perfil
       -- público y la página del servicio (certificaciones.publicas.ts).
       ${prestadorConCertificaciones} AS "conCertificaciones",
+
+      -- Conteo y suma de las valoraciones publicadas. El promedio (y la
+      -- regla de mostrarlo solo con 3 o más) lo calcula resumenCorto().
+      ${columnasResumen},
 
       -- La miniatura: la primera imagen VISIBLE de la galería, si hay.
       -- Una oculta por moderación nunca llega a la búsqueda.

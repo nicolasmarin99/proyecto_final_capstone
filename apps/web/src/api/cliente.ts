@@ -1,4 +1,4 @@
-import type { MotivoReporte, OrdenBusqueda } from "@localcl/shared";
+import { MOTIVOS_OBJECION, type MotivoObjecion, type MotivoReporte, type OrdenBusqueda } from "@localcl/shared";
 
 export interface DetalleError {
   campo: string;
@@ -174,6 +174,7 @@ export interface ServicioPublico extends Precio {
     certificaciones: CertificacionPublica[];
     /** Cursos aprobados: se muestran aparte y no encienden el sello. */
     cursos: CursoPublico[];
+    valoraciones: ResumenValoraciones;
   };
   /** Solo las visibles, en el orden que eligió el prestador. La primera es la portada. */
   imagenes: ImagenPublica[];
@@ -204,6 +205,7 @@ export interface ResultadoBusqueda extends Precio {
     comunasRestantes: number;
     /** Tiene al menos una certificación aprobada y vigente. */
     conCertificaciones: boolean;
+    valoraciones: ResumenCorto;
   };
 }
 
@@ -225,6 +227,7 @@ export interface PrestadorPublico {
   conCertificaciones: boolean;
   certificaciones: CertificacionPublica[];
   cursos: CursoPublico[];
+  valoraciones: ResumenValoraciones;
   servicios: ServicioDelPrestador[];
 }
 
@@ -235,8 +238,88 @@ export interface PaginaBusqueda {
   total: number;
 }
 
+/** Resumen de valoraciones: promedio y distribución solo con 3 o más publicadas (lo decide la API). */
+export interface ResumenCorto {
+  cantidad: number;
+  promedio: number | null;
+}
+
+export type Estrella = "1" | "2" | "3" | "4" | "5";
+
+export interface ResumenValoraciones extends ResumenCorto {
+  distribucion: Record<Estrella, number> | null;
+}
+
+/** Una valoración pública: del cliente, solo el nombre de pila. */
+export interface ValoracionPublica {
+  id: string;
+  calificacion: number;
+  comentario: string | null;
+  creadaEn: string;
+  editada: boolean;
+  cliente: { nombre: string; foto: string | null };
+}
+
+export interface PaginaValoraciones {
+  resumen: ResumenValoraciones;
+  valoraciones: ValoracionPublica[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+}
+
+export interface ValoracionPropia {
+  id: string;
+  calificacion: number;
+  comentario: string | null;
+  estado: "PUBLICADA" | "OCULTA";
+  ocultaPorModeracion: boolean;
+  creadaEn: string;
+  editada: boolean;
+}
+
+/** Lo que el cliente necesita para el formulario: su valoración y si puede valorar hoy. */
+export interface MiValoracion {
+  valoracion: ValoracionPropia | null;
+  puedeValorar: boolean;
+  motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO" | "MODERADA" | null;
+  plazoHasta: string | null;
+  puedeRetirar: boolean;
+}
+
+/** Una valoración que recibió el prestador, con su objeción y, si se ocultó, el motivo. */
+export interface ValoracionRecibida {
+  id: string;
+  calificacion: number;
+  comentario: string | null;
+  estado: "PUBLICADA" | "OCULTA";
+  creadaEn: string;
+  editada: boolean;
+  cliente: { nombre: string };
+  objecion: {
+    motivo: MotivoObjecion;
+    comentario: string | null;
+    estado: string;
+    enviadaEn: string;
+    resolucion: string | null;
+    decididaEn: string | null;
+  } | null;
+  retirada: { motivo: string; en: string } | null;
+}
+
+export interface PaginaRecibidas {
+  resumen: ResumenValoraciones;
+  valoraciones: ValoracionRecibida[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+}
+
+export type AccionDecision = "DESESTIMAR" | "OCULTAR_SERVICIO" | "OCULTAR_VALORACION";
+
 /** Una fila de la cola de reportes: un servicio, nunca una persona. */
 export interface FilaColaReportes {
+  tipo: "SERVICIO";
   servicio: { id: string; titulo: string; estado: string; prestador: string };
   /** Personas distintas que lo reportaron. */
   personas: number;
@@ -246,8 +329,20 @@ export interface FilaColaReportes {
   primerReporte: string;
   /** Minutos esperando una decisión (solo en pendientes). */
   esperaMinutos: number | null;
-  decision: { accion: "DESESTIMAR" | "OCULTAR_SERVICIO"; motivo: string; decididaEn: string } | null;
+  decision: { accion: AccionDecision; motivo: string; decididaEn: string } | null;
 }
+
+/** Una valoración objetada por su prestador, en la misma cola. Del cliente, nada. */
+export interface CasoValoracion {
+  tipo: "VALORACION";
+  valoracion: { id: string; calificacion: number; comentario: string | null; estado: string; editada: boolean; prestador: string };
+  objecion: { motivo: MotivoObjecion; comentario: string | null };
+  primerReporte: string;
+  esperaMinutos: number | null;
+  decision: { accion: AccionDecision; motivo: string; decididaEn: string } | null;
+}
+
+export type CasoCola = FilaColaReportes | CasoValoracion;
 
 /** Un reporte en el detalle. Sin la identidad de quien lo envió: solo si su cuenta tenía más de una semana. */
 export interface ReporteDetalle {
@@ -563,6 +658,135 @@ function esMotivo(valor: unknown): valor is MotivoReporte {
   return typeof valor === "string" && MOTIVOS.includes(valor);
 }
 
+const MOTIVOS_DE_OBJECION: readonly string[] = MOTIVOS_OBJECION;
+
+function esMotivoObjecion(valor: unknown): valor is MotivoObjecion {
+  return typeof valor === "string" && MOTIVOS_DE_OBJECION.includes(valor);
+}
+
+function leerResumenCorto(valor: unknown): ResumenCorto {
+  if (!esObjeto(valor)) return { cantidad: 0, promedio: null };
+  return {
+    cantidad: typeof valor.cantidad === "number" ? valor.cantidad : 0,
+    promedio: typeof valor.promedio === "number" ? valor.promedio : null,
+  };
+}
+
+function leerResumenValoraciones(valor: unknown): ResumenValoraciones {
+  const corto = leerResumenCorto(valor);
+  const distribucion = esObjeto(valor) && esObjeto(valor.distribucion) ? valor.distribucion : null;
+  const contar = (estrella: Estrella) => (distribucion && typeof distribucion[estrella] === "number" ? distribucion[estrella] : 0);
+  return {
+    ...corto,
+    distribucion: distribucion ? { "1": contar("1"), "2": contar("2"), "3": contar("3"), "4": contar("4"), "5": contar("5") } : null,
+  };
+}
+
+function leerValoracionPublica(valor: unknown): ValoracionPublica | null {
+  if (
+    !esObjeto(valor) ||
+    typeof valor.id !== "string" ||
+    typeof valor.calificacion !== "number" ||
+    typeof valor.creadaEn !== "string" ||
+    !esObjeto(valor.cliente) ||
+    typeof valor.cliente.nombre !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: valor.id,
+    calificacion: valor.calificacion,
+    comentario: typeof valor.comentario === "string" ? valor.comentario : null,
+    creadaEn: valor.creadaEn,
+    editada: valor.editada === true,
+    cliente: { nombre: valor.cliente.nombre, foto: typeof valor.cliente.foto === "string" ? valor.cliente.foto : null },
+  };
+}
+
+function leerValoracionPropia(valor: unknown): ValoracionPropia | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.calificacion !== "number" || typeof valor.creadaEn !== "string") return null;
+  return {
+    id: valor.id,
+    calificacion: valor.calificacion,
+    comentario: typeof valor.comentario === "string" ? valor.comentario : null,
+    estado: valor.estado === "OCULTA" ? "OCULTA" : "PUBLICADA",
+    ocultaPorModeracion: valor.ocultaPorModeracion === true,
+    creadaEn: valor.creadaEn,
+    editada: valor.editada === true,
+  };
+}
+
+function leerValoracionRecibida(valor: unknown): ValoracionRecibida | null {
+  if (
+    !esObjeto(valor) ||
+    typeof valor.id !== "string" ||
+    typeof valor.calificacion !== "number" ||
+    typeof valor.creadaEn !== "string" ||
+    !esObjeto(valor.cliente) ||
+    typeof valor.cliente.nombre !== "string"
+  ) {
+    return null;
+  }
+  const objecion = esObjeto(valor.objecion) ? valor.objecion : null;
+  const retirada = esObjeto(valor.retirada) ? valor.retirada : null;
+  return {
+    id: valor.id,
+    calificacion: valor.calificacion,
+    comentario: typeof valor.comentario === "string" ? valor.comentario : null,
+    estado: valor.estado === "OCULTA" ? "OCULTA" : "PUBLICADA",
+    creadaEn: valor.creadaEn,
+    editada: valor.editada === true,
+    cliente: { nombre: valor.cliente.nombre },
+    objecion:
+      objecion && esMotivoObjecion(objecion.motivo) && typeof objecion.estado === "string" && typeof objecion.enviadaEn === "string"
+        ? {
+            motivo: objecion.motivo,
+            comentario: typeof objecion.comentario === "string" ? objecion.comentario : null,
+            estado: objecion.estado,
+            enviadaEn: objecion.enviadaEn,
+            resolucion: typeof objecion.resolucion === "string" ? objecion.resolucion : null,
+            decididaEn: typeof objecion.decididaEn === "string" ? objecion.decididaEn : null,
+          }
+        : null,
+    retirada: retirada && typeof retirada.motivo === "string" && typeof retirada.en === "string" ? { motivo: retirada.motivo, en: retirada.en } : null,
+  };
+}
+
+function esAccionDecision(valor: unknown): valor is AccionDecision {
+  return valor === "DESESTIMAR" || valor === "OCULTAR_SERVICIO" || valor === "OCULTAR_VALORACION";
+}
+
+function leerDecisionCola(valor: unknown): FilaColaReportes["decision"] {
+  if (!esObjeto(valor) || !esAccionDecision(valor.accion) || typeof valor.motivo !== "string" || typeof valor.decididaEn !== "string") return null;
+  return { accion: valor.accion, motivo: valor.motivo, decididaEn: valor.decididaEn };
+}
+
+function leerCasoValoracion(valor: unknown): CasoValoracion | null {
+  if (!esObjeto(valor) || !esObjeto(valor.valoracion) || !esObjeto(valor.objecion) || typeof valor.primerReporte !== "string") return null;
+  const { id, calificacion, estado, prestador } = valor.valoracion;
+  if (typeof id !== "string" || typeof calificacion !== "number" || typeof estado !== "string" || typeof prestador !== "string") return null;
+  if (!esMotivoObjecion(valor.objecion.motivo)) return null;
+  return {
+    tipo: "VALORACION",
+    valoracion: {
+      id,
+      calificacion,
+      comentario: typeof valor.valoracion.comentario === "string" ? valor.valoracion.comentario : null,
+      estado,
+      editada: valor.valoracion.editada === true,
+      prestador,
+    },
+    objecion: { motivo: valor.objecion.motivo, comentario: typeof valor.objecion.comentario === "string" ? valor.objecion.comentario : null },
+    primerReporte: valor.primerReporte,
+    esperaMinutos: typeof valor.esperaMinutos === "number" ? valor.esperaMinutos : null,
+    decision: leerDecisionCola(valor.decision),
+  };
+}
+
+function leerCaso(valor: unknown): CasoCola | null {
+  return esObjeto(valor) && valor.tipo === "VALORACION" ? leerCasoValoracion(valor) : leerFilaCola(valor);
+}
+
 function leerFilaCola(valor: unknown): FilaColaReportes | null {
   if (!esObjeto(valor) || !esObjeto(valor.servicio) || !esMotivo(valor.motivoFrecuente)) return null;
   const { id, titulo, estado, prestador } = valor.servicio;
@@ -577,8 +801,8 @@ function leerFilaCola(valor: unknown): FilaColaReportes | null {
   ) {
     return null;
   }
-  const decision = esObjeto(valor.decision) ? valor.decision : null;
   return {
+    tipo: "SERVICIO",
     servicio: { id, titulo, estado, prestador },
     personas: valor.personas,
     reportes: valor.reportes,
@@ -586,10 +810,7 @@ function leerFilaCola(valor: unknown): FilaColaReportes | null {
     prioridad: valor.prioridad === "ALTA" ? "ALTA" : "NORMAL",
     primerReporte: valor.primerReporte,
     esperaMinutos: typeof valor.esperaMinutos === "number" ? valor.esperaMinutos : null,
-    decision:
-      decision && (decision.accion === "DESESTIMAR" || decision.accion === "OCULTAR_SERVICIO") && typeof decision.motivo === "string" && typeof decision.decididaEn === "string"
-        ? { accion: decision.accion, motivo: decision.motivo, decididaEn: decision.decididaEn }
-        : null,
+    decision: leerDecisionCola(valor.decision),
   };
 }
 
@@ -763,6 +984,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
       conCertificaciones: conCertificaciones === true,
       certificaciones: leerLista(certificaciones, leerCertificacionPublica),
       cursos: leerLista(cursos, leerCursoPublico),
+      valoraciones: leerResumenValoraciones(valor.prestador.valoraciones),
     },
   };
 }
@@ -794,6 +1016,7 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
       comunas: leerLista(comunas, leerComunaResumida),
       comunasRestantes: typeof comunasRestantes === "number" ? comunasRestantes : 0,
       conCertificaciones: conCertificaciones === true,
+      valoraciones: leerResumenCorto(valor.prestador.valoraciones),
     },
   };
 }
@@ -824,6 +1047,7 @@ function leerPrestadorPublico(valor: unknown): PrestadorPublico | null {
     conCertificaciones: valor.conCertificaciones === true,
     certificaciones: leerLista(valor.certificaciones, leerCertificacionPublica),
     cursos: leerLista(valor.cursos, leerCursoPublico),
+    valoraciones: leerResumenValoraciones(valor.valoraciones),
     servicios: leerLista(valor.servicios, leerServicioDelPrestador),
   };
 }
@@ -1498,14 +1722,14 @@ export function crearClienteApi() {
 
     async colaReportes(
       filtros: { estado: "pendientes" | "resueltos"; pagina?: number },
-    ): Promise<{ servicios: FilaColaReportes[]; total: number; pagina: number; porPagina: number }> {
+    ): Promise<{ casos: CasoCola[]; total: number; pagina: number; porPagina: number }> {
       const consulta = new URLSearchParams({ estado: filtros.estado });
       if (filtros.pagina) consulta.set("pagina", String(filtros.pagina));
       const cuerpo = await peticion(`/admin/reportes?${consulta.toString()}`, { autenticada: true });
       if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
         throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       }
-      return { servicios: leerLista(cuerpo.servicios, leerFilaCola), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
+      return { casos: leerLista(cuerpo.casos, leerCaso), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
     },
 
     async detalleReportes(servicioId: string): Promise<DetalleReportes> {
@@ -1521,6 +1745,79 @@ export function crearClienteApi() {
       );
       if (!detalle) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return detalle;
+    },
+
+    /** Desestima la objeción u oculta la valoración, siempre con motivo. */
+    async decidirValoracion(valoracionId: string, accion: "desestimar" | "ocultar", motivo: string): Promise<void> {
+      await peticion(`/admin/reportes/valoraciones/${encodeURIComponent(valoracionId)}/${accion}`, {
+        metodo: "PATCH",
+        cuerpo: { motivo },
+        autenticada: true,
+      });
+    },
+
+    /** Lista pública de valoraciones de un prestador, con su resumen. Sin sesión. */
+    async listarValoraciones(prestadorId: string, pagina = 1): Promise<PaginaValoraciones> {
+      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones?pagina=${pagina}`);
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return {
+        resumen: leerResumenValoraciones(cuerpo.resumen),
+        valoraciones: leerLista(cuerpo.valoraciones, leerValoracionPublica),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
+    },
+
+    async miValoracion(prestadorId: string): Promise<MiValoracion> {
+      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones/mia`, { autenticada: true });
+      if (!esObjeto(cuerpo)) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      const motivo = cuerpo.motivo;
+      return {
+        valoracion: leerValoracionPropia(cuerpo.valoracion),
+        puedeValorar: cuerpo.puedeValorar === true,
+        motivo: motivo === "SIN_CONTACTO" || motivo === "PLAZO_VENCIDO" || motivo === "MODERADA" ? motivo : null,
+        plazoHasta: typeof cuerpo.plazoHasta === "string" ? cuerpo.plazoHasta : null,
+        puedeRetirar: cuerpo.puedeRetirar === true,
+      };
+    },
+
+    /** Crea o edita la valoración propia. El estado lo fija el servidor. */
+    async valorar(prestadorId: string, datos: { calificacion: number; comentario: string | null }): Promise<ValoracionPropia> {
+      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones`, {
+        metodo: "POST",
+        cuerpo: datos,
+        autenticada: true,
+      });
+      const valoracion = esObjeto(cuerpo) ? leerValoracionPropia(cuerpo.valoracion) : null;
+      if (!valoracion) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return valoracion;
+    },
+
+    async retirarValoracion(prestadorId: string): Promise<void> {
+      await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones/mia`, { metodo: "DELETE", autenticada: true });
+    },
+
+    /** Las valoraciones que recibió el prestador conectado. */
+    async valoracionesRecibidas(pagina = 1): Promise<PaginaRecibidas> {
+      const cuerpo = await peticion(`/prestadores/yo/valoraciones?pagina=${pagina}`, { autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return {
+        resumen: leerResumenValoraciones(cuerpo.resumen),
+        valoraciones: leerLista(cuerpo.valoraciones, leerValoracionRecibida),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
+    },
+
+    /** El prestador objeta una valoración recibida. No la oculta: la manda a revisión. */
+    async objetarValoracion(valoracionId: string, datos: { motivo: MotivoObjecion; comentario: string | null }): Promise<void> {
+      await peticion(`/valoraciones/${encodeURIComponent(valoracionId)}/objecion`, { metodo: "POST", cuerpo: datos, autenticada: true });
     },
 
     /** Búsqueda pública: sin sesión, solo servicios publicados de prestadores verificados. */

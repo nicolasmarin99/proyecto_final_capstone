@@ -320,7 +320,121 @@ const CLIENTES_DEMO = [
   { correo: "demo.cliente2@localcl.cl", nombre: "Matías Fuentes", haceDias: 60 },
   { correo: "demo.cliente3@localcl.cl", nombre: "Fernanda Silva", haceDias: 2 },
   { correo: "demo.cliente4@localcl.cl", nombre: "Diego Navarro", haceDias: 1 },
+  { correo: "demo.cliente5@localcl.cl", nombre: "Javiera Muñoz", haceDias: 45 },
+  { correo: "demo.cliente6@localcl.cl", nombre: "Tomás Reyes", haceDias: 30 },
 ];
+
+interface ValoracionDemo {
+  prestador: string;
+  /** Índice en CLIENTES_DEMO. */
+  cliente: number;
+  calificacion: number;
+  comentario: string | null;
+  /** Días desde el contacto; la valoración se escribe un día después. */
+  haceDias: number;
+  /** Si el prestador la objetó (queda pendiente en la cola de reportes). */
+  objetada?: { motivo: "LENGUAJE_OFENSIVO" | "INFORMACION_FALSA"; comentario: string | null };
+}
+
+/**
+ * Valoraciones de demostración, pensadas para mostrar cada caso:
+ * - Pedro: 5 valoraciones (5, 5, 4, 4, 3) → promedio 4,2 y distribución.
+ * - Carolina: 3 (5, 4, 5) → promedio 4,7, justo en el mínimo.
+ * - Valentina: 2 → solo el conteo, sin promedio.
+ * - Jorge: 3 (4, 5, 1), y la de 1 estrella objetada por él → pendiente en la
+ *   cola. Mientras no se decida, sigue publicada y cuenta: promedio 3,3.
+ * - Luis: ninguna → «Aún sin valoraciones».
+ */
+const VALORACIONES_DEMO: ValoracionDemo[] = [
+  { prestador: "demo.pedro@localcl.cl", cliente: 0, calificacion: 5, comentario: "Llegó a la hora y dejó el calefont funcionando. Muy ordenado.", haceDias: 40 },
+  { prestador: "demo.pedro@localcl.cl", cliente: 1, calificacion: 5, comentario: "Explicó todo antes de cobrar. Lo volvería a llamar.", haceDias: 30 },
+  { prestador: "demo.pedro@localcl.cl", cliente: 2, calificacion: 4, comentario: null, haceDias: 20 },
+  { prestador: "demo.pedro@localcl.cl", cliente: 3, calificacion: 4, comentario: "Buen trabajo, aunque tuvo que volver por una pieza.", haceDias: 12 },
+  { prestador: "demo.pedro@localcl.cl", cliente: 4, calificacion: 3, comentario: "Cumplió, pero se demoró más de lo acordado.", haceDias: 6 },
+  { prestador: "demo.carolina@localcl.cl", cliente: 0, calificacion: 5, comentario: "Cambió todo el tablero en un día y quedó impecable.", haceDias: 25 },
+  { prestador: "demo.carolina@localcl.cl", cliente: 2, calificacion: 4, comentario: "Muy profesional. El presupuesto fue claro.", haceDias: 15 },
+  { prestador: "demo.carolina@localcl.cl", cliente: 5, calificacion: 5, comentario: null, haceDias: 8 },
+  { prestador: "demo.valentina@localcl.cl", cliente: 1, calificacion: 5, comentario: "El cóctel estuvo delicioso y llegaron puntuales.", haceDias: 18 },
+  { prestador: "demo.valentina@localcl.cl", cliente: 4, calificacion: 4, comentario: null, haceDias: 9 },
+  { prestador: "demo.jorge@localcl.cl", cliente: 2, calificacion: 4, comentario: "Abrió la puerta en veinte minutos, un domingo.", haceDias: 22 },
+  { prestador: "demo.jorge@localcl.cl", cliente: 3, calificacion: 5, comentario: "Los muebles quedaron tal como los diseñamos.", haceDias: 14 },
+  {
+    prestador: "demo.jorge@localcl.cl",
+    cliente: 5,
+    calificacion: 1,
+    comentario: "Un sinvergüenza, no sabe hacer nada. No lo contraten jamás.",
+    haceDias: 4,
+    objetada: { motivo: "LENGUAJE_OFENSIVO", comentario: "Insulta y no dice qué pasó con el trabajo." },
+  },
+];
+
+/**
+ * Siembra contactos, valoraciones y la objeción pendiente. Idempotente y
+ * SIN BORRAR: una valoración con una decisión de moderación no se puede
+ * borrar (bitácora de solo inserción), así que si ya existe se deja como
+ * esté (incluso si un administrador la ocultó durante una demostración).
+ */
+async function sembrarValoraciones(hashContrasena: string): Promise<number> {
+  let creadas = 0;
+  for (const demo of VALORACIONES_DEMO) {
+    const datosCliente = CLIENTES_DEMO[demo.cliente];
+    if (!datosCliente) continue;
+    const cliente = await prisma.usuario.upsert({
+      where: { correo: datosCliente.correo },
+      update: {},
+      create: {
+        correo: datosCliente.correo,
+        nombre: datosCliente.nombre,
+        rol: "CLIENTE",
+        correoVerificado: true,
+        hashContrasena,
+        creadoEn: new Date(Date.now() - datosCliente.haceDias * 24 * HORA),
+      },
+    });
+    const perfil = await prisma.perfilPrestador.findFirst({ where: { usuario: { correo: demo.prestador } }, select: { id: true, usuarioId: true } });
+    if (!perfil) continue;
+
+    // Contacto desde el perfil (sin servicio): así no depende de los servicios, que el seed rehace.
+    const contacto =
+      (await prisma.contacto.findFirst({ where: { clienteId: cliente.id, prestadorId: perfil.id }, select: { id: true } })) ??
+      (await prisma.contacto.create({
+        data: { clienteId: cliente.id, prestadorId: perfil.id, canal: "WHATSAPP", creadoEn: new Date(Date.now() - demo.haceDias * 24 * HORA) },
+        select: { id: true },
+      }));
+
+    const existente = await prisma.valoracion.findUnique({
+      where: { clienteId_prestadorId: { clienteId: cliente.id, prestadorId: perfil.id } },
+      select: { id: true },
+    });
+    const valoracion =
+      existente ??
+      (await prisma.valoracion.create({
+        data: {
+          contactoId: contacto.id,
+          clienteId: cliente.id,
+          prestadorId: perfil.id,
+          calificacion: demo.calificacion,
+          comentario: demo.comentario,
+          creadoEn: new Date(Date.now() - (demo.haceDias - 1) * 24 * HORA),
+        },
+        select: { id: true },
+      }));
+    if (!existente) creadas += 1;
+
+    if (demo.objetada && (await prisma.denuncia.count({ where: { valoracionId: valoracion.id } })) === 0) {
+      await prisma.denuncia.create({
+        data: {
+          valoracionId: valoracion.id,
+          denuncianteId: perfil.usuarioId,
+          motivo: demo.objetada.motivo,
+          detalle: demo.objetada.comentario,
+          creadoEn: new Date(Date.now() - 2 * 24 * HORA),
+        },
+      });
+    }
+  }
+  return creadas;
+}
 
 interface ReporteDemo {
   servicio: string;
@@ -570,9 +684,10 @@ async function main() {
   }
 
   const reportes = await sembrarReportes(idsPorTitulo, hashContrasena);
+  const valoraciones = await sembrarValoraciones(hashContrasena);
 
   console.log(
-    `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos y ${reportes} reportes de demostración listos`,
+    `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos, ${reportes} reportes y ${valoraciones} valoraciones nuevas de demostración listos`,
   );
   if (fotos === 0) {
     console.log(`Sin fotos: copia archivos JPG, PNG o WEBP en ${CARPETA_FOTOS} (ver su README.md) y vuelve a correr el seed.`);
