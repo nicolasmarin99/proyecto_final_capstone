@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
 import { esquemaIdPrestador, esquemaIdValoracion, esquemaObjecion, esquemaPaginaValoraciones, esquemaValoracion } from "./valoraciones.schema.js";
-import { mia, objetar, publicas, recibidas, retirar, valorar } from "./valoraciones.service.js";
+import { mia, objetar, publicas, recibidas, valorar } from "./valoraciones.service.js";
 
 /** Sin try/catch: Express 5 entrega los rechazos al manejador central. El usuario sale del token. */
 function idDelUsuario(req: Request): string {
@@ -11,20 +11,12 @@ function idDelUsuario(req: Request): string {
   return req.usuario.id;
 }
 
-export async function crearOEditar(req: Request, res: Response) {
+export async function crear(req: Request, res: Response) {
   const { id } = esquemaIdPrestador.parse(req.params);
   const datos = esquemaValoracion.parse(req.body);
-  const { creada, valoracion } = await valorar(idDelUsuario(req), id, datos);
+  const valoracion = await valorar(idDelUsuario(req), id, datos);
 
-  // 201 la primera vez, 200 al editar.
-  res.status(creada ? 201 : 200).json({ valoracion });
-}
-
-export async function retirarPropia(req: Request, res: Response) {
-  const { id } = esquemaIdPrestador.parse(req.params);
-  await retirar(idDelUsuario(req), id);
-
-  res.status(204).end();
+  res.status(201).json({ valoracion });
 }
 
 export async function obtenerPropia(req: Request, res: Response) {

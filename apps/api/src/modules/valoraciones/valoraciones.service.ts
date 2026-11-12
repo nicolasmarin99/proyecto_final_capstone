@@ -6,8 +6,7 @@ import {
   buscarPrestador,
   buscarValoracion,
   crearObjecion,
-  guardarValoracion,
-  retirarValoracion,
+  crearValoracion,
   ultimoContacto,
   valoracionDe,
   valoracionesPublicadas,
@@ -23,6 +22,11 @@ import type { DatosObjecion, DatosValoracion } from "./valoraciones.schema.js";
   reseñas, su perfil solo mostraría las positivas y la reputación no
   valdría nada. En este archivo no hay ninguna función que cambie el estado
   de una valoración.
+
+  Y una valoración es DEFINITIVA: su autor tampoco la edita ni la retira.
+  Así lo que el prestador objeta y lo que el administrador revisa es
+  exactamente lo que se publicó, y nadie puede reescribir una reseña
+  después (por ejemplo, tras una presión del prestador).
 */
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -83,20 +87,26 @@ function vistaPropia(valoracion: {
   };
 }
 
+function yaValorada(): ErrorHttp {
+  return new ErrorHttp(409, "VALORACION_YA_EXISTE", "Ya valoraste a este prestador. Una valoración publicada no se puede editar ni retirar.");
+}
+
 /**
- * Crea o edita la valoración del cliente. Reglas, en este orden:
+ * Publica la valoración del cliente. Reglas, en este orden:
  * 1. El prestador debe estar visible (404).
  * 2. Nadie se valora a sí mismo (403). Ya lo impide exigir el rol CLIENTE;
  *    se revisa igual por si un día cambian los roles.
- * 3. Un contacto registrado con ese prestador (403) y dentro de los
- *    últimos 60 días (403): también para editar.
- * 4. Una OCULTA por moderación no se edita (409).
+ * 3. Una por cliente y prestador, y definitiva: si ya existe, 409. Va antes
+ *    del plazo para no decirle «plazo vencido» a quien ya valoró.
+ * 4. Un contacto registrado con ese prestador (403) y dentro de los
+ *    últimos 60 días (403).
  */
 export async function valorar(clienteId: string, prestadorId: string, datos: DatosValoracion) {
   const prestador = await prestadorVisible(prestadorId);
   if (prestador.usuarioId === clienteId) {
     throw new ErrorHttp(403, "AUTOVALORACION", "No puedes valorarte a ti mismo.");
   }
+  if (await valoracionDe(clienteId, prestadorId)) throw yaValorada();
 
   const habilitado = await elegibilidad(clienteId, prestadorId);
   if (!habilitado.puede) {
@@ -105,23 +115,10 @@ export async function valorar(clienteId: string, prestadorId: string, datos: Dat
       : new ErrorHttp(403, "PLAZO_VENCIDO", `Solo puedes valorar dentro de los ${DIAS_PARA_VALORAR} días desde que lo contactaste.`);
   }
 
-  const resultado = await guardarValoracion({ clienteId, prestadorId, contactoId: habilitado.contactoId, ...datos });
-  if (resultado.resultado === "oculta") {
-    throw new ErrorHttp(409, "VALORACION_MODERADA", "Tu valoración fue ocultada por moderación y ya no se puede editar.");
-  }
-  return { creada: resultado.resultado === "creada", valoracion: vistaPropia(resultado.valoracion) };
-}
-
-/** El cliente retira la suya. Idempotente si no tenía; 409 si está en moderación. */
-export async function retirar(clienteId: string, prestadorId: string) {
-  const resultado = await retirarValoracion(clienteId, prestadorId);
-  if (resultado === "en_moderacion") {
-    throw new ErrorHttp(
-      409,
-      "VALORACION_EN_MODERACION",
-      "Tu valoración está o estuvo en revisión de moderación, así que se conserva. Puedes editarla mientras siga publicada.",
-    );
-  }
+  // La revisión de arriba da el mensaje; esta, bajo bloqueo, cubre dos envíos simultáneos.
+  const resultado = await crearValoracion({ clienteId, prestadorId, contactoId: habilitado.contactoId, ...datos });
+  if (resultado.resultado === "ya_existe") throw yaValorada();
+  return vistaPropia(resultado.valoracion);
 }
 
 /**
@@ -135,11 +132,10 @@ export async function mia(clienteId: string, prestadorId: string) {
 
   return {
     valoracion: valoracion ? vistaPropia(valoracion) : null,
-    puedeValorar: habilitado.puede && valoracion?.estado !== "OCULTA",
-    motivo: habilitado.puede ? (valoracion?.estado === "OCULTA" ? "MODERADA" : null) : habilitado.motivo,
-    plazoHasta: habilitado.plazoHasta,
-    // Retirar se bloquea si hubo moderación: la web no ofrece el botón.
-    puedeRetirar: valoracion !== null && valoracion._count.denuncias === 0,
+    // Con una valoración ya publicada no hay nada más que hacer: es definitiva.
+    puedeValorar: valoracion === null && habilitado.puede,
+    motivo: valoracion !== null ? "YA_VALORADA" : habilitado.puede ? null : habilitado.motivo,
+    plazoHasta: valoracion === null ? habilitado.plazoHasta : null,
   };
 }
 

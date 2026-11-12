@@ -3,12 +3,13 @@ import { Rol } from "../../generated/prisma/client.js";
 import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
-import { crearObjecion, crearOEditar, listarPublicas, listarRecibidas, obtenerPropia, retirarPropia } from "./valoraciones.controller.js";
+import { crear, crearObjecion, listarPublicas, listarRecibidas, obtenerPropia } from "./valoraciones.controller.js";
 
 /*
-  Ninguna ruta de este archivo oculta ni borra una valoración ajena. El
-  cliente crea, edita y retira la suya; el prestador solo objeta; ocultar es
-  una decisión del administrador en /admin/reportes (reportes.routes.ts).
+  Ninguna ruta de este archivo edita, oculta ni borra una valoración. El
+  cliente publica la suya una sola vez y queda definitiva (no hay PUT,
+  PATCH ni DELETE); el prestador solo objeta; ocultar es una decisión del
+  administrador en /admin/reportes (reportes.routes.ts).
 */
 
 // /prestadores/:id/valoraciones — se monta dentro de las rutas de prestadores.
@@ -20,8 +21,7 @@ rutasValoracionesPrestador.get("/", listarPublicas);
 // propio perfil, y autorizar() además confirma en la base que la cuenta
 // sigue activa. Para escribir, además, el correo confirmado.
 rutasValoracionesPrestador.get("/mia", autenticar, autorizar(Rol.CLIENTE), obtenerPropia);
-rutasValoracionesPrestador.post("/", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, crearOEditar);
-rutasValoracionesPrestador.delete("/mia", autenticar, autorizar(Rol.CLIENTE), retirarPropia);
+rutasValoracionesPrestador.post("/", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, crear);
 
 // /prestadores/yo/valoraciones — las que recibió el prestador conectado.
 export const rutasValoracionesRecibidas = Router();

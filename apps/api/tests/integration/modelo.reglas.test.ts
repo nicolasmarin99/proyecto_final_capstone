@@ -102,6 +102,42 @@ describe("valoraciones", () => {
       }),
     ).rejects.toThrow("valoraciones_contacto_id_cliente_id_prestador_id_fkey");
   });
+
+  describe("una valoración publicada es definitiva", () => {
+    async function valoracionPublicada() {
+      const cliente = await crearUsuario();
+      const prestador = await crearPrestador();
+      const contacto = await crearContacto(cliente.id, prestador.id);
+      return prisma.valoracion.create({
+        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, calificacion: 2, comentario: "Llegó tarde y no avisó." },
+      });
+    }
+
+    it.each([
+      ["la calificación", { calificacion: 5 }],
+      ["el comentario", { comentario: "Ahora digo otra cosa distinta." }],
+      ["el comentario, borrándolo", { comentario: null }],
+      ["la marca de edición", { editadaEn: new Date() }],
+      ["la fecha de creación", { creadoEn: new Date(2020, 0, 1) }],
+    ])("la base rechaza cambiar %s", async (_campo, data) => {
+      const valoracion = await valoracionPublicada();
+
+      await expect(prisma.valoracion.update({ where: { id: valoracion.id }, data })).rejects.toThrow("valoraciones_contenido_inmutable");
+      expect(await prisma.valoracion.findUniqueOrThrow({ where: { id: valoracion.id } })).toMatchObject({
+        calificacion: 2,
+        comentario: "Llegó tarde y no avisó.",
+        editadaEn: null,
+      });
+    });
+
+    it("la moderación sí puede cambiar el estado", async () => {
+      const valoracion = await valoracionPublicada();
+
+      const oculta = await prisma.valoracion.update({ where: { id: valoracion.id }, data: { estado: "OCULTA" } });
+
+      expect(oculta).toMatchObject({ estado: "OCULTA", calificacion: 2, comentario: "Llegó tarde y no avisó." });
+    });
+  });
 });
 
 describe("denuncias", () => {

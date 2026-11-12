@@ -82,7 +82,7 @@ function simularApi({ usuario = null, resumen = TRES, mia, respuestaValorar, rec
     if (url === "/api/servicios/s1") return json({ servicio: servicio(resumen) });
     if (url.startsWith("/api/prestadores/perfil-1/valoraciones?")) return json({ ...LISTA, resumen });
     if (url === "/api/prestadores/perfil-1/valoraciones/mia" && metodo === "GET") {
-      return json(mia ?? { valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null, puedeRetirar: false });
+      return json(mia ?? { valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null });
     }
     if (url === "/api/prestadores/perfil-1/valoraciones" && metodo === "POST") {
       return (
@@ -245,7 +245,7 @@ describe("Formulario para valorar", () => {
   });
 
   it("el selector de estrellas es un grupo de radios con valores anunciados, usable con teclado", async () => {
-    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: "2026-12-30T12:00:00Z", puedeRetirar: false } });
+    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: "2026-12-30T12:00:00Z" } });
     renderizar("/servicios/s1");
 
     const grupo = await screen.findByRole("group", { name: "Tu calificación" });
@@ -262,21 +262,42 @@ describe("Formulario para valorar", () => {
     expect(cuatro).toHaveFocus();
   });
 
-  it("publica la valoración con estrellas y comentario", async () => {
-    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: "2026-12-30T12:00:00Z", puedeRetirar: false } });
+  it("publica tras confirmar (es definitiva) y la deja solo para leer, sin editar ni retirar", async () => {
+    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: "2026-12-30T12:00:00Z" } });
     renderizar("/servicios/s1");
 
     fireEvent.click(await screen.findByRole("radio", { name: "4 estrellas" }));
     fireEvent.change(screen.getByLabelText("Comentario (opcional)"), { target: { value: "Muy buen trabajo, recomendado." } });
     fireEvent.click(screen.getByRole("button", { name: "Publicar valoración" }));
 
+    // Primero pide confirmar, sin enviar nada todavía.
+    const confirmacion = await screen.findByRole("group", { name: "Confirmar publicación" });
+    expect(confirmacion).toHaveTextContent(/4 estrellas.*no podrás editarla ni retirarla/i);
+    expect(llamadas("POST", /valoraciones$/)).toHaveLength(0);
+    fireEvent.click(within(confirmacion).getByRole("button", { name: "Sí, publicar" }));
+
     expect(await screen.findByRole("status")).toHaveTextContent(/tu valoración ya está publicada/i);
     const [llamada] = llamadas("POST", /\/api\/prestadores\/perfil-1\/valoraciones$/);
     expect(JSON.parse(String(llamada?.[1]?.body))).toEqual({ calificacion: 4, comentario: "Muy buen trabajo, recomendado." });
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publicar|guardar|retirar/i })).not.toBeInTheDocument();
+  });
+
+  it("«Volver a revisar» cancela la confirmación sin enviar", async () => {
+    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: null } });
+    renderizar("/servicios/s1");
+
+    fireEvent.click(await screen.findByRole("radio", { name: "2 estrellas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publicar valoración" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Volver a revisar" }));
+
+    expect(screen.getByRole("button", { name: "Publicar valoración" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "2 estrellas" })).toBeChecked();
+    expect(llamadas("POST", /valoraciones$/)).toHaveLength(0);
   });
 
   it("sin estrellas o con un comentario de 9 caracteres avisa antes de enviar", async () => {
-    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: null, puedeRetirar: false } });
+    simularApi({ usuario: clienteUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: null } });
     renderizar("/servicios/s1");
 
     await screen.findByRole("group", { name: "Tu calificación" });
@@ -288,26 +309,25 @@ describe("Formulario para valorar", () => {
     expect(llamadas("POST", /valoraciones$/)).toHaveLength(0);
   });
 
-  it("si ya valoró, puede editarla o retirarla", async () => {
+  it("si ya valoró, la ve solo para leer: sin formulario ni botones de editar o retirar", async () => {
     simularApi({
       usuario: clienteUsuario,
       mia: {
         valoracion: { id: "v1", calificacion: 3, comentario: "Cumplió, pero tarde.", estado: "PUBLICADA", ocultaPorModeracion: false, creadaEn: "2026-11-01T12:00:00Z", editada: false },
-        puedeValorar: true,
-        motivo: null,
-        plazoHasta: "2026-12-30T12:00:00Z",
-        puedeRetirar: true,
+        puedeValorar: false,
+        motivo: "YA_VALORADA",
+        plazoHasta: null,
       },
     });
     renderizar("/servicios/s1");
 
     const seccion = await screen.findByRole("region", { name: "Tu valoración" });
-    expect(within(seccion).getByRole("radio", { name: "3 estrellas" })).toBeChecked();
-    expect(within(seccion).getByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
-    fireEvent.click(within(seccion).getByRole("button", { name: "Retirar mi valoración" }));
-    fireEvent.click(within(seccion).getByRole("button", { name: "Sí, retirarla" }));
-
-    await waitFor(() => expect(llamadas("DELETE", /\/api\/prestadores\/perfil-1\/valoraciones\/mia$/)).toHaveLength(1));
+    expect(within(seccion).getByText("Cumplió, pero tarde.")).toBeInTheDocument();
+    expect(within(seccion).getByText("3 de 5")).toBeInTheDocument();
+    expect(within(seccion).getByText(/no se pueden editar ni retirar/i)).toBeInTheDocument();
+    expect(within(seccion).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(seccion).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(seccion).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("si fue ocultada por moderación, el cliente lo ve y no puede editarla", async () => {
@@ -316,9 +336,8 @@ describe("Formulario para valorar", () => {
       mia: {
         valoracion: { id: "v1", calificacion: 1, comentario: "Texto moderado por las normas.", estado: "OCULTA", ocultaPorModeracion: true, creadaEn: "2026-11-01T12:00:00Z", editada: false },
         puedeValorar: false,
-        motivo: "MODERADA",
+        motivo: "YA_VALORADA",
         plazoHasta: null,
-        puedeRetirar: false,
       },
     });
     renderizar("/servicios/s1");

@@ -278,13 +278,16 @@ export interface ValoracionPropia {
   editada: boolean;
 }
 
-/** Lo que el cliente necesita para el formulario: su valoración y si puede valorar hoy. */
+/**
+ * Lo que el cliente necesita para el formulario: su valoración y si puede
+ * valorar hoy. Una valoración es definitiva: con una ya publicada, el motivo
+ * es YA_VALORADA y no se ofrece nada más.
+ */
 export interface MiValoracion {
   valoracion: ValoracionPropia | null;
   puedeValorar: boolean;
-  motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO" | "MODERADA" | null;
+  motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO" | "YA_VALORADA" | null;
   plazoHasta: string | null;
-  puedeRetirar: boolean;
 }
 
 /** Una valoración que recibió el prestador, con su objeción y, si se ocultó, el motivo. */
@@ -1778,13 +1781,12 @@ export function crearClienteApi() {
       return {
         valoracion: leerValoracionPropia(cuerpo.valoracion),
         puedeValorar: cuerpo.puedeValorar === true,
-        motivo: motivo === "SIN_CONTACTO" || motivo === "PLAZO_VENCIDO" || motivo === "MODERADA" ? motivo : null,
+        motivo: motivo === "SIN_CONTACTO" || motivo === "PLAZO_VENCIDO" || motivo === "YA_VALORADA" ? motivo : null,
         plazoHasta: typeof cuerpo.plazoHasta === "string" ? cuerpo.plazoHasta : null,
-        puedeRetirar: cuerpo.puedeRetirar === true,
       };
     },
 
-    /** Crea o edita la valoración propia. El estado lo fija el servidor. */
+    /** Publica la valoración propia, que queda definitiva. El estado lo fija el servidor. */
     async valorar(prestadorId: string, datos: { calificacion: number; comentario: string | null }): Promise<ValoracionPropia> {
       const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones`, {
         metodo: "POST",
@@ -1794,10 +1796,6 @@ export function crearClienteApi() {
       const valoracion = esObjeto(cuerpo) ? leerValoracionPropia(cuerpo.valoracion) : null;
       if (!valoracion) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return valoracion;
-    },
-
-    async retirarValoracion(prestadorId: string): Promise<void> {
-      await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones/mia`, { metodo: "DELETE", autenticada: true });
     },
 
     /** Las valoraciones que recibió el prestador conectado. */
