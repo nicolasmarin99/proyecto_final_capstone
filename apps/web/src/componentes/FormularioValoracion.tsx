@@ -5,13 +5,32 @@ import { ErrorApi, type ClienteApi, type MiValoracion } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
-import { SelectorEstrellas } from "./Valoraciones";
+import { Estrellas, SelectorEstrellas } from "./Valoraciones";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "long" });
 
 /** Una explicación del requisito, sin decir nada de las valoraciones de otros. */
 function Requisito({ children }: { children: ReactNode }) {
   return <p className="rounded-chico bg-niebla px-4 py-3 text-sm text-noche">{children}</p>;
+}
+
+const estrellasEnTexto = (cantidad: number) => (cantidad === 1 ? "1 estrella" : `${cantidad} estrellas`);
+
+/** La valoración ya publicada, solo para leer: es definitiva. */
+function ValoracionPublicada({ calificacion, comentario, creadaEn }: { calificacion: number; comentario: string | null; creadaEn: string }) {
+  return (
+    <div>
+      <p className="flex items-center gap-2 text-sm">
+        <Estrellas valor={calificacion} />
+        <span className="font-semibold text-noche">{calificacion} de 5</span>
+        <span className="sr-only">{estrellasEnTexto(calificacion)}</span>
+      </p>
+      {comentario && <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-line text-noche">{comentario}</p>}
+      <p className="mt-2 text-xs text-texto-suave">
+        Publicada el {fecha.format(new Date(creadaEn))}. Las valoraciones son definitivas: no se pueden editar ni retirar.
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -21,7 +40,11 @@ function Requisito({ children }: { children: ReactNode }) {
  * valorar; el resto ve el requisito explicado. La API lo vuelve a revisar
  * todo: esto solo evita mostrar un formulario que sería rechazado.
  *
- * `alCambiar` avisa que se creó, editó o retiró, para recargar la lista.
+ * Una valoración es DEFINITIVA: antes de publicar se pide confirmar, y una
+ * vez publicada solo se muestra, sin editar ni retirar (la API tampoco lo
+ * permite, ni la base).
+ *
+ * `alCambiar` avisa que se publicó, para recargar la lista.
  */
 export function FormularioValoracion({
   prestadorId,
@@ -48,8 +71,8 @@ export function FormularioValoracion({
   const [errorComentario, setErrorComentario] = useState<string | undefined>(undefined);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [ocupado, setOcupado] = useState<"guardar" | "retirar" | null>(null);
-  const [confirmandoRetiro, setConfirmandoRetiro] = useState(false);
+  const [publicando, setPublicando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
 
   const esCliente = usuario?.rol === "CLIENTE";
 
@@ -61,8 +84,6 @@ export function FormularioValoracion({
       .then((respuesta) => {
         if (cancelado) return;
         setMia(respuesta);
-        setCalificacion(respuesta.valoracion?.calificacion ?? 0);
-        setComentario(respuesta.valoracion?.comentario ?? "");
       })
       .catch(() => {
         if (!cancelado) setErrorCarga(true);
@@ -72,10 +93,10 @@ export function FormularioValoracion({
     };
   }, [cliente, prestadorId, esCliente]);
 
-  async function guardar(evento: FormEvent) {
+  /** Primer paso: valida y pide confirmar, porque después no hay vuelta atrás. */
+  function revisar(evento: FormEvent) {
     evento.preventDefault();
     setErrorGeneral(null);
-    setAviso(null);
     const limpio = comentario.trim();
     const sinEstrellas = calificacion < 1;
     const comentarioCorto = limpio.length > 0 && limpio.length < LARGO_MINIMO_COMENTARIO_VALORACION;
@@ -84,38 +105,24 @@ export function FormularioValoracion({
       comentarioCorto ? `Si escribes un comentario, que tenga al menos ${LARGO_MINIMO_COMENTARIO_VALORACION} caracteres.` : undefined,
     );
     if (sinEstrellas || comentarioCorto) return;
+    setConfirmando(true);
+  }
 
-    setOcupado("guardar");
+  async function publicar() {
+    setErrorGeneral(null);
+    setPublicando(true);
     try {
-      const valoracion = await cliente.valorar(prestadorId, { calificacion, comentario: limpio || null });
-      setAviso(mia?.valoracion ? "Guardamos los cambios de tu valoración." : "¡Gracias! Tu valoración ya está publicada.");
-      setMia((actual) => (actual ? { ...actual, valoracion, puedeRetirar: actual.valoracion ? actual.puedeRetirar : true } : actual));
+      const valoracion = await cliente.valorar(prestadorId, { calificacion, comentario: comentario.trim() || null });
+      setAviso("¡Gracias! Tu valoración ya está publicada.");
+      setMia((actual) => (actual ? { ...actual, valoracion, puedeValorar: false, motivo: "YA_VALORADA", plazoHasta: null } : actual));
       alCambiar();
     } catch (causa) {
+      setConfirmando(false);
       if (causa instanceof ErrorApi && causa.mensajeDe("calificacion")) setErrorEstrellas(causa.mensajeDe("calificacion"));
       else if (causa instanceof ErrorApi && causa.mensajeDe("comentario")) setErrorComentario(causa.mensajeDe("comentario"));
       else setErrorGeneral(causa instanceof ErrorApi ? causa.message : "No fue posible conectar con el servidor. Intenta de nuevo.");
     } finally {
-      setOcupado(null);
-    }
-  }
-
-  async function retirar() {
-    setErrorGeneral(null);
-    setAviso(null);
-    setOcupado("retirar");
-    try {
-      await cliente.retirarValoracion(prestadorId);
-      setMia((actual) => (actual ? { ...actual, valoracion: null, puedeRetirar: false } : actual));
-      setCalificacion(0);
-      setComentario("");
-      setConfirmandoRetiro(false);
-      setAviso("Retiraste tu valoración.");
-      alCambiar();
-    } catch (causa) {
-      setErrorGeneral(causa instanceof ErrorApi ? causa.message : "No fue posible retirar tu valoración.");
-    } finally {
-      setOcupado(null);
+      setPublicando(false);
     }
   }
 
@@ -144,6 +151,19 @@ export function FormularioValoracion({
     if (mia.valoracion?.ocultaPorModeracion) {
       return <Requisito>Tu valoración fue ocultada por moderación y ya no se muestra en el perfil.</Requisito>;
     }
+    if (mia.valoracion) {
+      return (
+        <>
+          {/* Junto a la valoración recién publicada: es donde mira quien acaba de enviar. */}
+          {aviso && (
+            <p role="status" className="motion-safe:animate-aparecer-corto mb-3 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700">
+              {aviso}
+            </p>
+          )}
+          <ValoracionPublicada {...mia.valoracion} />
+        </>
+      );
+    }
     if (!mia.puedeValorar) {
       return (
         <Requisito>
@@ -154,68 +174,61 @@ export function FormularioValoracion({
       );
     }
 
-    const editando = mia.valoracion !== null;
     return (
-      <form onSubmit={guardar} noValidate aria-labelledby={idTitulo}>
-        {mia.plazoHasta && (
-          <p className="mb-3 text-xs text-texto-suave">Puedes valorar o editar hasta el {fecha.format(new Date(mia.plazoHasta))}.</p>
-        )}
-        <SelectorEstrellas
-          valor={calificacion}
-          alCambiar={(valor) => {
-            setCalificacion(valor);
-            setErrorEstrellas(undefined);
-          }}
-          error={errorEstrellas}
-          idError={idErrorEstrellas}
-        />
-        <CampoAreaTexto
-          id={idComentario}
-          etiqueta="Comentario (opcional)"
-          valor={comentario}
-          alCambiar={(valor) => {
-            setComentario(valor);
-            setErrorComentario(undefined);
-          }}
-          minimo={LARGO_MINIMO_COMENTARIO_VALORACION}
-          maximo={LARGO_MAXIMO_COMENTARIO_VALORACION}
-          error={errorComentario}
-          ayuda="Cuenta cómo fue el trabajo. Se publica con tu nombre de pila."
-        />
+      <form onSubmit={revisar} noValidate aria-labelledby={idTitulo}>
+        <p className="mb-3 text-xs text-texto-suave">
+          {mia.plazoHasta && `Puedes valorar hasta el ${fecha.format(new Date(mia.plazoHasta))}. `}
+          Una vez publicada, tu valoración no se puede editar ni retirar.
+        </p>
+        <fieldset disabled={confirmando} className="min-w-0">
+          <SelectorEstrellas
+            valor={calificacion}
+            alCambiar={(valor) => {
+              setCalificacion(valor);
+              setErrorEstrellas(undefined);
+            }}
+            error={errorEstrellas}
+            idError={idErrorEstrellas}
+          />
+          <CampoAreaTexto
+            id={idComentario}
+            etiqueta="Comentario (opcional)"
+            valor={comentario}
+            alCambiar={(valor) => {
+              setComentario(valor);
+              setErrorComentario(undefined);
+            }}
+            minimo={LARGO_MINIMO_COMENTARIO_VALORACION}
+            maximo={LARGO_MAXIMO_COMENTARIO_VALORACION}
+            error={errorComentario}
+            ayuda="Cuenta cómo fue el trabajo. Se publica con tu nombre de pila."
+          />
+        </fieldset>
 
         {/* Junto a los botones: es donde mira quien acaba de enviar. */}
-        {aviso && (
-          <p role="status" className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700">
-            {aviso}
-          </p>
-        )}
         {errorGeneral && (
           <p role="alert" className="motion-safe:animate-aparecer-corto mt-4 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700">
             {errorGeneral}
           </p>
         )}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Boton type="submit" cargando={ocupado === "guardar"} disabled={ocupado !== null}>
-            {ocupado === "guardar" ? "Guardando…" : editando ? "Guardar cambios" : "Publicar valoración"}
-          </Boton>
-          {editando && mia.puedeRetirar && !confirmandoRetiro && (
-            <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setConfirmandoRetiro(true)}>
-              Retirar mi valoración
-            </Boton>
-          )}
-        </div>
-        {confirmandoRetiro && (
-          <div className="mt-3 rounded-medio border border-borde bg-niebla p-3">
-            <p className="text-sm text-noche">¿Retirar tu valoración? Se borra y deja de contar en el promedio.</p>
+        {confirmando ? (
+          <div role="group" aria-label="Confirmar publicación" className="mt-4 rounded-medio border border-borde bg-niebla p-3">
+            <p className="text-sm text-noche">
+              ¿Publicar tu valoración de {estrellasEnTexto(calificacion)}? Después no podrás editarla ni retirarla.
+            </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setConfirmandoRetiro(false)}>
-                Cancelar
+              <Boton type="button" variante="secundario" disabled={publicando} onClick={() => setConfirmando(false)}>
+                Volver a revisar
               </Boton>
-              <Boton type="button" cargando={ocupado === "retirar"} disabled={ocupado !== null} onClick={() => void retirar()}>
-                Sí, retirarla
+              <Boton type="button" cargando={publicando} onClick={() => void publicar()}>
+                {publicando ? "Publicando…" : "Sí, publicar"}
               </Boton>
             </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <Boton type="submit">Publicar valoración</Boton>
           </div>
         )}
       </form>

@@ -32,84 +32,51 @@ const seleccionPropia = {
 export async function valoracionDe(clienteId: string, prestadorId: string) {
   return prisma.valoracion.findUnique({
     where: { clienteId_prestadorId: { clienteId, prestadorId } },
-    select: { ...seleccionPropia, _count: { select: { denuncias: true } } },
+    select: seleccionPropia,
   });
 }
 
-export type ResultadoGuardar =
-  | { resultado: "creada" | "editada"; valoracion: Prisma.ValoracionGetPayload<{ select: typeof seleccionPropia }> }
-  | { resultado: "oculta" };
+export type ResultadoCrear =
+  | { resultado: "creada"; valoracion: Prisma.ValoracionGetPayload<{ select: typeof seleccionPropia }> }
+  | { resultado: "ya_existe" };
 
 /**
- * Crea o edita la valoración del par cliente-prestador, bajo bloqueo de la
- * fila del cliente: dos envíos simultáneos no crean dos (además lo impide el
- * UNIQUE (cliente_id, prestador_id)).
+ * Crea la valoración del par cliente-prestador, enlazada al contacto que la
+ * habilita, bajo bloqueo de la fila del cliente: dos envíos simultáneos no
+ * crean dos (además lo impide el UNIQUE (cliente_id, prestador_id)).
  *
- * - Nueva: queda enlazada al contacto que la habilita.
- * - Existente: cambia calificación y comentario, y se marca editada_en.
- *   El estado no se toca: una edición no despublica ni republica nada.
- * - Una valoración OCULTA por moderación no se edita: editarla no puede ser
- *   la forma de sacarla de la moderación.
+ * Es DEFINITIVA: si ya existe no se toca y se informa "ya_existe". En este
+ * repositorio no hay ninguna función que edite ni borre una valoración, y la
+ * base además rechaza cambiar su contenido (trigger
+ * valoraciones_contenido_inmutable).
  */
-export async function guardarValoracion(datos: {
+export async function crearValoracion(datos: {
   clienteId: string;
   prestadorId: string;
   contactoId: string;
   calificacion: number;
   comentario: string | null;
-}): Promise<ResultadoGuardar> {
+}): Promise<ResultadoCrear> {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${datos.clienteId} FOR UPDATE`;
 
     const existente = await tx.valoracion.findUnique({
       where: { clienteId_prestadorId: { clienteId: datos.clienteId, prestadorId: datos.prestadorId } },
-      select: { id: true, estado: true },
+      select: { id: true },
     });
+    if (existente) return { resultado: "ya_existe" };
 
-    if (!existente) {
-      const valoracion = await tx.valoracion.create({
-        data: {
-          contactoId: datos.contactoId,
-          clienteId: datos.clienteId,
-          prestadorId: datos.prestadorId,
-          calificacion: datos.calificacion,
-          comentario: datos.comentario,
-        },
-        select: seleccionPropia,
-      });
-      return { resultado: "creada", valoracion };
-    }
-
-    if (existente.estado === "OCULTA") return { resultado: "oculta" };
-
-    const valoracion = await tx.valoracion.update({
-      where: { id: existente.id },
-      data: { calificacion: datos.calificacion, comentario: datos.comentario, editadaEn: new Date() },
+    const valoracion = await tx.valoracion.create({
+      data: {
+        contactoId: datos.contactoId,
+        clienteId: datos.clienteId,
+        prestadorId: datos.prestadorId,
+        calificacion: datos.calificacion,
+        comentario: datos.comentario,
+      },
       select: seleccionPropia,
     });
-    return { resultado: "editada", valoracion };
-  });
-}
-
-export type ResultadoRetiro = "retirada" | "no_existe" | "en_moderacion";
-
-/**
- * El cliente retira su valoración: se borra. Si tiene una objeción (abierta
- * o ya decidida) no se borra: la evidencia de la moderación se conserva, y
- * las claves foráneas RESTRICT de denuncias y decisiones_reporte también lo
- * impedirían.
- */
-export async function retirarValoracion(clienteId: string, prestadorId: string): Promise<ResultadoRetiro> {
-  return prisma.$transaction(async (tx) => {
-    const valoracion = await tx.valoracion.findUnique({
-      where: { clienteId_prestadorId: { clienteId, prestadorId } },
-      select: { id: true, _count: { select: { denuncias: true, decisiones: true } } },
-    });
-    if (!valoracion) return "no_existe";
-    if (valoracion._count.denuncias > 0 || valoracion._count.decisiones > 0) return "en_moderacion";
-
-    await tx.valoracion.delete({ where: { id: valoracion.id } });
-    return "retirada";
+    return { resultado: "creada", valoracion };
   });
 }
 

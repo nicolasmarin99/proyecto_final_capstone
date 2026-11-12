@@ -586,8 +586,10 @@ model Valoracion {
   calificacion  Int
   comentario    String?
   estado        EstadoValoracion @default(PUBLICADA)
-  /// Cuándo la editó su autor por última vez; nulo si nunca la editó.
-  /// No se usa actualizado_en porque también cambia con la moderación.
+  /// Cuándo la editó su autor, solo en las anteriores a la regla de
+  /// valoraciones definitivas: desde entonces queda nula y un trigger
+  /// (valoraciones_contenido_inmutable) impide cambiarla, igual que la
+  /// calificación y el comentario.
   editadaEn     DateTime?        @map("editada_en")
   creadoEn      DateTime         @default(now()) @map("creado_en")
   actualizadoEn DateTime         @updatedAt @map("actualizado_en")

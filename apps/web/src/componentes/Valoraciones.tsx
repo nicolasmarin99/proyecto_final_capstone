@@ -230,7 +230,8 @@ export function SelectorEstrellas({
   return (
     <fieldset aria-describedby={error ? idError : undefined} aria-invalid={error ? true : undefined}>
       <legend className="text-sm font-bold text-noche">Tu calificación</legend>
-      <div className="mt-1.5 flex items-center gap-1" onMouseLeave={() => setEncima(null)}>
+      {/* Sin separación entre estrellas: cada una ya es un blanco de 44 px con aire propio, y así caben con el texto a 390 px. */}
+      <div className="mt-1.5 flex flex-wrap items-center" onMouseLeave={() => setEncima(null)}>
         {Array.from({ length: CALIFICACION_MAXIMA }, (_, indice) => {
           const estrellas = indice + 1;
           return (

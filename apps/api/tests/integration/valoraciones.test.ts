@@ -154,7 +154,7 @@ describe("POST /prestadores/:id/valoraciones", () => {
     expect(await prisma.valoracion.count()).toBe(0);
   });
 
-  it("valorar dos veces actualiza la existente y la marca como editada, con su fecha", async () => {
+  it("es definitiva: valorar dos veces responde 409 VALORACION_YA_EXISTE y la primera queda intacta", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
     await contactar(cliente.id, prestador.perfilId);
@@ -162,10 +162,22 @@ describe("POST /prestadores/:id/valoraciones", () => {
 
     const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 4, comentario: "Volvió y lo dejó funcionando." });
 
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.valoracion).toMatchObject({ calificacion: 4, comentario: "Volvió y lo dejó funcionando.", editada: true });
-    expect(respuesta.body.valoracion.editadaEn).toEqual(expect.any(String));
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error.codigo).toBe("VALORACION_YA_EXISTE");
+    const guardada = await prisma.valoracion.findFirstOrThrow();
+    expect(guardada).toMatchObject({ calificacion: 2, comentario: "Llegó tarde y no avisó nada.", editadaEn: null });
     expect(await prisma.valoracion.count()).toBe(1);
+  });
+
+  it("quien ya valoró recibe 409 aunque su plazo haya vencido: no se le dice «plazo vencido»", async () => {
+    const prestador = await crearPrestador();
+    const { cliente } = await valoracionDe(prestador, 3);
+    await prisma.contacto.updateMany({ data: { creadoEn: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } });
+
+    const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 5 });
+
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error.codigo).toBe("VALORACION_YA_EXISTE");
   });
 
   it.each([
@@ -340,32 +352,36 @@ describe("La valoración propia", () => {
     const respuesta = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
 
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({ valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null, puedeRetirar: false });
+    expect(respuesta.body).toEqual({ valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null });
   });
 
-  it("el cliente retira la suya: se borra y sale del conteo", async () => {
+  it("GET mia con una valoración publicada: la muestra y ya no ofrece valorar (YA_VALORADA)", async () => {
     const prestador = await crearPrestador();
-    const { cliente } = await valoracionDe(prestador, 4);
+    const { cliente } = await valoracionDe(prestador, 4, "Buen trabajo, muy puntual.");
 
-    const respuesta = await request(app).delete(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
+    const respuesta = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
 
-    expect(respuesta.status).toBe(204);
-    expect(await prisma.valoracion.count()).toBe(0);
-    expect((await lista(prestador.perfilId)).body.resumen.cantidad).toBe(0);
+    expect(respuesta.body).toMatchObject({
+      valoracion: { calificacion: 4, comentario: "Buen trabajo, muy puntual.", estado: "PUBLICADA" },
+      puedeValorar: false,
+      motivo: "YA_VALORADA",
+      plazoHasta: null,
+    });
   });
 
-  it("con una objeción no se puede retirar (409): la evidencia de la moderación se conserva", async () => {
+  it("el cliente no puede retirarla ni editarla por otra vía: no hay DELETE, PUT ni PATCH (404)", async () => {
     const prestador = await crearPrestador();
-    const { cliente, id } = await valoracionDe(prestador, 1, "Un desastre, no lo recomiendo.");
-    await objetar(prestador.token, id);
+    const { cliente } = await valoracionDe(prestador, 4, "Buen trabajo, muy puntual.");
+    const ruta = `/prestadores/${prestador.perfilId}/valoraciones/mia`;
+    const autorizacion = `Bearer ${cliente.token}`;
 
-    const respuesta = await request(app).delete(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
-
-    expect(respuesta.status).toBe(409);
-    expect(await prisma.valoracion.count()).toBe(1);
+    expect((await request(app).delete(ruta).set("Authorization", autorizacion)).status).toBe(404);
+    expect((await request(app).put(ruta).set("Authorization", autorizacion).send({ calificacion: 1 })).status).toBe(404);
+    expect((await request(app).patch(ruta).set("Authorization", autorizacion).send({ calificacion: 1 })).status).toBe(404);
+    expect(await prisma.valoracion.findFirstOrThrow()).toMatchObject({ calificacion: 4, comentario: "Buen trabajo, muy puntual." });
   });
 
-  it("si se oculta: el cliente ve que fue ocultada por moderación y ya no puede editarla", async () => {
+  it("si se oculta: el cliente ve que fue ocultada por moderación y no puede volver a valorar", async () => {
     const prestador = await crearPrestador();
     const { cliente, id } = await valoracionDe(prestador, 1, "Un desastre, no lo recomiendo.");
     await objetar(prestador.token, id);
@@ -373,7 +389,7 @@ describe("La valoración propia", () => {
 
     const propia = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
     expect(propia.body.valoracion).toMatchObject({ estado: "OCULTA", ocultaPorModeracion: true });
-    expect(propia.body).toMatchObject({ puedeValorar: false, motivo: "MODERADA" });
+    expect(propia.body).toMatchObject({ puedeValorar: false, motivo: "YA_VALORADA" });
 
     const edicion = await valorar(cliente.token, prestador.perfilId, { calificacion: 5 });
     expect(edicion.status).toBe(409);
@@ -457,7 +473,7 @@ describe("Objeciones del prestador", () => {
     expect(await prisma.denuncia.count()).toBe(1);
   });
 
-  it("OCULTAR una valoración solo lo hace un administrador: un prestador recibe 403 al ocultar o eliminar", async () => {
+  it("OCULTAR una valoración solo lo hace un administrador: un prestador recibe 403, y no existe ruta para eliminar", async () => {
     const prestador = await crearPrestador();
     const { id } = await valoracionDe(prestador, 1, "Pésimo trabajo, no lo contraten.");
     await objetar(prestador.token, id);
@@ -465,7 +481,7 @@ describe("Objeciones del prestador", () => {
     expect((await decidir(prestador.token, id, "ocultar")).status).toBe(403);
     expect((await decidir(prestador.token, id, "desestimar")).status).toBe(403);
     const borrar = await request(app).delete(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${prestador.token}`);
-    expect(borrar.status).toBe(403);
+    expect(borrar.status).toBe(404);
     const cliente = await crearCliente();
     expect((await decidir(cliente.token, id, "ocultar")).status).toBe(403);
 
