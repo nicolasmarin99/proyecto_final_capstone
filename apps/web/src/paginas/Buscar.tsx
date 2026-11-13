@@ -33,7 +33,8 @@ function formularioDe(filtros: FiltrosBusqueda): Formulario {
     comuna: filtros.comuna === undefined ? "" : String(filtros.comuna),
     categoria: filtros.categoria ?? "",
     precioMax: filtros.precioMax === undefined ? "" : String(filtros.precioMax),
-    orden: filtros.orden === "precio" ? "precio" : "",
+    // "" es el orden predeterminado: por relevancia con texto, más recientes sin él.
+    orden: filtros.orden === "precio" ? "precio" : filtros.orden === "recientes" && filtros.q ? "recientes" : "",
   };
 }
 
@@ -73,7 +74,8 @@ function FormularioBusqueda({
     }
     setErrorPrecio(undefined);
 
-    const orden: OrdenBusqueda | undefined = formulario.orden === "precio" ? "precio" : undefined;
+    const orden: OrdenBusqueda | undefined =
+      formulario.orden === "precio" ? "precio" : formulario.orden === "recientes" ? "recientes" : undefined;
     // Sin página: una búsqueda nueva siempre parte en la primera.
     navegar(
       rutaBuscar({
@@ -138,8 +140,13 @@ function FormularioBusqueda({
           etiqueta="Ordenar por"
           valor={formulario.orden}
           alCambiar={cambiar("orden")}
-          opciones={[{ valor: "precio", texto: "Menor precio" }]}
-          vacio="Más recientes"
+          // Con texto, lo predeterminado es «Más relevantes» (palabras y
+          // significado juntos); sin texto no hay relevancia que medir.
+          opciones={[
+            ...(formulario.q.trim() ? [{ valor: "recientes", texto: "Más recientes" }] : []),
+            { valor: "precio", texto: "Menor precio" },
+          ]}
+          vacio={formulario.q.trim() ? "Más relevantes" : "Más recientes"}
         />
         <div className="mt-5 flex gap-3 sm:col-span-2 lg:col-span-1 lg:mt-[29px]">
           <Boton type="submit" className="lg:w-auto! lg:px-8">
@@ -233,7 +240,15 @@ function Cargando() {
  * Sin resultados: en vez de una página vacía, formas concretas de ampliar
  * la búsqueda. La comuna va primero porque es el filtro que más recorta.
  */
-function SinResultados({ filtros, activos }: { filtros: FiltrosBusqueda; activos: FiltroActivo[] }) {
+function SinResultados({
+  filtros,
+  activos,
+  sugerencias,
+}: {
+  filtros: FiltrosBusqueda;
+  activos: FiltroActivo[];
+  sugerencias: Categoria[];
+}) {
   const comuna = activos.find((activo) => activo.clave === "comuna");
   const otros = activos.filter((activo) => activo.clave !== "comuna");
 
@@ -250,9 +265,28 @@ function SinResultados({ filtros, activos }: { filtros: FiltrosBusqueda; activos
           : "Todavía no hay servicios publicados"}
       </h2>
 
+      {sugerencias.length > 0 && (
+        <div className="mt-5 w-full max-w-lg">
+          <h3 className="text-sm font-bold text-noche">{filtros.q ? "¿Buscabas alguna de estas categorías?" : "Categorías con servicios"}</h3>
+          {/* La comuna se mantiene: la API solo sugiere categorías con servicios en ella. */}
+          <ul aria-label="Categorías sugeridas" className="mt-3 flex flex-wrap justify-center gap-2">
+            {sugerencias.map((sugerencia) => (
+              <li key={sugerencia.slug}>
+                <Link
+                  to={rutaBuscar({ comuna: filtros.comuna, categoria: sugerencia.slug })}
+                  className="flex min-h-11 items-center rounded-full border border-primario/30 bg-hielo px-4 text-sm font-semibold text-primario transition-colors hover:border-primario hover:bg-blanco focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primario"
+                >
+                  {sugerencia.nombre}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {hayFiltros(filtros) ? (
         <>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-texto-suave">
+          <p className="mt-5 max-w-md text-sm leading-relaxed text-texto-suave">
             {comuna
               ? "Puede que haya prestadores en comunas cercanas. Prueba sin el filtro de comuna:"
               : "Prueba ampliando la búsqueda:"}
@@ -434,9 +468,18 @@ export default function PaginaBuscar() {
 
             {estado.tipo === "cargando" && <Cargando />}
             {estado.tipo === "error" && <ErrorBusqueda mensaje={estado.mensaje} alReintentar={() => setIntento((n) => n + 1)} />}
-            {estado.tipo === "listo" && estado.datos.resultados.length === 0 && <SinResultados filtros={filtros} activos={activos} />}
+            {estado.tipo === "listo" && estado.datos.resultados.length === 0 && (
+              <SinResultados filtros={filtros} activos={activos} sugerencias={estado.datos.sugerencias} />
+            )}
             {estado.tipo === "listo" && estado.datos.resultados.length > 0 && (
               <>
+                {/* Discreto: explica por qué aparece algo que no contiene el texto escrito. */}
+                {estado.datos.incluyeRelacionados && (
+                  <p className="mb-4 text-sm text-texto-suave">
+                    También mostramos servicios relacionados con lo que buscas aunque no usen tus mismas palabras; van
+                    marcados como «Relacionado».
+                  </p>
+                )}
                 <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {estado.datos.resultados.map((resultado) => (
                     <li key={resultado.id}>

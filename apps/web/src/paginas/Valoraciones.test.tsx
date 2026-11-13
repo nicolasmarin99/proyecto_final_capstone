@@ -199,6 +199,7 @@ describe("Resumen de valoraciones", () => {
       unidadPrecio: null,
       imagen: null,
       prestador: { nombre: "Pedro Soto", comunas: [], comunasRestantes: 0, conCertificaciones: false, valoraciones: { cantidad: 5, promedio: 4.6 } },
+      coincidencia: null,
     };
     const { rerender } = render(
       <MemoryRouter>

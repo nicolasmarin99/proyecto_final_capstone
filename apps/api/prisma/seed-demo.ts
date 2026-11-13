@@ -26,6 +26,7 @@ import { prisma } from "../src/db.js";
 import type { MotivoDenuncia, UnidadPrecio } from "../src/generated/prisma/client.js";
 import { obtenerAlmacenamientoPublico } from "../src/modules/almacenamiento/index.js";
 import { detectarTipoImagen, quitarMetadatosImagen } from "../src/modules/imagenes/imagenes.archivo.js";
+import { regenerarEmbeddings } from "../src/modules/servicios/servicios.indexacion.js";
 
 const CARPETA_FOTOS = path.resolve(process.argv[2] ?? fileURLToPath(new URL("./demo-imagenes/", import.meta.url)));
 
@@ -159,6 +160,15 @@ const PRESTADORES: PrestadorDemo[] = [
         unidad: "POR_SERVICIO",
         haceDias: 15,
       },
+      {
+        // Búsqueda por significado: «se cortó la luz en la mitad de la casa».
+        titulo: "Reparación de cortocircuitos y fallas eléctricas",
+        descripcion: "Diagnóstico de enchufes que no funcionan, automáticos que se bajan solos y cortes de luz en parte de la casa.",
+        categoria: "electricidad",
+        precioDesde: 30000,
+        unidad: "POR_SERVICIO",
+        haceDias: 6,
+      },
     ],
   },
   {
@@ -229,6 +239,16 @@ const PRESTADORES: PrestadorDemo[] = [
         haceDias: 12,
         fotos: "pintura",
       },
+      {
+        // Búsqueda por significado: «hace demasiado calor en la pieza».
+        titulo: "Instalación y mantención de aire acondicionado",
+        descripcion: "Equipos split para departamentos y oficinas: instalación, limpieza de filtros y recarga de gas refrigerante.",
+        categoria: "otros",
+        categoriaPersonalizada: "Climatización",
+        precioDesde: 45000,
+        unidad: "POR_SERVICIO",
+        haceDias: 8,
+      },
     ],
   },
   {
@@ -248,6 +268,56 @@ const PRESTADORES: PrestadorDemo[] = [
         precioDesde: null,
         haceDias: 9,
         fotos: "soldadura",
+      },
+      {
+        titulo: "Cierre de terrazas con estructura metálica",
+        descripcion: "Estructuras de fierro para cerrar terrazas, cobertizos y techumbres de policarbonato.",
+        categoria: "soldadura",
+        precioDesde: 250000,
+        unidad: "POR_SERVICIO",
+        haceDias: 14,
+      },
+    ],
+  },
+  {
+    // Oficios fuera de la lista de categorías («Otros»), pensados para la
+    // búsqueda por significado: ninguno comparte palabras con frases como
+    // «el pasto está muy largo» o «el sillón quedó manchado».
+    correo: "demo.ana@localcl.cl",
+    nombre: "Ana Contreras",
+    rut: 13579246,
+    telefono: "+56977778888",
+    identidad: true,
+    comunaBase: "Macul",
+    comunas: ["Macul", "Ñuñoa", "Providencia", "La Reina"],
+    descripcion: "Jardinería, limpieza a domicilio y reparación de electrodomésticos, con herramientas propias.",
+    servicios: [
+      {
+        titulo: "Mantención de jardines y poda",
+        descripcion: "Corte de pasto, poda de árboles y arbustos, retiro de maleza y programación del riego.",
+        categoria: "otros",
+        categoriaPersonalizada: "Jardinería",
+        precioDesde: 20000,
+        unidad: "POR_SERVICIO",
+        haceDias: 3,
+      },
+      {
+        titulo: "Limpieza profunda de alfombras y sillones",
+        descripcion: "Lavado a domicilio con máquina de inyección y extracción. Quita manchas y olores de tapices.",
+        categoria: "otros",
+        categoriaPersonalizada: "Limpieza",
+        precioDesde: 15000,
+        unidad: "POR_SERVICIO",
+        haceDias: 11,
+      },
+      {
+        titulo: "Reparación de lavadoras y refrigeradores",
+        descripcion: "Diagnóstico a domicilio de lavadoras que no centrifugan, refrigeradores que no enfrían y secadoras.",
+        categoria: "otros",
+        categoriaPersonalizada: "Reparación de electrodomésticos",
+        precioDesde: 25000,
+        unidad: "POR_SERVICIO",
+        haceDias: 16,
       },
     ],
   },
@@ -650,6 +720,11 @@ async function main() {
     // bitácora de decisiones no se toca (solo inserción); sus filas viejas
     // quedan con ids de servicios que ya no existen y no aparecen en la cola.
     await prisma.denuncia.deleteMany({ where: { servicio: { prestadorId: perfil.id } } });
+    // Los contactos hechos desde la web durante una demostración también
+    // apuntan al servicio (RESTRICT). No se borran (de un contacto cuelga la
+    // valoración): se desligan del servicio y quedan como contacto con el
+    // prestador, que es lo que importa para poder valorarlo.
+    await prisma.contacto.updateMany({ where: { servicio: { prestadorId: perfil.id } }, data: { servicioId: null } });
     await prisma.servicio.deleteMany({ where: { prestadorId: perfil.id } });
 
     for (const servicio of demo.servicios) {
@@ -685,6 +760,15 @@ async function main() {
 
   const reportes = await sembrarReportes(idsPorTitulo, hashContrasena);
   const valoraciones = await sembrarValoraciones(hashContrasena);
+
+  // Los servicios se rehicieron desde cero: se vectorizan todos, en lotes,
+  // con el proveedor de EMBEDDINGS_PROVEEDOR. Si falla, quedan sin vector
+  // (siguen apareciendo por palabras) y basta correr embeddings:regenerar.
+  const embeddings = await regenerarEmbeddings();
+  console.log(
+    `Embeddings: ${embeddings.vectorizados} servicios vectorizados en ${embeddings.llamadas} llamada(s)` +
+      (embeddings.fallidos > 0 ? `, ${embeddings.fallidos} sin vector (corre npm run embeddings:regenerar).` : "."),
+  );
 
   console.log(
     `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos, ${reportes} reportes y ${valoraciones} valoraciones nuevas de demostración listos`,

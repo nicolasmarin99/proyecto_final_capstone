@@ -295,3 +295,84 @@ describe("Estados", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("Búsqueda por significado", () => {
+  it("un resultado que entró por significado se marca «Relacionado» y un aviso discreto explica por qué", async () => {
+    simularApi(() =>
+      json({
+        resultados: [
+          { ...RESULTADO, id: "s1", titulo: "Destape de alcantarillado", coincidencia: "significado" },
+          { ...RESULTADO, id: "s2", titulo: "Gasfitería a domicilio", coincidencia: "texto" },
+        ],
+        pagina: 1,
+        porPagina: 12,
+        total: 2,
+        incluyeRelacionados: true,
+        sugerencias: [],
+      }),
+    );
+    renderizar("/buscar?q=se%20me%20tap%C3%B3%20el%20ba%C3%B1o");
+
+    const relacionado = await screen.findByRole("link", { name: "Destape de alcantarillado" });
+    expect(within(relacionado).getByText("Relacionado")).toBeInTheDocument();
+    expect(relacionado).toHaveAccessibleDescription(/relacionado con tu búsqueda/i);
+    const porPalabras = screen.getByRole("link", { name: "Gasfitería a domicilio" });
+    expect(within(porPalabras).queryByText("Relacionado")).not.toBeInTheDocument();
+    expect(screen.getByText(/aunque no usen tus mismas palabras/i)).toBeInTheDocument();
+  });
+
+  it("si todo coincide por palabras, no hay aviso ni marcas", async () => {
+    simularApi(() => json({ resultados: [{ ...RESULTADO, coincidencia: "ambas" }], pagina: 1, porPagina: 12, total: 1, incluyeRelacionados: false, sugerencias: [] }));
+    renderizar("/buscar?q=gasfiter");
+
+    await screen.findByRole("link", { name: "Gasfitería a domicilio" });
+    expect(screen.queryByText("Relacionado")).not.toBeInTheDocument();
+    expect(screen.queryByText(/aunque no usen tus mismas palabras/i)).not.toBeInTheDocument();
+  });
+
+  it("sin resultados muestra las categorías sugeridas, que buscan en esa categoría y conservan la comuna", async () => {
+    simularApi(() =>
+      json({
+        resultados: [],
+        pagina: 1,
+        porPagina: 12,
+        total: 0,
+        incluyeRelacionados: false,
+        sugerencias: [
+          { slug: "gasfiteria", nombre: "Gasfitería" },
+          { slug: "electricidad", nombre: "Electricidad" },
+        ],
+      }),
+    );
+    renderizar("/buscar?q=clases%20de%20piano&comuna=13114");
+
+    const lista = await screen.findByRole("list", { name: "Categorías sugeridas" });
+    expect(screen.getByText("¿Buscabas alguna de estas categorías?")).toBeInTheDocument();
+    expect(within(lista).getByRole("link", { name: "Gasfitería" })).toHaveAttribute("href", "/buscar?categoria=gasfiteria&comuna=13114");
+    expect(within(lista).getByRole("link", { name: "Electricidad" })).toHaveAttribute("href", "/buscar?categoria=electricidad&comuna=13114");
+  });
+
+  it("con texto el orden predeterminado es «Más relevantes»; «Más recientes» se pide en la URL", async () => {
+    simularApi();
+    renderizar("/buscar?q=gasfiter");
+    await esperarFormulario();
+
+    const orden = within(screen.getByRole("search")).getByLabelText("Ordenar por");
+    expect(within(orden).getByRole("option", { name: "Más relevantes" })).toBeInTheDocument();
+    fireEvent.change(orden, { target: { value: "recientes" } });
+    fireEvent.click(within(screen.getByRole("search")).getByRole("button", { name: "Buscar" }));
+
+    await waitFor(() => expect(ubicacion()).toBe("/buscar?q=gasfiter&orden=recientes"));
+    await waitFor(() => expect(busquedas()).toContain("/api/servicios?q=gasfiter&orden=recientes"));
+  });
+
+  it("sin texto el orden predeterminado sigue siendo «Más recientes»", async () => {
+    simularApi();
+    renderizar("/buscar");
+    await esperarFormulario();
+
+    const orden = within(screen.getByRole("search")).getByLabelText("Ordenar por");
+    expect(within(orden).getByRole("option", { name: "Más recientes" })).toBeInTheDocument();
+    expect(within(orden).queryByRole("option", { name: "Más relevantes" })).not.toBeInTheDocument();
+  });
+});

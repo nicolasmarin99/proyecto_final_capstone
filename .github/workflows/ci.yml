@@ -81,6 +81,11 @@ jobs:
       # altere en silencio lo que las pruebas ven en los correos.
       URL_WEB: http://localhost:5173
 
+      # Las pruebas NUNCA llaman a la API de Google: el proveedor determinista
+      # deriva los vectores de un hash del texto, sin red. tests/setup.ts lo
+      # fuerza igual; acá se deja explícito y sin clave.
+      EMBEDDINGS_PROVEEDOR: determinista
+
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
@@ -102,6 +107,18 @@ jobs:
 
       - name: Generar cliente de Prisma
         run: npm run prisma:generate --workspace=@localcl/api
+
+      # La imagen postgis/postgis no trae pgvector, que la migración de la
+      # búsqueda semántica necesita (CREATE EXTENSION vector). Se instala el
+      # paquete oficial en el contenedor del servicio, igual que hace
+      # infra/postgres/Dockerfile en local: la imagen está sobre Debian 11,
+      # cuyos paquetes viven ahora en el archivo histórico de PostgreSQL.
+      - name: Instalar pgvector en la base de pruebas
+        run: |
+          docker exec ${{ job.services.postgres.id }} sh -c '
+            echo "deb [ signed-by=/usr/local/share/keyrings/postgres.gpg.asc ] http://apt-archive.postgresql.org/pub/repos/apt bullseye-pgdg-archive main" > /etc/apt/sources.list.d/pgdg.list &&
+            apt-get update &&
+            apt-get install -y --no-install-recommends postgresql-17-pgvector'
 
       - name: Aplicar migraciones
         run: npm run migrate:deploy --workspace=@localcl/api

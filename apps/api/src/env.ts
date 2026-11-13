@@ -72,6 +72,36 @@ const esquema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((valor) => valor === "true"),
+
+  // Quién convierte texto en vectores para la búsqueda semántica.
+  // "determinista" deriva el vector de un hash del texto, sin red: es lo que
+  // usan las pruebas (tests/setup.ts lo fuerza) y el desarrollo sin clave.
+  // "gemini" llama a la API de Google; es la que da resultados con sentido.
+  EMBEDDINGS_PROVEEDOR: z.enum(["gemini", "determinista"]).default("determinista"),
+
+  // Clave de la API de Gemini. Vacía por defecto, como las demás credenciales:
+  // se exige abajo solo con EMBEDDINGS_PROVEEDOR=gemini. Nunca va en el
+  // repositorio: se configura en el panel del servicio donde corre la API.
+  GEMINI_API_KEY: z.string().default(""),
+
+  EMBEDDINGS_MODELO: z.string().min(1).default("gemini-embedding-001"),
+
+  // Tiene que coincidir con la columna servicios.embedding, que es vector(768).
+  // Cambiarla exige una migración (y regenerar todos los vectores): por eso se
+  // valida aquí en vez de dejar que la base rechace cada escritura.
+  EMBEDDINGS_DIMENSIONES: z.coerce
+    .number()
+    .refine((valor) => valor === 768, "Debe ser 768: es el tamaño de la columna servicios.embedding.")
+    .default(768),
+
+  // Similitud de coseno mínima (0 a 1) para que un resultado entre por
+  // significado. Sin umbral, cualquier consulta devuelve «lo menos lejano»,
+  // aunque no tenga nada que ver.
+  BUSQUEDA_UMBRAL_SIMILITUD: z.coerce
+    .number({ error: "BUSQUEDA_UMBRAL_SIMILITUD debe ser un número entre 0 y 1." })
+    .min(0, "BUSQUEDA_UMBRAL_SIMILITUD debe ser un número entre 0 y 1.")
+    .max(1, "BUSQUEDA_UMBRAL_SIMILITUD debe ser un número entre 0 y 1.")
+    .default(0.5),
 })
   // La clave solo es obligatoria cuando se va a usar. Exigirla siempre
   // obligaría a inventar un valor en desarrollo y en CI, y un valor inventado
@@ -90,6 +120,16 @@ const esquema = z.object({
           });
         }
       }
+    }
+
+    if (valores.EMBEDDINGS_PROVEEDOR === "gemini" && valores.GEMINI_API_KEY.length === 0) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["GEMINI_API_KEY"],
+        message:
+          "Es obligatoria cuando EMBEDDINGS_PROVEEDOR=gemini. Sin ella cada publicación " +
+          "quedaría sin vector y la búsqueda por significado no encontraría nada.",
+      });
     }
 
     if (valores.CORREO_TRANSPORTE === "produccion" && valores.CORREO_API_CLAVE.length === 0) {

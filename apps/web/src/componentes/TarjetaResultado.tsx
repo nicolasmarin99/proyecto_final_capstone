@@ -45,11 +45,18 @@ export function TarjetaResultado({ resultado }: { resultado: ResultadoBusqueda }
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-hielo px-2.5 py-1 text-xs font-bold text-primario">{nombreCategoria(resultado)}</span>
           {prestador.conCertificaciones && <SelloCertificaciones />}
+          {/* Apareció por lo que significa, no por las palabras escritas: se avisa, sin alarma. */}
+          {resultado.coincidencia === "significado" && (
+            <span aria-hidden="true" className="rounded-full border border-dashed border-borde-fuerte px-2.5 py-0.5 text-xs font-medium text-texto-suave">
+              Relacionado
+            </span>
+          )}
         </div>
 
         <h3 id={`titulo-${resultado.id}`} className="mt-3 font-titulos text-lg leading-snug font-bold text-noche group-hover:text-primario">{resultado.titulo}</h3>
 
         <div id={`detalle-${resultado.id}`} className="mt-auto pt-4">
+          {resultado.coincidencia === "significado" && <p className="sr-only">Relacionado con tu búsqueda, aunque no usa tus mismas palabras.</p>}
           <p className="font-bold text-noche">{textoPrecio(resultado)}</p>
           <p className="mt-2 flex items-center gap-1.5 text-sm text-texto-suave">
             <Icono nombre="persona" tamano={16} className="shrink-0 text-primario" />
