@@ -190,6 +190,13 @@ export interface FiltrosBusqueda {
   pagina?: number;
 }
 
+/**
+ * Por qué apareció un resultado: por las palabras escritas, por su
+ * significado (sin compartir palabras con la búsqueda) o por ambas. null en
+ * una búsqueda sin texto.
+ */
+export type CoincidenciaBusqueda = "texto" | "significado" | "ambas";
+
 /** Una tarjeta de resultado. Nunca trae teléfono, correo ni RUT. */
 export interface ResultadoBusqueda extends Precio {
   id: string;
@@ -207,6 +214,7 @@ export interface ResultadoBusqueda extends Precio {
     conCertificaciones: boolean;
     valoraciones: ResumenCorto;
   };
+  coincidencia: CoincidenciaBusqueda | null;
 }
 
 /** Un servicio en el perfil público del prestador. */
@@ -236,6 +244,10 @@ export interface PaginaBusqueda {
   pagina: number;
   porPagina: number;
   total: number;
+  /** Algún resultado entró solo por significado: la web lo explica. */
+  incluyeRelacionados: boolean;
+  /** Sin resultados: categorías cercanas a lo buscado que sí tienen servicios. */
+  sugerencias: Categoria[];
 }
 
 /** Resumen de valoraciones: promedio y distribución solo con 3 o más publicadas (lo decide la API). */
@@ -1021,6 +1033,8 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
       conCertificaciones: conCertificaciones === true,
       valoraciones: leerResumenCorto(valor.prestador.valoraciones),
     },
+    coincidencia:
+      valor.coincidencia === "texto" || valor.coincidencia === "significado" || valor.coincidencia === "ambas" ? valor.coincidencia : null,
   };
 }
 
@@ -1111,7 +1125,9 @@ export function parametrosBusqueda(filtros: FiltrosBusqueda): URLSearchParams {
   if (filtros.categoria) parametros.set("categoria", filtros.categoria);
   if (filtros.comuna !== undefined) parametros.set("comuna", String(filtros.comuna));
   if (filtros.precioMax !== undefined) parametros.set("precioMax", String(filtros.precioMax));
-  if (filtros.orden && filtros.orden !== "recientes") parametros.set("orden", filtros.orden);
+  // El orden se omite cuando es el predeterminado: «relevancia» con texto y «recientes» sin él.
+  const ordenPredeterminado = filtros.q?.trim() ? "relevancia" : "recientes";
+  if (filtros.orden && filtros.orden !== ordenPredeterminado) parametros.set("orden", filtros.orden);
   if (filtros.pagina !== undefined && filtros.pagina > 1) parametros.set("pagina", String(filtros.pagina));
   return parametros;
 }
@@ -1832,6 +1848,8 @@ export function crearClienteApi() {
         pagina: cuerpo.pagina,
         porPagina: cuerpo.porPagina,
         total: cuerpo.total,
+        incluyeRelacionados: cuerpo.incluyeRelacionados === true,
+        sugerencias: leerLista(cuerpo.sugerencias, leerCategoria),
       };
     },
 

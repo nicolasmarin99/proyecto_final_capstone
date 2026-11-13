@@ -158,7 +158,8 @@ export const esquemaBusqueda = z.object({
       .min(0, "El precio máximo no puede ser negativo.")
       .max(PRECIO_MAXIMO, "El precio máximo es demasiado alto."),
   ),
-  orden: z.enum(ORDENES_BUSQUEDA, { error: "El orden debe ser recientes o precio." }).default("recientes"),
+  // Sin valor por defecto acá: depende de si hay texto (lo decide buscar()).
+  orden: opcional(z.enum(ORDENES_BUSQUEDA, { error: "El orden debe ser relevancia, recientes o precio." })),
   pagina: z.coerce
     .number({ error: "La página debe ser un número." })
     .int("La página debe ser un número entero.")

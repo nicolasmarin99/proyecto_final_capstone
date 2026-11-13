@@ -1,6 +1,10 @@
 services:
   db:
-    image: postgis/postgis:17-3.5
+    # postgis/postgis:17-3.5 más pgvector (búsqueda semántica). Ver el
+    # Dockerfile: misma base y misma glibc, así que el volumen db_data sirve
+    # tal cual. Para aplicarlo: docker compose up -d --build db
+    build: ./infra/postgres
+    image: localcl-db:17-3.5-pgvector
     container_name: localcl-db
     environment:
       POSTGRES_USER: postgres

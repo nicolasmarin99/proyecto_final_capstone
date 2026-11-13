@@ -14,6 +14,10 @@ export const LARGO_MAXIMO_CONSULTA = 100;
 /** Comunas que se nombran en cada resultado; el resto va como un contador. */
 export const COMUNAS_POR_RESULTADO = 3;
 
-/** Órdenes posibles. «recientes» es el predeterminado. */
-export const ORDENES_BUSQUEDA = ["recientes", "precio"] as const;
+/**
+ * Órdenes posibles. Sin indicar uno, con texto se ordena por «relevancia»
+ * (la fusión de la búsqueda por palabras y por significado) y sin texto por
+ * «recientes». «relevancia» sin texto equivale a «recientes».
+ */
+export const ORDENES_BUSQUEDA = ["relevancia", "recientes", "precio"] as const;
 export type OrdenBusqueda = (typeof ORDENES_BUSQUEDA)[number];

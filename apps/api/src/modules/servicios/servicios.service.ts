@@ -4,7 +4,6 @@ import { ErrorHttp } from "../../shared/errores.js";
 import {
   actualizarServicio,
   buscarCategoriaActiva,
-  buscarServiciosPublicados,
   buscarDuenoServicio,
   buscarPerfilParaPublicar,
   buscarServicioPublico,
@@ -19,6 +18,10 @@ import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/
 import { motivosDeOcultamiento } from "../reportes/reportes.repository.js";
 import { resumenCorto, resumenDe } from "../valoraciones/valoraciones.resumen.js";
 import { esServicioVisible, serviciosVisiblesEntre } from "./servicios.visibilidad.js";
+import { indexarSinInterrumpir } from "./servicios.indexacion.js";
+import { buscarServiciosPublicados, categoriasCercanas } from "./servicios.busqueda.repository.js";
+import { obtenerProveedorEmbeddings } from "../embeddings/index.js";
+import { env } from "../../env.js";
 
 /**
  * La respuesta para todo servicio que el público no puede ver: no existe,
@@ -135,6 +138,9 @@ export async function crear(usuarioId: string, datos: DatosServicio) {
   const pendientes = requisitosPendientes(perfil);
 
   const servicio = await crearServicio(perfil.id, campos(datos, categoriaId, estadoFinal(datos.estado, pendientes)));
+  // El vector del significado se calcula al publicar, no al buscar. Si el
+  // proveedor falla, el servicio queda igual guardado, sin vector.
+  await indexarSinInterrumpir(servicio.id);
 
   return { servicio: await conImagenes(servicio), requisitosPendientes: pendientes };
 }
@@ -176,6 +182,8 @@ export async function editar(usuarioId: string, id: string, datos: DatosServicio
     id,
     campos(datos, categoriaId, estadoFinal(datos.estado, pendientes, servicio.estado)),
   );
+  // Solo llama al proveedor si cambió el texto (título, descripción o categoría).
+  await indexarSinInterrumpir(id);
 
   return { servicio: await conImagenes(actualizado), requisitosPendientes: pendientes };
 }
@@ -315,23 +323,97 @@ export function consultaPorPrefijos(texto: string | undefined): string | null {
   return terminos.length > 0 ? terminos.map((termino) => `${termino}:*`).join(" & ") : null;
 }
 
+/** Constante k de Reciprocal Rank Fusion (el valor del artículo original). */
+export const K_RRF = 60;
+/** Candidatos por significado que entran a la fusión: más allá, el aporte 1/(60+n) es despreciable. */
+const CANDIDATOS_SEMANTICOS = 100;
+/** Categorías sugeridas cuando no hay resultados. */
+const SUGERENCIAS = 3;
+
+/*
+  Caché de vectores de consultas, en memoria. La misma búsqueda al pasar de
+  página (o la que hacen muchas personas: «gasfiter») no vuelve a llamar al
+  proveedor. Acotada: al llenarse se descarta la más antigua. La clave lleva
+  el identificador del proveedor, para no mezclar vectores de dos modelos.
+*/
+const MAXIMO_CONSULTAS_EN_CACHE = 500;
+const vectoresDeConsultas = new Map<string, number[]>();
+
 /**
+ * El vector de lo que escribió la persona, o null si el proveedor falla: la
+ * búsqueda sigue, solo por palabras, y el fallo queda en el log.
+ */
+async function vectorDeConsulta(texto: string): Promise<number[] | null> {
+  const proveedor = obtenerProveedorEmbeddings();
+  const clave = `${proveedor.identificador}\n${texto.toLowerCase().replace(/\s+/g, " ").trim()}`;
+  const guardado = vectoresDeConsultas.get(clave);
+  if (guardado) return guardado;
+
+  try {
+    const [vector] = await proveedor.vectorizar([texto], "consulta");
+    if (!vector || vector.length !== proveedor.dimensiones) throw new Error("El proveedor no devolvió un vector válido.");
+    if (vectoresDeConsultas.size >= MAXIMO_CONSULTAS_EN_CACHE) {
+      const masAntigua = vectoresDeConsultas.keys().next().value;
+      if (masAntigua !== undefined) vectoresDeConsultas.delete(masAntigua);
+    }
+    vectoresDeConsultas.set(clave, vector);
+    return vector;
+  } catch (error) {
+    console.error("No se pudo vectorizar la consulta; la búsqueda sigue solo por palabras.", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+/** Para las pruebas: cada una parte sin vectores de consultas guardados. */
+export function vaciarCacheDeConsultas(): void {
+  vectoresDeConsultas.clear();
+}
+
+/** Por qué apareció un resultado: por sus palabras, por su significado, o por ambas. */
+function coincidencia(fila: { porTexto: boolean; porSignificado: boolean }): "texto" | "significado" | "ambas" | null {
+  if (fila.porTexto && fila.porSignificado) return "ambas";
+  if (fila.porSignificado) return "significado";
+  if (fila.porTexto) return "texto";
+  return null;
+}
+
+/**
+ * Búsqueda pública: solo servicios PUBLICADOS de prestadores con la/**
  * Búsqueda pública: solo servicios PUBLICADOS de prestadores con la
  * identidad verificada. Como en publico(), la respuesta se arma campo por
  * campo: del prestador salen su nombre, hasta tres comunas y si tiene
  * certificaciones públicas. Nunca teléfono, correo ni RUT.
  */
 export async function buscar(filtros: FiltrosBusqueda) {
+  const consulta = consultaPorPrefijos(filtros.q);
+  // Solo se vectoriza la consulta: los servicios ya tienen su vector desde
+  // que se publicaron. Sin palabras (vacía o solo signos) no hay nada que vectorizar.
+  const vector = consulta && filtros.q ? await vectorDeConsulta(filtros.q) : null;
+  const vectorComoTexto = vector ? `[${vector.join(",")}]` : null;
+
   const filas = await buscarServiciosPublicados({
-    consulta: consultaPorPrefijos(filtros.q),
+    consulta,
+    vector: vectorComoTexto,
+    umbral: env.BUSQUEDA_UMBRAL_SIMILITUD,
+    kRrf: K_RRF,
+    candidatosSemanticos: CANDIDATOS_SEMANTICOS,
     categoria: filtros.categoria ?? null,
     comuna: filtros.comuna ?? null,
     precioMax: filtros.precioMax ?? null,
-    orden: filtros.orden,
+    // Con texto, por relevancia salvo que se pida otro orden; sin texto, los más recientes.
+    orden: filtros.orden ?? (consulta ? "relevancia" : "recientes"),
     limite: filtros.porPagina,
     desplazamiento: (filtros.pagina - 1) * filtros.porPagina,
     comunasPorResultado: COMUNAS_POR_RESULTADO,
   });
+
+  const total = filas[0]?.total ?? 0;
+  // Sin resultados (y en la primera página), en vez de una lista vacía sin
+  // explicación: categorías cercanas a lo que se buscó, que sí tienen servicios.
+  const sugerencias =
+    total === 0 && filtros.pagina === 1
+      ? await categoriasCercanas({ vector: vectorComoTexto, comuna: filtros.comuna ?? null, limite: SUGERENCIAS })
+      : [];
 
   return {
     resultados: filas.map((fila) => {
@@ -355,11 +437,17 @@ export async function buscar(filtros: FiltrosBusqueda) {
           conCertificaciones: fila.conCertificaciones,
           valoraciones: resumenCorto(fila.valoracionesCantidad, fila.valoracionesSuma),
         },
+        // «significado»: apareció sin compartir palabras con la búsqueda. La
+        // web lo indica para que se entienda por qué está. null sin texto.
+        coincidencia: coincidencia(fila),
       };
     }),
     pagina: filtros.pagina,
     porPagina: filtros.porPagina,
     // Fuera de rango (pagina más allá del final) no hay filas de donde leerlo.
-    total: filas[0]?.total ?? 0,
+    total,
+    // Hay al menos un resultado que entró solo por significado.
+    incluyeRelacionados: filas.some((fila) => fila.porSignificado && !fila.porTexto),
+    sugerencias,
   };
 }

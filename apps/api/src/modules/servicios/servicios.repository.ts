@@ -1,9 +1,6 @@
 import { prisma } from "../../db.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
 import { seleccionImagen } from "../imagenes/imagenes.repository.js";
-import { prestadorConCertificaciones } from "../certificaciones/certificaciones.publicas.js";
-import { columnasResumen } from "../valoraciones/valoraciones.resumen.js";
-import { condicionServicioVisible } from "./servicios.visibilidad.js";
 
 /** Lo que ve el dueño de su servicio. */
 const seleccionServicio = {
@@ -139,133 +136,52 @@ export async function buscarServicioPublico(id: string) {
   });
 }
 
-/** Una fila del resultado de la búsqueda, tal como la devuelve la consulta. */
-export interface FilaBusqueda {
-  id: string;
-  titulo: string;
-  categoriaSlug: string;
-  categoriaNombre: string;
-  categoriaPersonalizada: string | null;
-  precioDesde: number | null;
-  precioHasta: number | null;
-  unidadPrecio: UnidadPrecio | null;
-  prestadorNombre: string;
-  comunas: { id: number; nombre: string }[] | null;
-  totalComunas: number;
-  /** Tiene al menos una certificación pública (certificaciones.publicas.ts). */
-  conCertificaciones: boolean;
-  /** Valoraciones publicadas del prestador y la suma de sus estrellas (valoraciones.resumen.ts). */
-  valoracionesCantidad: number;
-  valoracionesSuma: number;
-  /** La primera imagen visible, para la miniatura; null si no tiene. */
-  imagenIdentificador: string | null;
-  total: number;
+// ─── Embeddings (búsqueda semántica) ──────────────────────────────────────
+
+/** Lo que hace falta para armar el texto que se vectoriza y saber si está al día. */
+const seleccionIndexacion = {
+  id: true,
+  titulo: true,
+  descripcion: true,
+  categoriaPersonalizada: true,
+  categoria: { select: { nombre: true } },
+  embeddingTextoHash: true,
+} as const;
+
+export type FilaIndexacion = Awaited<ReturnType<typeof serviciosParaIndexar>>[number];
+
+export async function serviciosParaIndexar(ids: string[]) {
+  return prisma.servicio.findMany({ where: { id: { in: ids } }, select: seleccionIndexacion });
 }
 
-export interface ParametrosBusqueda {
-  /** tsquery ya armada por el servicio («gasfiter:* & domicilio:*»), o null sin texto. */
-  consulta: string | null;
-  categoria: string | null;
-  comuna: number | null;
-  precioMax: number | null;
-  orden: "recientes" | "precio";
-  limite: number;
-  desplazamiento: number;
-  comunasPorResultado: number;
+/** Una página del catálogo completo, por id: el script de regeneración lo recorre así. */
+export async function paginaParaIndexar(despuesDe: string | null, tamano: number) {
+  return prisma.servicio.findMany({
+    ...(despuesDe ? { where: { id: { gt: despuesDe } } } : {}),
+    orderBy: { id: "asc" },
+    take: tamano,
+    select: seleccionIndexacion,
+  });
 }
 
 /**
- * Búsqueda pública de servicios.
- *
- * Es una sola consulta fija: cada filtro es un parámetro que puede venir en
- * NULL, y «$x IS NULL OR ...» lo desactiva. Así no se arma SQL concatenando
- * texto según qué filtros llegaron: todo valor viaja como parámetro ($1, $2…)
- * y el texto de la consulta nunca cambia.
+ * Guarda el vector de un servicio, o lo borra (vector null). Prisma no
+ * conoce el tipo vector, así que va por $executeRaw: el vector viaja como
+ * UN parámetro de texto («[0.12,-0.03,…]») y la base lo convierte con
+ * ::vector. Nunca se arma SQL con los números.
  */
-export async function buscarServiciosPublicados(p: ParametrosBusqueda): Promise<FilaBusqueda[]> {
-  return prisma.$queryRaw<FilaBusqueda[]>`
-    SELECT
-      s.id,
-      s.titulo,
-      c.slug                     AS "categoriaSlug",
-      c.nombre                   AS "categoriaNombre",
-      s.categoria_personalizada  AS "categoriaPersonalizada",
-      s.precio_desde             AS "precioDesde",
-      s.precio_hasta             AS "precioHasta",
-      s.unidad_precio::text      AS "unidadPrecio",
-      u.nombre                   AS "prestadorNombre",
-
-      -- Hasta N comunas del prestador; la que se buscó va primero, para que
-      -- la tarjeta muestre por qué apareció. El resto, ordenadas por nombre.
-      (SELECT json_agg(json_build_object('id', x.id, 'nombre', x.nombre))
-         FROM (SELECT co.id, co.nombre
-                 FROM prestadores_comunas pc
-                 JOIN comunas co ON co.id = pc.comuna_id
-                WHERE pc.prestador_id = p.id
-                ORDER BY (co.id = ${p.comuna}::int) IS TRUE DESC, co.nombre
-                LIMIT ${p.comunasPorResultado}::int) x
-      )                          AS comunas,
-      (SELECT count(*)::int FROM prestadores_comunas pc WHERE pc.prestador_id = p.id) AS "totalComunas",
-
-      -- Sello «Prestador con certificaciones»: la misma regla que su perfil
-      -- público y la página del servicio (certificaciones.publicas.ts).
-      ${prestadorConCertificaciones} AS "conCertificaciones",
-
-      -- Conteo y suma de las valoraciones publicadas. El promedio (y la
-      -- regla de mostrarlo solo con 3 o más) lo calcula resumenCorto().
-      ${columnasResumen},
-
-      -- La miniatura: la primera imagen VISIBLE de la galería, si hay.
-      -- Una oculta por moderación nunca llega a la búsqueda.
-      (SELECT im.identificador
-         FROM imagenes_servicio im
-        WHERE im.servicio_id = s.id AND im.estado = 'VISIBLE'
-        ORDER BY im.orden, im.creado_en
-        LIMIT 1)                 AS "imagenIdentificador",
-
-      -- Total de coincidencias antes de LIMIT/OFFSET, para la paginación.
-      count(*) OVER ()::int      AS total
-    FROM servicios s
-    JOIN categorias c          ON c.id = s.categoria_id
-    JOIN perfiles_prestador p  ON p.id = s.prestador_id
-    JOIN usuarios u            ON u.id = p.usuario_id
-
-    -- La tsquery se calcula una vez. to_tsquery pasa cada término por la
-    -- misma configuración que la columna (unaccent + raíz en español), así
-    -- que «Gasfitería», «gasfiteria» y «GASFITER» terminan comparándose
-    -- igual. El «:*» de cada término la vuelve búsqueda por prefijo.
-    CROSS JOIN (SELECT to_tsquery('espanol_sin_tildes', ${p.consulta}::text) AS q) busqueda
-
-    -- La regla de visibilidad pública, la misma que la página del servicio y
-    -- el contacto (servicios.visibilidad.ts). No se reescribe acá.
-    WHERE ${condicionServicioVisible}
-
-      -- Texto: título y descripción por la columna generada (índice GIN);
-      -- además la categoría y el oficio escrito con «Otros», que no están en
-      -- esa columna. numnode = 0 es una consulta que quedó sin términos (solo
-      -- palabras vacías como «de»): se ignora en vez de no devolver nada.
-      AND (busqueda.q IS NULL
-           OR numnode(busqueda.q) = 0
-           OR s.busqueda @@ busqueda.q
-           OR to_tsvector('espanol_sin_tildes', c.nombre || ' ' || coalesce(s.categoria_personalizada, '')) @@ busqueda.q)
-
-      AND (${p.categoria}::text IS NULL OR c.slug = ${p.categoria}::text)
-
-      -- Comuna: prestadores que declararon atenderla (prestadores_comunas).
-      AND (${p.comuna}::int IS NULL OR EXISTS (
-             SELECT 1 FROM prestadores_comunas pc
-              WHERE pc.prestador_id = p.id AND pc.comuna_id = ${p.comuna}::int))
-
-      -- Con tope de precio, «a convenir» (precio nulo) queda fuera: no se
-      -- puede asegurar que entre en el presupuesto.
-      AND (${p.precioMax}::int IS NULL OR s.precio_desde <= ${p.precioMax}::int)
-
-    -- El id al final desempata: con un orden total, cada fila tiene un lugar
-    -- fijo y la paginación no repite ni salta resultados.
-    ORDER BY
-      CASE WHEN ${p.orden}::text = 'precio' THEN s.precio_desde END ASC NULLS LAST,
-      s.creado_en DESC,
-      s.id DESC
-    LIMIT ${p.limite}::int OFFSET ${p.desplazamiento}::int
-  `;
+export async function guardarEmbedding(id: string, embedding: { vector: number[]; hash: string } | null) {
+  if (!embedding) {
+    await prisma.$executeRaw`
+      UPDATE servicios
+         SET embedding = NULL, embedding_texto_hash = NULL, embedding_actualizado_en = NULL
+       WHERE id = ${id}`;
+    return;
+  }
+  await prisma.$executeRaw`
+    UPDATE servicios
+       SET embedding = ${`[${embedding.vector.join(",")}]`}::vector,
+           embedding_texto_hash = ${embedding.hash},
+           embedding_actualizado_en = now()
+     WHERE id = ${id}`;
 }

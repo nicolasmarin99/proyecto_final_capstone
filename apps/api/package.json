@@ -13,7 +13,9 @@
     "prisma:generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "seed:maestros": "tsx prisma/seed-maestros.ts",
-    "seed:demo": "tsx prisma/seed-demo.ts"
+    "seed:demo": "tsx prisma/seed-demo.ts",
+    "embeddings:regenerar": "tsx src/scripts/regenerarEmbeddings.ts",
+    "embeddings:regenerar:dist": "node dist/scripts/regenerarEmbeddings.js"
   },
   "keywords": [],
   "author": "",

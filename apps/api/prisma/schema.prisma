@@ -238,6 +238,18 @@ model Servicio {
   /// PostgreSQL la guarda. Sin él, Prisma cree que la expresión es un
   /// default sobrante y la próxima migración intentaría borrarlo.
   busqueda               Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
+  /// Vector del significado del servicio (búsqueda semántica, pgvector).
+  /// Prisma no tiene el tipo vector: se escribe y se consulta solo con
+  /// $queryRaw parametrizado (servicios.indexacion.ts y el buscador). Nulo
+  /// si todavía no se calculó o si el proveedor falló: el servicio sigue
+  /// apareciendo por la búsqueda de texto. El índice HNSW
+  /// (vector_cosine_ops) vive en la migración: Prisma no lo expresa.
+  embedding              Unsupported("vector(768)")?
+  /// SHA-256 del texto que se vectorizó (y del proveedor que lo hizo). Si al
+  /// editar el texto no cambió, el vector no se recalcula. Un CHECK exige
+  /// que vector, hash y fecha estén los tres o ninguno.
+  embeddingTextoHash     String?                  @map("embedding_texto_hash")
+  embeddingActualizadoEn DateTime?                @map("embedding_actualizado_en")
   creadoEn               DateTime                 @default(now()) @map("creado_en")
   actualizadoEn          DateTime                 @updatedAt @map("actualizado_en")
 
@@ -250,6 +262,12 @@ model Servicio {
   @@index([prestadorId])
   @@index([categoriaId, estado])
   @@index([busqueda], type: Gin)
+  /// Índice HNSW con vector_cosine_ops (búsqueda semántica). Prisma no sabe
+  /// expresar HNSW ni la clase de operadores: el índice real lo crea la
+  /// migración 20261113120000_busqueda_semantica. Se declara acá, tal como
+  /// lo lee `prisma db pull`, solo para que Prisma sepa que existe y una
+  /// migración futura no lo borre.
+  @@index([embedding], map: "servicios_embedding_hnsw_idx")
   @@map("servicios")
 }
 
