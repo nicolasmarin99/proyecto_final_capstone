@@ -5,6 +5,7 @@ import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
 import { rutasImagenesServicio } from "../imagenes/imagenes.routes.js";
 import { rutasReportesServicio } from "../reportes/reportes.routes.js";
+import { rutasValoracionesServicio } from "../valoraciones/valoraciones.routes.js";
 import {
   buscarServicios,
   crearServicio,
@@ -32,6 +33,8 @@ rutasServicios.delete("/:id", ...prestadorVerificado, eliminarServicio);
 rutasServicios.use("/:id/imagenes", rutasImagenesServicio);
 // Reportes de usuarios: /servicios/:id/reportes (ver reportes.routes.ts).
 rutasServicios.use("/:id/reportes", rutasReportesServicio);
+// Valoraciones de ese servicio: /servicios/:id/valoraciones (ver valoraciones.routes.ts).
+rutasServicios.use("/:id/valoraciones", rutasValoracionesServicio);
 
 // /categorias: pública, para el selector del formulario.
 export const rutasCategorias = Router();

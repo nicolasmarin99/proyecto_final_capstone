@@ -396,6 +396,8 @@ const CLIENTES_DEMO = [
 
 interface ValoracionDemo {
   prestador: string;
+  /** Título del servicio valorado: cada valoración califica UN servicio. */
+  servicio: string;
   /** Índice en CLIENTES_DEMO. */
   cliente: number;
   calificacion: number;
@@ -407,29 +409,35 @@ interface ValoracionDemo {
 }
 
 /**
- * Valoraciones de demostración, pensadas para mostrar cada caso:
- * - Pedro: 5 valoraciones (5, 5, 4, 4, 3) → promedio 4,2 y distribución.
- * - Carolina: 3 (5, 4, 5) → promedio 4,7, justo en el mínimo.
- * - Valentina: 2 → solo el conteo, sin promedio.
- * - Jorge: 3 (4, 5, 1), y la de 1 estrella objetada por él → pendiente en la
- *   cola. Mientras no se decida, sigue publicada y cuenta: promedio 3,3.
- * - Luis: ninguna → «Aún sin valoraciones».
+ * Valoraciones de demostración, POR SERVICIO, pensadas para mostrar cada caso:
+ * - Pedro (general 4,2 con 5):
+ *   · «Mantención e instalación de calefont»: 5, 5, 4 → 4,7 con distribución.
+ *   · «Gasfitería a domicilio»: 4, 3 → solo el conteo (menos de 3).
+ *   · «Destape de cañerías y alcantarillado»: ninguna.
+ * - Carolina: «Tableros eléctricos y certificación TE1»: 5, 4, 5 → 4,7, justo
+ *   en el mínimo; sus otros servicios, sin valoraciones.
+ * - Valentina: «Cóctel para eventos y cumpleaños»: 2 → solo el conteo.
+ * - Jorge (general 3,3 con 3): «Cerrajería de urgencia 24 horas»: 4 y 1, y la
+ *   de 1 estrella objetada por él → pendiente en la cola; «Muebles de cocina
+ *   a medida»: 5.
+ * - Luis y Ana: ninguna → «Aún sin valoraciones».
  */
 const VALORACIONES_DEMO: ValoracionDemo[] = [
-  { prestador: "demo.pedro@localcl.cl", cliente: 0, calificacion: 5, comentario: "Llegó a la hora y dejó el calefont funcionando. Muy ordenado.", haceDias: 40 },
-  { prestador: "demo.pedro@localcl.cl", cliente: 1, calificacion: 5, comentario: "Explicó todo antes de cobrar. Lo volvería a llamar.", haceDias: 30 },
-  { prestador: "demo.pedro@localcl.cl", cliente: 2, calificacion: 4, comentario: null, haceDias: 20 },
-  { prestador: "demo.pedro@localcl.cl", cliente: 3, calificacion: 4, comentario: "Buen trabajo, aunque tuvo que volver por una pieza.", haceDias: 12 },
-  { prestador: "demo.pedro@localcl.cl", cliente: 4, calificacion: 3, comentario: "Cumplió, pero se demoró más de lo acordado.", haceDias: 6 },
-  { prestador: "demo.carolina@localcl.cl", cliente: 0, calificacion: 5, comentario: "Cambió todo el tablero en un día y quedó impecable.", haceDias: 25 },
-  { prestador: "demo.carolina@localcl.cl", cliente: 2, calificacion: 4, comentario: "Muy profesional. El presupuesto fue claro.", haceDias: 15 },
-  { prestador: "demo.carolina@localcl.cl", cliente: 5, calificacion: 5, comentario: null, haceDias: 8 },
-  { prestador: "demo.valentina@localcl.cl", cliente: 1, calificacion: 5, comentario: "El cóctel estuvo delicioso y llegaron puntuales.", haceDias: 18 },
-  { prestador: "demo.valentina@localcl.cl", cliente: 4, calificacion: 4, comentario: null, haceDias: 9 },
-  { prestador: "demo.jorge@localcl.cl", cliente: 2, calificacion: 4, comentario: "Abrió la puerta en veinte minutos, un domingo.", haceDias: 22 },
-  { prestador: "demo.jorge@localcl.cl", cliente: 3, calificacion: 5, comentario: "Los muebles quedaron tal como los diseñamos.", haceDias: 14 },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Mantención e instalación de calefont", cliente: 0, calificacion: 5, comentario: "Llegó a la hora y dejó el calefont funcionando. Muy ordenado.", haceDias: 40 },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Mantención e instalación de calefont", cliente: 1, calificacion: 5, comentario: "Explicó todo antes de cobrar. Lo volvería a llamar.", haceDias: 30 },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Mantención e instalación de calefont", cliente: 2, calificacion: 4, comentario: null, haceDias: 20 },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Gasfitería a domicilio", cliente: 3, calificacion: 4, comentario: "Buen trabajo, aunque tuvo que volver por una pieza.", haceDias: 12 },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Gasfitería a domicilio", cliente: 4, calificacion: 3, comentario: "Cumplió, pero se demoró más de lo acordado.", haceDias: 6 },
+  { prestador: "demo.carolina@localcl.cl", servicio: "Tableros eléctricos y certificación TE1", cliente: 0, calificacion: 5, comentario: "Cambió todo el tablero en un día y quedó impecable.", haceDias: 25 },
+  { prestador: "demo.carolina@localcl.cl", servicio: "Tableros eléctricos y certificación TE1", cliente: 2, calificacion: 4, comentario: "Muy profesional. El presupuesto fue claro.", haceDias: 15 },
+  { prestador: "demo.carolina@localcl.cl", servicio: "Tableros eléctricos y certificación TE1", cliente: 5, calificacion: 5, comentario: null, haceDias: 8 },
+  { prestador: "demo.valentina@localcl.cl", servicio: "Cóctel para eventos y cumpleaños", cliente: 1, calificacion: 5, comentario: "El cóctel estuvo delicioso y llegaron puntuales.", haceDias: 18 },
+  { prestador: "demo.valentina@localcl.cl", servicio: "Cóctel para eventos y cumpleaños", cliente: 4, calificacion: 4, comentario: null, haceDias: 9 },
+  { prestador: "demo.jorge@localcl.cl", servicio: "Cerrajería de urgencia 24 horas", cliente: 2, calificacion: 4, comentario: "Abrió la puerta en veinte minutos, un domingo.", haceDias: 22 },
+  { prestador: "demo.jorge@localcl.cl", servicio: "Muebles de cocina a medida", cliente: 3, calificacion: 5, comentario: "Los muebles quedaron tal como los diseñamos.", haceDias: 14 },
   {
     prestador: "demo.jorge@localcl.cl",
+    servicio: "Cerrajería de urgencia 24 horas",
     cliente: 5,
     calificacion: 1,
     comentario: "Un sinvergüenza, no sabe hacer nada. No lo contraten jamás.",
@@ -463,17 +471,25 @@ async function sembrarValoraciones(hashContrasena: string): Promise<number> {
     });
     const perfil = await prisma.perfilPrestador.findFirst({ where: { usuario: { correo: demo.prestador } }, select: { id: true, usuarioId: true } });
     if (!perfil) continue;
+    const servicio = await prisma.servicio.findFirst({ where: { prestadorId: perfil.id, titulo: demo.servicio }, select: { id: true } });
+    if (!servicio) throw new Error(`El servicio de demostración «${demo.servicio}» no existe.`);
 
-    // Contacto desde el perfil (sin servicio): así no depende de los servicios, que el seed rehace.
+    // El contacto es POR ESE SERVICIO: es lo que habilita a valorarlo.
     const contacto =
-      (await prisma.contacto.findFirst({ where: { clienteId: cliente.id, prestadorId: perfil.id }, select: { id: true } })) ??
+      (await prisma.contacto.findFirst({ where: { clienteId: cliente.id, servicioId: servicio.id }, select: { id: true } })) ??
       (await prisma.contacto.create({
-        data: { clienteId: cliente.id, prestadorId: perfil.id, canal: "WHATSAPP", creadoEn: new Date(Date.now() - demo.haceDias * 24 * HORA) },
+        data: {
+          clienteId: cliente.id,
+          prestadorId: perfil.id,
+          servicioId: servicio.id,
+          canal: "WHATSAPP",
+          creadoEn: new Date(Date.now() - demo.haceDias * 24 * HORA),
+        },
         select: { id: true },
       }));
 
     const existente = await prisma.valoracion.findUnique({
-      where: { clienteId_prestadorId: { clienteId: cliente.id, prestadorId: perfil.id } },
+      where: { clienteId_servicioId: { clienteId: cliente.id, servicioId: servicio.id } },
       select: { id: true },
     });
     const valoracion =
@@ -483,6 +499,7 @@ async function sembrarValoraciones(hashContrasena: string): Promise<number> {
           contactoId: contacto.id,
           clienteId: cliente.id,
           prestadorId: perfil.id,
+          servicioId: servicio.id,
           calificacion: demo.calificacion,
           comentario: demo.comentario,
           creadoEn: new Date(Date.now() - (demo.haceDias - 1) * 24 * HORA),
@@ -709,39 +726,39 @@ async function main() {
       await sembrarCursoRevisado(perfil.id, demo.cursoRevisado);
     }
 
-    // Los servicios de demostración se rehacen desde cero en cada corrida.
-    // Antes, sus fotos se borran del almacenamiento: la cascada solo borra filas.
+    // Los servicios de demostración se ACTUALIZAN en su lugar (se reconocen
+    // por su título), no se borran: de ellos cuelgan contactos y valoraciones
+    // (RESTRICT), y una valoración es definitiva. Sus fotos sí se rehacen:
+    // primero se borran del almacenamiento (la base no puede hacerlo) y luego
+    // las filas.
     const anteriores = await prisma.imagenServicio.findMany({
       where: { servicio: { prestadorId: perfil.id } },
       select: { identificador: true },
     });
     for (const { identificador } of anteriores) await obtenerAlmacenamientoPublico().eliminar(identificador);
-    // Los reportes apuntan a los servicios con RESTRICT: se borran antes. La
-    // bitácora de decisiones no se toca (solo inserción); sus filas viejas
-    // quedan con ids de servicios que ya no existen y no aparecen en la cola.
+    await prisma.imagenServicio.deleteMany({ where: { servicio: { prestadorId: perfil.id } } });
+    // Los reportes de servicios se rehacen en sembrarReportes. La bitácora de
+    // decisiones no se toca (solo inserción).
     await prisma.denuncia.deleteMany({ where: { servicio: { prestadorId: perfil.id } } });
-    // Los contactos hechos desde la web durante una demostración también
-    // apuntan al servicio (RESTRICT). No se borran (de un contacto cuelga la
-    // valoración): se desligan del servicio y quedan como contacto con el
-    // prestador, que es lo que importa para poder valorarlo.
-    await prisma.contacto.updateMany({ where: { servicio: { prestadorId: perfil.id } }, data: { servicioId: null } });
-    await prisma.servicio.deleteMany({ where: { prestadorId: perfil.id } });
+
+    const existentes = await prisma.servicio.findMany({ where: { prestadorId: perfil.id }, select: { id: true, titulo: true } });
 
     for (const servicio of demo.servicios) {
-      const creado = await prisma.servicio.create({
-        data: {
-          prestadorId: perfil.id,
-          categoriaId: await idCategoria(servicio.categoria),
-          categoriaPersonalizada: servicio.categoriaPersonalizada ?? null,
-          titulo: servicio.titulo,
-          descripcion: servicio.descripcion,
-          precioDesde: servicio.precioDesde,
-          precioHasta: servicio.precioHasta ?? null,
-          unidadPrecio: servicio.precioDesde === null ? null : (servicio.unidad ?? "POR_SERVICIO"),
-          estado: servicio.estado ?? "PUBLICADO",
-          creadoEn: new Date(Date.now() - servicio.haceDias * 24 * 60 * 60 * 1000),
-        },
-      });
+      const datos = {
+        categoriaId: await idCategoria(servicio.categoria),
+        categoriaPersonalizada: servicio.categoriaPersonalizada ?? null,
+        titulo: servicio.titulo,
+        descripcion: servicio.descripcion,
+        precioDesde: servicio.precioDesde,
+        precioHasta: servicio.precioHasta ?? null,
+        unidadPrecio: servicio.precioDesde === null ? null : (servicio.unidad ?? "POR_SERVICIO"),
+        estado: servicio.estado ?? "PUBLICADO",
+        creadoEn: new Date(Date.now() - servicio.haceDias * 24 * 60 * 60 * 1000),
+      } as const;
+      const actual = existentes.find((existente) => existente.titulo === servicio.titulo);
+      const creado = actual
+        ? await prisma.servicio.update({ where: { id: actual.id }, data: datos })
+        : await prisma.servicio.create({ data: { prestadorId: perfil.id, ...datos } });
       servicios += 1;
       idsPorTitulo.set(servicio.titulo, creado.id);
 
@@ -761,9 +778,10 @@ async function main() {
   const reportes = await sembrarReportes(idsPorTitulo, hashContrasena);
   const valoraciones = await sembrarValoraciones(hashContrasena);
 
-  // Los servicios se rehicieron desde cero: se vectorizan todos, en lotes,
-  // con el proveedor de EMBEDDINGS_PROVEEDOR. Si falla, quedan sin vector
-  // (siguen apareciendo por palabras) y basta correr embeddings:regenerar.
+  // Se vectorizan, en lotes, los servicios nuevos o cuyo texto cambió (los
+  // demás conservan su vector), con el proveedor de EMBEDDINGS_PROVEEDOR. Si
+  // falla, quedan sin vector (siguen apareciendo por palabras) y basta correr
+  // npm run embeddings:regenerar.
   const embeddings = await regenerarEmbeddings();
   console.log(
     `Embeddings: ${embeddings.vectorizados} servicios vectorizados en ${embeddings.llamadas} llamada(s)` +

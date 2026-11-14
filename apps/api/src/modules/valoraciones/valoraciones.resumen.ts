@@ -3,7 +3,9 @@ import { prisma } from "../../db.js";
 import { Prisma } from "../../generated/prisma/client.js";
 
 /*
-  ÚNICA definición del resumen de valoraciones de un prestador.
+  ÚNICA definición del resumen de valoraciones, de un SERVICIO (lo que
+  muestran su página y su tarjeta en el buscador) o de un PRESTADOR (todos
+  sus servicios juntos, en su perfil).
 
   - Solo cuentan las valoraciones PUBLICADAS: una OCULTA por moderación no
     entra en el conteo, ni en el promedio, ni en la distribución.
@@ -13,8 +15,8 @@ import { Prisma } from "../../generated/prisma/client.js";
     la opinión de una persona presentada como reputación, y la distribución
     de una sola reseña la revela entera.
 
-  Lo usan el buscador (tarjetas), la página del servicio y el perfil del
-  prestador. La regla del mínimo vive en una sola función (aplicarMinimo);
+  Lo usan el buscador (tarjetas, por servicio), la página del servicio (por
+  servicio) y el perfil del prestador (general, y uno corto por servicio). La regla del mínimo vive en una sola función (aplicarMinimo);
   la suma y el conteo salen de SQL, en enteros, para que el redondeo se haga
   una vez y de la misma forma en todas partes.
 */
@@ -40,26 +42,33 @@ function aplicarMinimo(cantidad: number, suma: number): ResumenCorto {
 }
 
 /**
- * Columnas para incrustar en el $queryRaw del buscador (alias de perfil `p`):
- * "valoracionesCantidad" y "valoracionesSuma". El buscador las pasa por
- * resumenCorto(); nunca calcula el promedio por su cuenta.
+ * Columnas para incrustar en el $queryRaw del buscador (alias de servicio
+ * `s`): "valoracionesCantidad" y "valoracionesSuma" DE ESE SERVICIO. El
+ * buscador las pasa por resumenCorto(); nunca calcula el promedio por su cuenta.
  */
 export const columnasResumen = Prisma.sql`
   (SELECT count(*)::int FROM valoraciones v
-    WHERE v.prestador_id = p.id AND v.estado = 'PUBLICADA')                         AS "valoracionesCantidad",
+    WHERE v.servicio_id = s.id AND v.estado = 'PUBLICADA')                          AS "valoracionesCantidad",
   (SELECT coalesce(sum(v.calificacion), 0)::int FROM valoraciones v
-    WHERE v.prestador_id = p.id AND v.estado = 'PUBLICADA')                         AS "valoracionesSuma"`;
+    WHERE v.servicio_id = s.id AND v.estado = 'PUBLICADA')                          AS "valoracionesSuma"`;
 
 export function resumenCorto(cantidad: number, suma: number): ResumenCorto {
   return aplicarMinimo(cantidad, suma);
 }
 
-/** Resumen completo (con distribución) de un prestador. */
-export async function resumenDe(prestadorId: string): Promise<ResumenValoraciones> {
+/** De qué se resume: un servicio, o un prestador con todos sus servicios. */
+export type AlcanceResumen = { servicioId: string } | { prestadorId: string };
+
+/** Resumen completo (con distribución) de un servicio o de un prestador. */
+export async function resumenDe(alcance: AlcanceResumen): Promise<ResumenValoraciones> {
+  const servicioId = "servicioId" in alcance ? alcance.servicioId : null;
+  const prestadorId = "prestadorId" in alcance ? alcance.prestadorId : null;
   const filas = await prisma.$queryRaw<{ calificacion: number; cantidad: number }[]>`
     SELECT v.calificacion, count(*)::int AS cantidad
       FROM valoraciones v
-     WHERE v.prestador_id = ${prestadorId} AND v.estado = 'PUBLICADA'
+     WHERE v.estado = 'PUBLICADA'
+       AND (${servicioId}::text IS NULL OR v.servicio_id = ${servicioId}::text)
+       AND (${prestadorId}::text IS NULL OR v.prestador_id = ${prestadorId}::text)
      GROUP BY v.calificacion`;
 
   const distribucion: Distribucion = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
@@ -77,4 +86,17 @@ export async function resumenDe(prestadorId: string): Promise<ResumenValoracione
 
   const corto = aplicarMinimo(cantidad, suma);
   return { ...corto, distribucion: corto.promedio === null ? null : distribucion };
+}
+
+/** Resumen corto de varios servicios a la vez (la lista de servicios del perfil). */
+export async function resumenesDeServicios(servicioIds: string[]): Promise<Map<string, ResumenCorto>> {
+  const resumenes = new Map<string, ResumenCorto>(servicioIds.map((id) => [id, aplicarMinimo(0, 0)]));
+  if (servicioIds.length === 0) return resumenes;
+  const filas = await prisma.$queryRaw<{ servicioId: string; cantidad: number; suma: number }[]>`
+    SELECT v.servicio_id AS "servicioId", count(*)::int AS cantidad, sum(v.calificacion)::int AS suma
+      FROM valoraciones v
+     WHERE v.servicio_id IN (${Prisma.join(servicioIds)}) AND v.estado = 'PUBLICADA'
+     GROUP BY v.servicio_id`;
+  for (const fila of filas) resumenes.set(fila.servicioId, aplicarMinimo(fila.cantidad, fila.suma));
+  return resumenes;
 }

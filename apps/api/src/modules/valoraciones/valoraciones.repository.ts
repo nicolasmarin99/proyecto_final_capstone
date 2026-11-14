@@ -1,19 +1,31 @@
 import { prisma } from "../../db.js";
 import { Prisma, type MotivoDenuncia } from "../../generated/prisma/client.js";
 
-/** El perfil y su dueño: para saber si existe y si quien valora es el mismo prestador. */
+/** El perfil y su dueño: para saber si existe. */
 export async function buscarPrestador(prestadorId: string) {
   return prisma.perfilPrestador.findUnique({ where: { id: prestadorId }, select: { id: true, usuarioId: true } });
+}
+
+/** El servicio, su prestador y el dueño: para saber si quien valora es el mismo prestador. */
+export async function buscarServicio(servicioId: string) {
+  return prisma.servicio.findUnique({
+    where: { id: servicioId },
+    select: { id: true, prestadorId: true, prestador: { select: { usuarioId: true } } },
+  });
 }
 
 export async function buscarPerfilDelUsuario(usuarioId: string) {
   return prisma.perfilPrestador.findUnique({ where: { usuarioId }, select: { id: true } });
 }
 
-/** El contacto más reciente de ese cliente con ese prestador: el plazo para valorar se cuenta desde él. */
-export async function ultimoContacto(clienteId: string, prestadorId: string) {
+/**
+ * El contacto más reciente de ese cliente POR ESE SERVICIO: el plazo para
+ * valorarlo se cuenta desde él. Un contacto por otro servicio del mismo
+ * prestador no sirve.
+ */
+export async function ultimoContacto(clienteId: string, servicioId: string) {
   return prisma.contacto.findFirst({
-    where: { clienteId, prestadorId },
+    where: { clienteId, servicioId },
     orderBy: [{ creadoEn: "desc" }, { id: "desc" }],
     select: { id: true, creadoEn: true },
   });
@@ -29,9 +41,9 @@ const seleccionPropia = {
   editadaEn: true,
 } as const;
 
-export async function valoracionDe(clienteId: string, prestadorId: string) {
+export async function valoracionDe(clienteId: string, servicioId: string) {
   return prisma.valoracion.findUnique({
-    where: { clienteId_prestadorId: { clienteId, prestadorId } },
+    where: { clienteId_servicioId: { clienteId, servicioId } },
     select: seleccionPropia,
   });
 }
@@ -41,9 +53,9 @@ export type ResultadoCrear =
   | { resultado: "ya_existe" };
 
 /**
- * Crea la valoración del par cliente-prestador, enlazada al contacto que la
+ * Crea la valoración del par cliente-servicio, enlazada al contacto que la
  * habilita, bajo bloqueo de la fila del cliente: dos envíos simultáneos no
- * crean dos (además lo impide el UNIQUE (cliente_id, prestador_id)).
+ * crean dos (además lo impide el UNIQUE (cliente_id, servicio_id)).
  *
  * Es DEFINITIVA: si ya existe no se toca y se informa "ya_existe". En este
  * repositorio no hay ninguna función que edite ni borre una valoración, y la
@@ -53,6 +65,7 @@ export type ResultadoCrear =
 export async function crearValoracion(datos: {
   clienteId: string;
   prestadorId: string;
+  servicioId: string;
   contactoId: string;
   calificacion: number;
   comentario: string | null;
@@ -61,7 +74,7 @@ export async function crearValoracion(datos: {
     await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${datos.clienteId} FOR UPDATE`;
 
     const existente = await tx.valoracion.findUnique({
-      where: { clienteId_prestadorId: { clienteId: datos.clienteId, prestadorId: datos.prestadorId } },
+      where: { clienteId_servicioId: { clienteId: datos.clienteId, servicioId: datos.servicioId } },
       select: { id: true },
     });
     if (existente) return { resultado: "ya_existe" };
@@ -71,6 +84,7 @@ export async function crearValoracion(datos: {
         contactoId: datos.contactoId,
         clienteId: datos.clienteId,
         prestadorId: datos.prestadorId,
+        servicioId: datos.servicioId,
         calificacion: datos.calificacion,
         comentario: datos.comentario,
       },
@@ -81,12 +95,17 @@ export async function crearValoracion(datos: {
 }
 
 /**
- * Lista pública: solo PUBLICADAS, más recientes primero. Del cliente se lee
- * únicamente el nombre, que el servicio recorta al nombre de pila: nunca el
- * correo ni el RUT.
+ * Lista pública de un servicio o de un prestador (todos sus servicios):
+ * solo PUBLICADAS, más recientes primero. Del cliente se lee únicamente el
+ * nombre, que el servicio recorta al nombre de pila: nunca el correo ni el
+ * RUT. Cada una dice qué servicio valora.
  */
-export async function valoracionesPublicadas(prestadorId: string, pagina: number, porPagina: number) {
-  const where = { prestadorId, estado: "PUBLICADA" as const };
+export async function valoracionesPublicadas(
+  alcance: { servicioId: string } | { prestadorId: string },
+  pagina: number,
+  porPagina: number,
+) {
+  const where = { ...alcance, estado: "PUBLICADA" as const };
   const [valoraciones, total] = await Promise.all([
     prisma.valoracion.findMany({
       where,
@@ -99,6 +118,7 @@ export async function valoracionesPublicadas(prestadorId: string, pagina: number
         comentario: true,
         creadoEn: true,
         editadaEn: true,
+        servicio: { select: { id: true, titulo: true } },
         // valoraciones llega al cliente por su contacto (clave compuesta).
         contacto: { select: { cliente: { select: { nombre: true } } } },
       },
@@ -127,6 +147,7 @@ export async function valoracionesRecibidas(prestadorId: string, pagina: number,
         estado: true,
         creadoEn: true,
         editadaEn: true,
+        servicio: { select: { id: true, titulo: true } },
         // valoraciones llega al cliente por su contacto (clave compuesta).
         contacto: { select: { cliente: { select: { nombre: true } } } },
         denuncias: {

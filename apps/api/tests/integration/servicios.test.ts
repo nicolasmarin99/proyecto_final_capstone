@@ -509,11 +509,12 @@ describe("GET /prestadores/:id/contacto", () => {
     const prestador = await crearPrestador();
     const otro = await crearPrestador();
     const cliente = await crearUsuario("CLIENTE");
-    await crear(prestador.token);
+    const { body } = await crear(prestador.token);
     await crear(otro.token);
 
+    // El servicio es obligatorio; lo que se prueba es que ?id= no cambia de prestador.
     await request(app)
-      .get(`/prestadores/${prestador.perfilId}/contacto?id=${otro.perfilId}`)
+      .get(`/prestadores/${prestador.perfilId}/contacto?servicio=${body.servicio.id}&id=${otro.perfilId}`)
       .set("Authorization", `Bearer ${cliente.token}`);
 
     expect(await prisma.contacto.findMany()).toEqual([expect.objectContaining({ prestadorId: prestador.perfilId })]);
@@ -521,9 +522,9 @@ describe("GET /prestadores/:id/contacto", () => {
 
   it("un prestador pidiendo su propio contacto: 400, sin registrar nada", async () => {
     const prestador = await crearPrestador();
-    await crear(prestador.token);
+    const { body } = await crear(prestador.token);
 
-    const respuesta = await contacto(prestador.token, prestador.perfilId);
+    const respuesta = await contacto(prestador.token, prestador.perfilId, body.servicio.id);
 
     expect(respuesta.status).toBe(400);
     expect(respuesta.body.error.codigo).toBe("AUTOCONTACTO");
@@ -533,9 +534,9 @@ describe("GET /prestadores/:id/contacto", () => {
   it("un prestador sin servicios publicados no entrega su teléfono: 404", async () => {
     const prestador = await crearPrestador({ identidad: false });
     const cliente = await crearUsuario("CLIENTE");
-    await crear(prestador.token);
+    const { body } = await crear(prestador.token);
 
-    expect((await contacto(cliente.token, prestador.perfilId)).status).toBe(404);
+    expect((await contacto(cliente.token, prestador.perfilId, body.servicio.id)).status).toBe(404);
     expect(await prisma.contacto.count()).toBe(0);
   });
 

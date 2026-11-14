@@ -210,11 +210,14 @@ export default function PaginaMisValoraciones() {
               {datos.valoraciones.map((valoracion) => (
                 <li key={valoracion.id} className="rounded-medio border border-borde p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="flex flex-wrap items-center gap-x-2 text-sm">
-                      <span className="font-semibold text-noche">{valoracion.cliente.nombre}</span>
-                      <Estrellas valor={valoracion.calificacion} tamano={14} />
-                      <span className="sr-only">{valoracion.calificacion} de 5 estrellas</span>
-                    </p>
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-x-2 text-sm">
+                        <span className="font-semibold text-noche">{valoracion.cliente.nombre}</span>
+                        <Estrellas valor={valoracion.calificacion} tamano={14} />
+                        <span className="sr-only">{valoracion.calificacion} de 5 estrellas</span>
+                      </p>
+                      {valoracion.servicio && <p className="mt-0.5 text-xs font-semibold text-primario">Servicio: {valoracion.servicio.titulo}</p>}
+                    </div>
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         valoracion.estado === "OCULTA" ? "bg-niebla text-texto-suave" : "bg-exito-50 text-exito-700"

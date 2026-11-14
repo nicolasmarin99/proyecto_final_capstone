@@ -47,13 +47,11 @@ function ValoracionPublicada({ calificacion, comentario, creadaEn }: { calificac
  * `alCambiar` avisa que se publicó, para recargar la lista.
  */
 export function FormularioValoracion({
-  prestadorId,
   nombrePrestador,
   servicioId,
   cliente,
   alCambiar,
 }: {
-  prestadorId: string;
   nombrePrestador: string;
   servicioId: string;
   cliente: ClienteApi;
@@ -80,7 +78,7 @@ export function FormularioValoracion({
     if (!esCliente) return;
     let cancelado = false;
     cliente
-      .miValoracion(prestadorId)
+      .miValoracion(servicioId)
       .then((respuesta) => {
         if (cancelado) return;
         setMia(respuesta);
@@ -91,7 +89,7 @@ export function FormularioValoracion({
     return () => {
       cancelado = true;
     };
-  }, [cliente, prestadorId, esCliente]);
+  }, [cliente, servicioId, esCliente]);
 
   /** Primer paso: valida y pide confirmar, porque después no hay vuelta atrás. */
   function revisar(evento: FormEvent) {
@@ -112,7 +110,7 @@ export function FormularioValoracion({
     setErrorGeneral(null);
     setPublicando(true);
     try {
-      const valoracion = await cliente.valorar(prestadorId, { calificacion, comentario: comentario.trim() || null });
+      const valoracion = await cliente.valorar(servicioId, { calificacion, comentario: comentario.trim() || null });
       setAviso("¡Gracias! Tu valoración ya está publicada.");
       setMia((actual) => (actual ? { ...actual, valoracion, puedeValorar: false, motivo: "YA_VALORADA", plazoHasta: null } : actual));
       alCambiar();
@@ -130,7 +128,7 @@ export function FormularioValoracion({
     if (!usuario) {
       return (
         <Requisito>
-          Valoran quienes contactaron a {nombrePrestador} desde LocalCL.{" "}
+          Valoran este servicio quienes contactaron a {nombrePrestador} por él desde LocalCL.{" "}
           <Link
             to="/iniciar-sesion"
             state={{ desde: `/servicios/${servicioId}` }}
@@ -143,7 +141,7 @@ export function FormularioValoracion({
       );
     }
     if (!esCliente) {
-      return <Requisito>Solo los clientes que contactaron a este prestador desde LocalCL pueden valorarlo.</Requisito>;
+      return <Requisito>Solo los clientes que contactaron a este prestador por este servicio pueden valorarlo.</Requisito>;
     }
     if (errorCarga) return <Requisito>No fue posible revisar si puedes valorar. Recarga la página para intentarlo de nuevo.</Requisito>;
     if (!mia) return <p className="text-sm text-texto-suave">Revisando si puedes valorar…</p>;
@@ -169,7 +167,7 @@ export function FormularioValoracion({
         <Requisito>
           {mia.motivo === "PLAZO_VENCIDO"
             ? `Se puede valorar dentro de los ${DIAS_PARA_VALORAR} días desde que contactas a un prestador, y ese plazo ya terminó.`
-            : `Para valorar a ${nombrePrestador}, primero contáctalo desde uno de sus servicios: solo valoran quienes lo contactaron por LocalCL.`}
+            : `Para valorar este servicio, primero contacta a ${nombrePrestador} desde esta página: cada servicio lo valoran quienes lo contactaron por él.`}
         </Requisito>
       );
     }
@@ -238,7 +236,7 @@ export function FormularioValoracion({
   return (
     <section aria-labelledby={idTitulo} className="mt-6 rounded-medio border border-borde p-4 sm:p-5">
       <h3 id={idTitulo} className="font-titulos text-base font-bold text-noche">
-        {mia?.valoracion && !mia.valoracion.ocultaPorModeracion ? "Tu valoración" : `Valorar a ${nombrePrestador}`}
+        {mia?.valoracion && !mia.valoracion.ocultaPorModeracion ? "Tu valoración de este servicio" : "Valorar este servicio"}
       </h3>
       <div className="mt-3">{contenido()}</div>
     </section>

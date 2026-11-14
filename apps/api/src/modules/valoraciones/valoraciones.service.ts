@@ -1,9 +1,10 @@
 import { DIAS_PARA_VALORAR } from "@localcl/shared";
 import { ErrorHttp } from "../../shared/errores.js";
-import { contarServiciosVisiblesDe } from "../servicios/servicios.visibilidad.js";
+import { contarServiciosVisiblesDe, esServicioVisible } from "../servicios/servicios.visibilidad.js";
 import {
   buscarPerfilDelUsuario,
   buscarPrestador,
+  buscarServicio,
   buscarValoracion,
   crearObjecion,
   crearValoracion,
@@ -27,6 +28,10 @@ import type { DatosObjecion, DatosValoracion } from "./valoraciones.schema.js";
   Así lo que el prestador objeta y lo que el administrador revisa es
   exactamente lo que se publicó, y nadie puede reescribir una reseña
   después (por ejemplo, tras una presión del prestador).
+
+  Cada valoración califica UN SERVICIO: el que el cliente contactó. La página
+  de cada servicio muestra solo las suyas; el perfil del prestador junta
+  todas, cada una con el servicio que valora.
 */
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +51,21 @@ async function prestadorVisible(prestadorId: string) {
   return prestador;
 }
 
+function servicioNoEncontrado(): ErrorHttp {
+  return new ErrorHttp(404, "SERVICIO_NO_ENCONTRADO", "Ese servicio no existe o no está publicado.");
+}
+
+/**
+ * Un servicio que el público no ve (pausado, oculto, o de un prestador sin
+ * verificar) no se valora ni muestra valoraciones: la misma regla y la
+ * misma respuesta que su página (servicios.visibilidad.ts).
+ */
+async function servicioVisible(servicioId: string) {
+  const servicio = await buscarServicio(servicioId);
+  if (!servicio || !(await esServicioVisible(servicioId))) throw servicioNoEncontrado();
+  return servicio;
+}
+
 /** «Juan Pérez Soto» → «Juan». Lo único del cliente que se publica. */
 export function nombreDePila(nombre: string): string {
   return nombre.trim().split(/\s+/)[0] ?? "";
@@ -55,9 +75,9 @@ type Elegibilidad =
   | { puede: true; contactoId: string; plazoHasta: Date }
   | { puede: false; motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO"; plazoHasta: Date | null };
 
-/** ¿Puede valorar hoy? Solo con un contacto registrado en los últimos DIAS_PARA_VALORAR días. */
-async function elegibilidad(clienteId: string, prestadorId: string): Promise<Elegibilidad> {
-  const contacto = await ultimoContacto(clienteId, prestadorId);
+/** ¿Puede valorar hoy ese servicio? Solo con un contacto POR ESE SERVICIO en los últimos DIAS_PARA_VALORAR días. */
+async function elegibilidad(clienteId: string, servicioId: string): Promise<Elegibilidad> {
+  const contacto = await ultimoContacto(clienteId, servicioId);
   if (!contacto) return { puede: false, motivo: "SIN_CONTACTO", plazoHasta: null };
 
   const plazoHasta = new Date(contacto.creadoEn.getTime() + DIAS_PARA_VALORAR * DIA_MS);
@@ -88,35 +108,41 @@ function vistaPropia(valoracion: {
 }
 
 function yaValorada(): ErrorHttp {
-  return new ErrorHttp(409, "VALORACION_YA_EXISTE", "Ya valoraste a este prestador. Una valoración publicada no se puede editar ni retirar.");
+  return new ErrorHttp(409, "VALORACION_YA_EXISTE", "Ya valoraste este servicio. Una valoración publicada no se puede editar ni retirar.");
 }
 
 /**
- * Publica la valoración del cliente. Reglas, en este orden:
- * 1. El prestador debe estar visible (404).
+ * Publica la valoración del cliente sobre un servicio. Reglas, en este orden:
+ * 1. El servicio debe estar visible (404).
  * 2. Nadie se valora a sí mismo (403). Ya lo impide exigir el rol CLIENTE;
  *    se revisa igual por si un día cambian los roles.
- * 3. Una por cliente y prestador, y definitiva: si ya existe, 409. Va antes
+ * 3. Una por cliente y servicio, y definitiva: si ya existe, 409. Va antes
  *    del plazo para no decirle «plazo vencido» a quien ya valoró.
- * 4. Un contacto registrado con ese prestador (403) y dentro de los
- *    últimos 60 días (403).
+ * 4. Un contacto registrado POR ESE SERVICIO (403) y dentro de los últimos
+ *    60 días (403). Haber contactado otro servicio del mismo prestador no basta.
  */
-export async function valorar(clienteId: string, prestadorId: string, datos: DatosValoracion) {
-  const prestador = await prestadorVisible(prestadorId);
-  if (prestador.usuarioId === clienteId) {
+export async function valorar(clienteId: string, servicioId: string, datos: DatosValoracion) {
+  const servicio = await servicioVisible(servicioId);
+  if (servicio.prestador.usuarioId === clienteId) {
     throw new ErrorHttp(403, "AUTOVALORACION", "No puedes valorarte a ti mismo.");
   }
-  if (await valoracionDe(clienteId, prestadorId)) throw yaValorada();
+  if (await valoracionDe(clienteId, servicioId)) throw yaValorada();
 
-  const habilitado = await elegibilidad(clienteId, prestadorId);
+  const habilitado = await elegibilidad(clienteId, servicioId);
   if (!habilitado.puede) {
     throw habilitado.motivo === "SIN_CONTACTO"
-      ? new ErrorHttp(403, "SIN_CONTACTO", "Solo puedes valorar a un prestador que hayas contactado desde LocalCL.")
+      ? new ErrorHttp(403, "SIN_CONTACTO", "Solo puedes valorar un servicio por el que hayas contactado al prestador desde LocalCL.")
       : new ErrorHttp(403, "PLAZO_VENCIDO", `Solo puedes valorar dentro de los ${DIAS_PARA_VALORAR} días desde que lo contactaste.`);
   }
 
   // La revisión de arriba da el mensaje; esta, bajo bloqueo, cubre dos envíos simultáneos.
-  const resultado = await crearValoracion({ clienteId, prestadorId, contactoId: habilitado.contactoId, ...datos });
+  const resultado = await crearValoracion({
+    clienteId,
+    prestadorId: servicio.prestadorId,
+    servicioId,
+    contactoId: habilitado.contactoId,
+    ...datos,
+  });
   if (resultado.resultado === "ya_existe") throw yaValorada();
   return vistaPropia(resultado.valoracion);
 }
@@ -126,9 +152,9 @@ export async function valorar(clienteId: string, prestadorId: string, datos: Dat
  * si puede valorar hoy. Solo habla del propio cliente: nada de las
  * valoraciones de otros.
  */
-export async function mia(clienteId: string, prestadorId: string) {
-  await prestadorVisible(prestadorId);
-  const [valoracion, habilitado] = await Promise.all([valoracionDe(clienteId, prestadorId), elegibilidad(clienteId, prestadorId)]);
+export async function mia(clienteId: string, servicioId: string) {
+  await servicioVisible(servicioId);
+  const [valoracion, habilitado] = await Promise.all([valoracionDe(clienteId, servicioId), elegibilidad(clienteId, servicioId)]);
 
   return {
     valoracion: valoracion ? vistaPropia(valoracion) : null,
@@ -140,14 +166,15 @@ export async function mia(clienteId: string, prestadorId: string) {
 }
 
 /**
- * Lista pública, paginada, solo PUBLICADAS. Del cliente sale el nombre de
- * pila y la foto (null: el modelo todavía no tiene foto de perfil).
+ * Lista pública, paginada, solo PUBLICADAS, de un servicio (su página) o de
+ * un prestador (su perfil: todos sus servicios). Del cliente sale el nombre
+ * de pila y la foto (null: el modelo todavía no tiene foto de perfil). Cada
+ * una dice qué servicio valora.
  */
-export async function publicas(prestadorId: string, pagina: number, porPagina: number) {
-  await prestadorVisible(prestadorId);
+async function listaPublica(alcance: { servicioId: string } | { prestadorId: string }, pagina: number, porPagina: number) {
   const [{ valoraciones, total }, resumen] = await Promise.all([
-    valoracionesPublicadas(prestadorId, pagina, porPagina),
-    resumenDe(prestadorId),
+    valoracionesPublicadas(alcance, pagina, porPagina),
+    resumenDe(alcance),
   ]);
 
   return {
@@ -159,12 +186,25 @@ export async function publicas(prestadorId: string, pagina: number, porPagina: n
       creadaEn: valoracion.creadoEn,
       editada: valoracion.editadaEn !== null,
       editadaEn: valoracion.editadaEn,
+      servicio: { id: valoracion.servicio.id, titulo: valoracion.servicio.titulo },
       cliente: { nombre: nombreDePila(valoracion.contacto.cliente.nombre), foto: null },
     })),
     pagina,
     porPagina,
     total,
   };
+}
+
+/** Las de un servicio, para su página. */
+export async function publicasDeServicio(servicioId: string, pagina: number, porPagina: number) {
+  await servicioVisible(servicioId);
+  return listaPublica({ servicioId }, pagina, porPagina);
+}
+
+/** Las de todos los servicios de un prestador, para su perfil (con el promedio general). */
+export async function publicasDePrestador(prestadorId: string, pagina: number, porPagina: number) {
+  await prestadorVisible(prestadorId);
+  return listaPublica({ prestadorId }, pagina, porPagina);
 }
 
 /** /prestadores/yo/valoraciones: lo que recibió, con el estado de sus objeciones. */
@@ -175,7 +215,7 @@ export async function recibidas(usuarioId: string, pagina: number, porPagina: nu
   }
   const [{ valoraciones, total }, resumen] = await Promise.all([
     valoracionesRecibidas(perfil.id, pagina, porPagina),
-    resumenDe(perfil.id),
+    resumenDe({ prestadorId: perfil.id }),
   ]);
 
   return {
@@ -190,6 +230,7 @@ export async function recibidas(usuarioId: string, pagina: number, porPagina: nu
         estado: valoracion.estado,
         creadaEn: valoracion.creadoEn,
         editada: valoracion.editadaEn !== null,
+        servicio: { id: valoracion.servicio.id, titulo: valoracion.servicio.titulo },
         cliente: { nombre: nombreDePila(valoracion.contacto.cliente.nombre) },
         objecion: objecion
           ? {

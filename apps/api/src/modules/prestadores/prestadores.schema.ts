@@ -77,4 +77,7 @@ export const esquemaComunasAtencion = z.object({
 
 /** GET /prestadores/:id/contacto?servicio=... — ruta y consulta se validan por separado. */
 export const esquemaIdPrestador = z.object({ id: z.string().min(1).max(64) });
-export const esquemaConsultaContacto = z.object({ servicio: z.string().min(1).max(64).optional() });
+// El servicio es obligatorio: el contacto habilita a valorar ESE servicio.
+export const esquemaConsultaContacto = z.object({
+  servicio: z.string({ error: "Indica por qué servicio contactas." }).min(1, "Indica por qué servicio contactas.").max(64),
+});

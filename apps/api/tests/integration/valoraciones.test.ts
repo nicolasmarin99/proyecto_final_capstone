@@ -64,20 +64,41 @@ async function crearPrestador() {
 const crearCliente = (opciones: { correoVerificado?: boolean; nombre?: string } = {}) => crearUsuario("CLIENTE", opciones);
 const crearAdministrador = () => crearUsuario("ADMINISTRADOR");
 
-/** Un contacto registrado, hace `diasAtras` días. */
-async function contactar(clienteId: string, prestadorId: string, diasAtras = 1) {
+/** Un contacto registrado POR UN SERVICIO, hace `diasAtras` días. */
+async function contactar(clienteId: string, servicio: { perfilId: string; servicioId: string }, diasAtras = 1) {
   return prisma.contacto.create({
-    data: { clienteId, prestadorId, canal: "WHATSAPP", creadoEn: new Date(Date.now() - diasAtras * DIA_MS) },
+    data: {
+      clienteId,
+      prestadorId: servicio.perfilId,
+      servicioId: servicio.servicioId,
+      canal: "WHATSAPP",
+      creadoEn: new Date(Date.now() - diasAtras * DIA_MS),
+    },
   });
 }
 
-function valorar(token: string | null, prestadorId: string, cuerpo: object = { calificacion: 5, comentario: "Excelente trabajo, muy puntual." }) {
-  const solicitud = request(app).post(`/prestadores/${prestadorId}/valoraciones`);
+function valorar(token: string | null, servicioId: string, cuerpo: object = { calificacion: 5, comentario: "Excelente trabajo, muy puntual." }) {
+  const solicitud = request(app).post(`/servicios/${servicioId}/valoraciones`);
   return token ? solicitud.set("Authorization", `Bearer ${token}`).send(cuerpo) : solicitud.send(cuerpo);
 }
 
+/** Todas las del prestador (su perfil), con el promedio general. */
 function lista(prestadorId: string, consulta = "") {
   return request(app).get(`/prestadores/${prestadorId}/valoraciones${consulta}`);
+}
+
+/** Las de un servicio (su página). */
+function listaServicio(servicioId: string, consulta = "") {
+  return request(app).get(`/servicios/${servicioId}/valoraciones${consulta}`);
+}
+
+/** Otro servicio publicado del mismo prestador. */
+async function otroServicio(prestador: { perfilId: string }, titulo = "Destape de cañerías") {
+  const categoria = await prisma.categoria.findUniqueOrThrow({ where: { slug: "gasfiteria" } });
+  const servicio = await prisma.servicio.create({
+    data: { prestadorId: prestador.perfilId, categoriaId: categoria.id, titulo, descripcion: "Destapes con máquina, el mismo día.", estado: "PUBLICADO" },
+  });
+  return { perfilId: prestador.perfilId, servicioId: servicio.id };
 }
 
 function objetar(token: string, valoracionId: string, cuerpo: object = { motivo: "LENGUAJE_OFENSIVO" }) {
@@ -95,11 +116,11 @@ function decidir(token: string, valoracionId: string, accion: "desestimar" | "oc
     .send({ motivo });
 }
 
-/** Un cliente con contacto valora al prestador; devuelve el id de la valoración. */
-async function valoracionDe(prestador: { perfilId: string }, calificacion: number, comentario: string | null = null) {
+/** Un cliente con contacto valora el servicio; devuelve el id de la valoración. */
+async function valoracionDe(prestador: { perfilId: string; servicioId: string }, calificacion: number, comentario: string | null = null) {
   const cliente = await crearCliente();
-  await contactar(cliente.id, prestador.perfilId);
-  const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion, comentario });
+  await contactar(cliente.id, prestador);
+  const respuesta = await valorar(cliente.token, prestador.servicioId, { calificacion, comentario });
   expect(respuesta.status).toBe(201);
   return { cliente, id: String(respuesta.body.valoracion.id) };
 }
@@ -108,13 +129,13 @@ function detalleDe(cuerpo: { error?: { detalles?: { campo: string }[] } }, campo
   return cuerpo.error?.detalles?.find((detalle) => detalle.campo === campo);
 }
 
-describe("POST /prestadores/:id/valoraciones", () => {
+describe("POST /servicios/:id/valoraciones", () => {
   it("un cliente con contacto y correo verificado valora: se crea PUBLICADA y enlazada al contacto", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
-    const contacto = await contactar(cliente.id, prestador.perfilId);
+    const contacto = await contactar(cliente.id, prestador);
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId);
+    const respuesta = await valorar(cliente.token, prestador.servicioId);
 
     expect(respuesta.status).toBe(201);
     expect(respuesta.body.valoracion).toMatchObject({ calificacion: 5, estado: "PUBLICADA", editada: false, editadaEn: null });
@@ -125,9 +146,9 @@ describe("POST /prestadores/:id/valoraciones", () => {
   it("el estado lo fija el servidor: un «estado» en el cuerpo se ignora", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
-    await contactar(cliente.id, prestador.perfilId);
+    await contactar(cliente.id, prestador);
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 4, estado: "OCULTA" });
+    const respuesta = await valorar(cliente.token, prestador.servicioId, { calificacion: 4, estado: "OCULTA" });
 
     expect(respuesta.status).toBe(201);
     expect(respuesta.body.valoracion.estado).toBe("PUBLICADA");
@@ -137,7 +158,7 @@ describe("POST /prestadores/:id/valoraciones", () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId);
+    const respuesta = await valorar(cliente.token, prestador.servicioId);
 
     expect(respuesta.status).toBe(403);
     expect(respuesta.body.error.codigo).toBe("SIN_CONTACTO");
@@ -147,20 +168,20 @@ describe("POST /prestadores/:id/valoraciones", () => {
   it("sin correo verificado: 403; sin sesión: 401", async () => {
     const prestador = await crearPrestador();
     const sinCorreo = await crearCliente({ correoVerificado: false });
-    await contactar(sinCorreo.id, prestador.perfilId);
+    await contactar(sinCorreo.id, prestador);
 
-    expect((await valorar(sinCorreo.token, prestador.perfilId)).status).toBe(403);
-    expect((await valorar(null, prestador.perfilId)).status).toBe(401);
+    expect((await valorar(sinCorreo.token, prestador.servicioId)).status).toBe(403);
+    expect((await valorar(null, prestador.servicioId)).status).toBe(401);
     expect(await prisma.valoracion.count()).toBe(0);
   });
 
   it("es definitiva: valorar dos veces responde 409 VALORACION_YA_EXISTE y la primera queda intacta", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
-    await contactar(cliente.id, prestador.perfilId);
-    await valorar(cliente.token, prestador.perfilId, { calificacion: 2, comentario: "Llegó tarde y no avisó nada." });
+    await contactar(cliente.id, prestador);
+    await valorar(cliente.token, prestador.servicioId, { calificacion: 2, comentario: "Llegó tarde y no avisó nada." });
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 4, comentario: "Volvió y lo dejó funcionando." });
+    const respuesta = await valorar(cliente.token, prestador.servicioId, { calificacion: 4, comentario: "Volvió y lo dejó funcionando." });
 
     expect(respuesta.status).toBe(409);
     expect(respuesta.body.error.codigo).toBe("VALORACION_YA_EXISTE");
@@ -174,7 +195,7 @@ describe("POST /prestadores/:id/valoraciones", () => {
     const { cliente } = await valoracionDe(prestador, 3);
     await prisma.contacto.updateMany({ data: { creadoEn: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } });
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 5 });
+    const respuesta = await valorar(cliente.token, prestador.servicioId, { calificacion: 5 });
 
     expect(respuesta.status).toBe(409);
     expect(respuesta.body.error.codigo).toBe("VALORACION_YA_EXISTE");
@@ -190,9 +211,9 @@ describe("POST /prestadores/:id/valoraciones", () => {
   ])("400 con %s", async (_caso, cuerpo, campo) => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
-    await contactar(cliente.id, prestador.perfilId);
+    await contactar(cliente.id, prestador);
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId, cuerpo);
+    const respuesta = await valorar(cliente.token, prestador.servicioId, cuerpo);
 
     expect(respuesta.status).toBe(400);
     expect(detalleDe(respuesta.body, campo)).toBeDefined();
@@ -201,9 +222,9 @@ describe("POST /prestadores/:id/valoraciones", () => {
   it("el comentario es opcional: solo estrellas está bien", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente();
-    await contactar(cliente.id, prestador.perfilId);
+    await contactar(cliente.id, prestador);
 
-    const respuesta = await valorar(cliente.token, prestador.perfilId, { calificacion: 3, comentario: "   " });
+    const respuesta = await valorar(cliente.token, prestador.servicioId, { calificacion: 3, comentario: "   " });
 
     expect(respuesta.status).toBe(201);
     expect(respuesta.body.valoracion.comentario).toBeNull();
@@ -212,21 +233,21 @@ describe("POST /prestadores/:id/valoraciones", () => {
   it("con un contacto de hace 61 días: 403 PLAZO_VENCIDO; con uno de hace 59, sí", async () => {
     const prestador = await crearPrestador();
     const tarde = await crearCliente();
-    await contactar(tarde.id, prestador.perfilId, 61);
+    await contactar(tarde.id, prestador, 61);
     const aTiempo = await crearCliente();
-    await contactar(aTiempo.id, prestador.perfilId, 59);
+    await contactar(aTiempo.id, prestador, 59);
 
-    const rechazada = await valorar(tarde.token, prestador.perfilId);
+    const rechazada = await valorar(tarde.token, prestador.servicioId);
     expect(rechazada.status).toBe(403);
     expect(rechazada.body.error.codigo).toBe("PLAZO_VENCIDO");
-    expect((await valorar(aTiempo.token, prestador.perfilId)).status).toBe(201);
+    expect((await valorar(aTiempo.token, prestador.servicioId)).status).toBe(201);
   });
 
   it("un prestador valorándose a sí mismo: 403, aunque tenga un contacto consigo mismo", async () => {
     const prestador = await crearPrestador();
-    await contactar(prestador.id, prestador.perfilId);
+    await contactar(prestador.id, prestador);
 
-    const respuesta = await valorar(prestador.token, prestador.perfilId);
+    const respuesta = await valorar(prestador.token, prestador.servicioId);
 
     expect(respuesta.status).toBe(403);
     expect(await prisma.valoracion.count()).toBe(0);
@@ -236,9 +257,10 @@ describe("POST /prestadores/:id/valoraciones", () => {
     const prestador = await crearPrestador();
     await prisma.servicio.update({ where: { id: prestador.servicioId }, data: { estado: "PAUSADO" } });
     const cliente = await crearCliente();
-    await contactar(cliente.id, prestador.perfilId);
+    await contactar(cliente.id, prestador);
 
-    expect((await valorar(cliente.token, prestador.perfilId)).status).toBe(404);
+    expect((await valorar(cliente.token, prestador.servicioId)).status).toBe(404);
+    expect((await listaServicio(prestador.servicioId)).status).toBe(404);
     expect((await lista(prestador.perfilId)).status).toBe(404);
   });
 });
@@ -270,10 +292,10 @@ describe("Resumen: promedio y distribución", () => {
     for (const estrellas of [5, 4, 3]) await valoracionDe(prestador, estrellas);
 
     const busqueda = await request(app).get("/servicios");
-    expect(busqueda.body.resultados[0].prestador.valoraciones).toEqual({ cantidad: 3, promedio: 4 });
+    expect(busqueda.body.resultados[0].valoraciones).toEqual({ cantidad: 3, promedio: 4 });
 
     const pagina = await request(app).get(`/servicios/${prestador.servicioId}`);
-    expect(pagina.body.servicio.prestador.valoraciones).toMatchObject({ cantidad: 3, promedio: 4 });
+    expect(pagina.body.servicio.valoraciones).toMatchObject({ cantidad: 3, promedio: 4 });
 
     const perfil = await request(app).get(`/prestadores/${prestador.perfilId}/publico`);
     expect(perfil.body.prestador.valoraciones).toEqual({ cantidad: 3, promedio: 4, distribucion: { "1": 0, "2": 0, "3": 1, "4": 1, "5": 1 } });
@@ -283,7 +305,7 @@ describe("Resumen: promedio y distribución", () => {
     await crearPrestador();
 
     const busqueda = await request(app).get("/servicios");
-    expect(busqueda.body.resultados[0].prestador.valoraciones).toEqual({ cantidad: 0, promedio: null });
+    expect(busqueda.body.resultados[0].valoraciones).toEqual({ cantidad: 0, promedio: null });
   });
 
   it("ocultar una valoración la saca del promedio, del conteo y de la lista", async () => {
@@ -303,7 +325,7 @@ describe("Resumen: promedio y distribución", () => {
     expect(despues.body.total).toBe(3);
     expect(despues.body.valoraciones.map((valoracion: { id: string }) => valoracion.id)).not.toContain(id);
     const busqueda = await request(app).get("/servicios");
-    expect(busqueda.body.resultados[0].prestador.valoraciones).toEqual({ cantidad: 3, promedio: 5 });
+    expect(busqueda.body.resultados[0].valoraciones).toEqual({ cantidad: 3, promedio: 5 });
   });
 });
 
@@ -311,8 +333,8 @@ describe("GET /prestadores/:id/valoraciones (pública)", () => {
   it("no incluye nombre completo, correo ni RUT del cliente: solo el nombre de pila", async () => {
     const prestador = await crearPrestador();
     const cliente = await crearCliente({ nombre: "Camila Andrea Torres Soto" });
-    await contactar(cliente.id, prestador.perfilId);
-    await valorar(cliente.token, prestador.perfilId, { calificacion: 5, comentario: "Impecable, muy recomendable." });
+    await contactar(cliente.id, prestador);
+    await valorar(cliente.token, prestador.servicioId, { calificacion: 5, comentario: "Impecable, muy recomendable." });
 
     const respuesta = await lista(prestador.perfilId);
 
@@ -349,7 +371,7 @@ describe("La valoración propia", () => {
     await valoracionDe(prestador, 5, "Muy buen trabajo, lo recomiendo.");
     const cliente = await crearCliente();
 
-    const respuesta = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
+    const respuesta = await request(app).get(`/servicios/${prestador.servicioId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
 
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toEqual({ valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null });
@@ -359,7 +381,7 @@ describe("La valoración propia", () => {
     const prestador = await crearPrestador();
     const { cliente } = await valoracionDe(prestador, 4, "Buen trabajo, muy puntual.");
 
-    const respuesta = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
+    const respuesta = await request(app).get(`/servicios/${prestador.servicioId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
 
     expect(respuesta.body).toMatchObject({
       valoracion: { calificacion: 4, comentario: "Buen trabajo, muy puntual.", estado: "PUBLICADA" },
@@ -372,7 +394,7 @@ describe("La valoración propia", () => {
   it("el cliente no puede retirarla ni editarla por otra vía: no hay DELETE, PUT ni PATCH (404)", async () => {
     const prestador = await crearPrestador();
     const { cliente } = await valoracionDe(prestador, 4, "Buen trabajo, muy puntual.");
-    const ruta = `/prestadores/${prestador.perfilId}/valoraciones/mia`;
+    const ruta = `/servicios/${prestador.servicioId}/valoraciones/mia`;
     const autorizacion = `Bearer ${cliente.token}`;
 
     expect((await request(app).delete(ruta).set("Authorization", autorizacion)).status).toBe(404);
@@ -387,11 +409,11 @@ describe("La valoración propia", () => {
     await objetar(prestador.token, id);
     await decidir((await crearAdministrador()).token, id, "ocultar", "Contiene acusaciones sin relación con el servicio.");
 
-    const propia = await request(app).get(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
+    const propia = await request(app).get(`/servicios/${prestador.servicioId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
     expect(propia.body.valoracion).toMatchObject({ estado: "OCULTA", ocultaPorModeracion: true });
     expect(propia.body).toMatchObject({ puedeValorar: false, motivo: "YA_VALORADA" });
 
-    const edicion = await valorar(cliente.token, prestador.perfilId, { calificacion: 5 });
+    const edicion = await valorar(cliente.token, prestador.servicioId, { calificacion: 5 });
     expect(edicion.status).toBe(409);
     expect((await prisma.valoracion.findUniqueOrThrow({ where: { id } })).estado).toBe("OCULTA");
   });
@@ -480,7 +502,7 @@ describe("Objeciones del prestador", () => {
 
     expect((await decidir(prestador.token, id, "ocultar")).status).toBe(403);
     expect((await decidir(prestador.token, id, "desestimar")).status).toBe(403);
-    const borrar = await request(app).delete(`/prestadores/${prestador.perfilId}/valoraciones/mia`).set("Authorization", `Bearer ${prestador.token}`);
+    const borrar = await request(app).delete(`/servicios/${prestador.servicioId}/valoraciones/mia`).set("Authorization", `Bearer ${prestador.token}`);
     expect(borrar.status).toBe(404);
     const cliente = await crearCliente();
     expect((await decidir(cliente.token, id, "ocultar")).status).toBe(403);
@@ -554,5 +576,138 @@ describe("Objeciones del prestador", () => {
 
     await expect(prisma.decisionReporte.create({ data: { ...base, accion: "DESESTIMAR", servicioId: prestador.servicioId, valoracionId: id } })).rejects.toThrow();
     await expect(prisma.decisionReporte.create({ data: { ...base, accion: "OCULTAR_SERVICIO", valoracionId: id } })).rejects.toThrow();
+  });
+});
+
+describe("Valoraciones por servicio", () => {
+  it("una valoración aparece en su servicio y no en otro del mismo prestador; el perfil las junta, cada una con su servicio", async () => {
+    const prestador = await crearPrestador();
+    const destape = await otroServicio(prestador);
+    await valoracionDe(prestador, 5, "El calefont quedó como nuevo.");
+    await valoracionDe(destape, 2, "Volvió a taparse al otro día.");
+
+    const deCalefont = await listaServicio(prestador.servicioId);
+    const deDestape = await listaServicio(destape.servicioId);
+    const delPerfil = await lista(prestador.perfilId);
+
+    expect(deCalefont.body.valoraciones.map((v: { comentario: string }) => v.comentario)).toEqual(["El calefont quedó como nuevo."]);
+    expect(deCalefont.body.resumen).toMatchObject({ cantidad: 1 });
+    expect(deDestape.body.valoraciones.map((v: { comentario: string }) => v.comentario)).toEqual(["Volvió a taparse al otro día."]);
+    expect(delPerfil.body.resumen).toMatchObject({ cantidad: 2 });
+    expect(delPerfil.body.valoraciones.map((v: { servicio: { titulo: string } }) => v.servicio.titulo).sort()).toEqual([
+      "Destape de cañerías",
+      "Reparación de calefont",
+    ]);
+  });
+
+  it("el promedio de un servicio no mezcla los de otro; el del perfil es el general", async () => {
+    const prestador = await crearPrestador();
+    const destape = await otroServicio(prestador);
+    for (const estrellas of [5, 5, 5]) await valoracionDe(prestador, estrellas);
+    for (const estrellas of [1, 1, 1]) await valoracionDe(destape, estrellas);
+
+    expect((await request(app).get(`/servicios/${prestador.servicioId}`)).body.servicio.valoraciones).toMatchObject({ cantidad: 3, promedio: 5 });
+    expect((await request(app).get(`/servicios/${destape.servicioId}`)).body.servicio.valoraciones).toMatchObject({ cantidad: 3, promedio: 1 });
+    const busqueda = await request(app).get("/servicios");
+    const porTitulo = new Map(
+      (busqueda.body.resultados as { titulo: string; valoraciones: unknown }[]).map((resultado) => [resultado.titulo, resultado.valoraciones]),
+    );
+    expect(porTitulo.get("Reparación de calefont")).toEqual({ cantidad: 3, promedio: 5 });
+    expect(porTitulo.get("Destape de cañerías")).toEqual({ cantidad: 3, promedio: 1 });
+
+    const perfil = await request(app).get(`/prestadores/${prestador.perfilId}/publico`);
+    expect(perfil.body.prestador.valoraciones).toMatchObject({ cantidad: 6, promedio: 3 });
+    const servicios = new Map(
+      (perfil.body.prestador.servicios as { titulo: string; valoraciones: unknown }[]).map((servicio) => [servicio.titulo, servicio.valoraciones]),
+    );
+    expect(servicios.get("Reparación de calefont")).toEqual({ cantidad: 3, promedio: 5 });
+    expect(servicios.get("Destape de cañerías")).toEqual({ cantidad: 3, promedio: 1 });
+  });
+
+  it("haber contactado OTRO servicio del mismo prestador no habilita a valorar este: 403 SIN_CONTACTO", async () => {
+    const prestador = await crearPrestador();
+    const destape = await otroServicio(prestador);
+    const cliente = await crearCliente();
+    await contactar(cliente.id, destape);
+
+    const respuesta = await valorar(cliente.token, prestador.servicioId);
+    const mia = await request(app).get(`/servicios/${prestador.servicioId}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`);
+
+    expect(respuesta.status).toBe(403);
+    expect(respuesta.body.error.codigo).toBe("SIN_CONTACTO");
+    expect(mia.body).toMatchObject({ puedeValorar: false, motivo: "SIN_CONTACTO" });
+    expect(await prisma.valoracion.count()).toBe(0);
+  });
+
+  it("el mismo cliente puede valorar dos servicios del mismo prestador, pero cada uno una sola vez", async () => {
+    const prestador = await crearPrestador();
+    const destape = await otroServicio(prestador);
+    const cliente = await crearCliente();
+    await contactar(cliente.id, prestador);
+    await contactar(cliente.id, destape);
+
+    expect((await valorar(cliente.token, prestador.servicioId, { calificacion: 5 })).status).toBe(201);
+    expect((await valorar(cliente.token, destape.servicioId, { calificacion: 3 })).status).toBe(201);
+    const repetida = await valorar(cliente.token, destape.servicioId, { calificacion: 1 });
+
+    expect(repetida.status).toBe(409);
+    expect(repetida.body.error.codigo).toBe("VALORACION_YA_EXISTE");
+    expect(await prisma.valoracion.count()).toBe(2);
+  });
+
+  it("un servicio que no existe o no es visible: 404 al valorar, al pedir la propia y al listar", async () => {
+    const prestador = await crearPrestador();
+    const pausado = await otroServicio(prestador, "Servicio en pausa");
+    await prisma.servicio.update({ where: { id: pausado.servicioId }, data: { estado: "PAUSADO" } });
+    const cliente = await crearCliente();
+    await contactar(cliente.id, pausado);
+
+    for (const id of [pausado.servicioId, "no-existe"]) {
+      expect((await valorar(cliente.token, id)).status).toBe(404);
+      expect((await request(app).get(`/servicios/${id}/valoraciones/mia`).set("Authorization", `Bearer ${cliente.token}`)).status).toBe(404);
+      expect((await listaServicio(id)).status).toBe(404);
+    }
+  });
+
+  it("ya no se valora por prestador: POST /prestadores/:id/valoraciones no existe (404)", async () => {
+    const prestador = await crearPrestador();
+    const cliente = await crearCliente();
+    await contactar(cliente.id, prestador);
+
+    const respuesta = await request(app)
+      .post(`/prestadores/${prestador.perfilId}/valoraciones`)
+      .set("Authorization", `Bearer ${cliente.token}`)
+      .send({ calificacion: 5 });
+
+    expect(respuesta.status).toBe(404);
+    expect(await prisma.valoracion.count()).toBe(0);
+  });
+
+  it("contactar exige indicar el servicio: sin ?servicio= responde 400 y no registra nada", async () => {
+    const prestador = await crearPrestador();
+    await prisma.perfilPrestador.update({ where: { id: prestador.perfilId }, data: { telefono: "+56912345678" } });
+    const cliente = await crearCliente();
+
+    const sinServicio = await request(app).get(`/prestadores/${prestador.perfilId}/contacto`).set("Authorization", `Bearer ${cliente.token}`);
+    const conServicio = await request(app)
+      .get(`/prestadores/${prestador.perfilId}/contacto`)
+      .query({ servicio: prestador.servicioId })
+      .set("Authorization", `Bearer ${cliente.token}`);
+
+    expect(sinServicio.status).toBe(400);
+    expect(conServicio.status).toBe(200);
+    const contactos = await prisma.contacto.findMany({ where: { clienteId: cliente.id } });
+    expect(contactos.map((contacto) => contacto.servicioId)).toEqual([prestador.servicioId]);
+  });
+
+  it("el administrador ve en la cola qué servicio se valoró", async () => {
+    const prestador = await crearPrestador();
+    const { id } = await valoracionDe(prestador, 1, "No volvería a contratarlo nunca más.");
+    await objetar(prestador.token, id);
+
+    const respuesta = await cola((await crearAdministrador()).token);
+    const caso = respuesta.body.casos.find((c: { tipo: string }) => c.tipo === "VALORACION");
+
+    expect(caso.valoracion.servicio).toBe("Reparación de calefont");
   });
 });

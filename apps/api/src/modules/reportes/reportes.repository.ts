@@ -166,7 +166,8 @@ export async function colaAgrupada(filtro: {
       SELECT
         'VALORACION',
         v.id,
-        NULL,
+        -- El servicio que se valoró (cada valoración califica uno).
+        sv.titulo,
         v.estado::text,
         u.nombre,
         1,
@@ -180,6 +181,7 @@ export async function colaAgrupada(filtro: {
         v.editada_en
       FROM denuncias d
       JOIN valoraciones v        ON v.id = d.valoracion_id
+      JOIN servicios sv          ON sv.id = v.servicio_id
       JOIN perfiles_prestador p  ON p.id = v.prestador_id
       JOIN usuarios u            ON u.id = p.usuario_id
       WHERE d.valoracion_id IS NOT NULL AND ${enEstado}

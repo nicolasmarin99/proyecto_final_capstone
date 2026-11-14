@@ -153,7 +153,9 @@ describe("Otros caminos públicos aplican la misma regla", () => {
     const sinServicio = await request(app).get(`/prestadores/${perfilId}/contacto`).set("Authorization", `Bearer ${cliente}`);
 
     expect(conServicio.status).toBe(404);
-    expect(sinServicio.status).toBe(404);
+    // Sin servicio ya no es un contacto válido (cada contacto es por un
+    // servicio): se rechaza antes, como dato faltante. Tampoco entrega nada.
+    expect(sinServicio.status).toBe(400);
     expect(JSON.stringify([conServicio.body, sinServicio.body])).not.toContain("+569");
     // Solo el contacto de antes de revocar quedó registrado.
     expect(await prisma.contacto.count({ where: { prestadorId: perfilId } })).toBe(1);

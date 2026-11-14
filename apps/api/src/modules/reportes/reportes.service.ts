@@ -141,6 +141,7 @@ export async function cola(filtros: FiltrosCola) {
             estado: fila.estadoObjeto,
             editada: fila.editadaEn !== null,
             prestador: fila.prestador,
+            servicio: fila.titulo,
           },
           objecion: { motivo: fila.motivoFrecuente, comentario: fila.detalleObjecion },
           ...comun,
