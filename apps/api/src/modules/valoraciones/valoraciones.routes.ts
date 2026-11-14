@@ -3,7 +3,7 @@ import { Rol } from "../../generated/prisma/client.js";
 import { autenticar } from "../../middlewares/autenticar.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
-import { crear, crearObjecion, listarPublicas, listarRecibidas, obtenerPropia } from "./valoraciones.controller.js";
+import { crear, crearObjecion, listarDePrestador, listarDeServicio, listarRecibidas, obtenerPropia } from "./valoraciones.controller.js";
 
 /*
   Ninguna ruta de este archivo edita, oculta ni borra una valoración. El
@@ -12,16 +12,22 @@ import { crear, crearObjecion, listarPublicas, listarRecibidas, obtenerPropia } 
   administrador en /admin/reportes (reportes.routes.ts).
 */
 
-// /prestadores/:id/valoraciones — se monta dentro de las rutas de prestadores.
-export const rutasValoracionesPrestador = Router({ mergeParams: true });
+// /servicios/:id/valoraciones — se monta dentro de las rutas de servicios.
+// Cada valoración califica UN servicio, el que el cliente contactó.
+export const rutasValoracionesServicio = Router({ mergeParams: true });
 
-// Pública: la lista y el resumen, sin sesión.
-rutasValoracionesPrestador.get("/", listarPublicas);
-// Solo el rol CLIENTE valora: un prestador nunca escribe (ni borra) en su
-// propio perfil, y autorizar() además confirma en la base que la cuenta
+// Pública: la lista y el resumen de ese servicio, sin sesión.
+rutasValoracionesServicio.get("/", listarDeServicio);
+// Solo el rol CLIENTE valora: un prestador nunca escribe (ni borra) en sus
+// propios servicios, y autorizar() además confirma en la base que la cuenta
 // sigue activa. Para escribir, además, el correo confirmado.
-rutasValoracionesPrestador.get("/mia", autenticar, autorizar(Rol.CLIENTE), obtenerPropia);
-rutasValoracionesPrestador.post("/", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, crear);
+rutasValoracionesServicio.get("/mia", autenticar, autorizar(Rol.CLIENTE), obtenerPropia);
+rutasValoracionesServicio.post("/", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, crear);
+
+// /prestadores/:id/valoraciones — pública: todas las de sus servicios, con
+// el promedio general, para su perfil. Aquí no se valora: se valora un servicio.
+export const rutasValoracionesPrestador = Router({ mergeParams: true });
+rutasValoracionesPrestador.get("/", listarDePrestador);
 
 // /prestadores/yo/valoraciones — las que recibió el prestador conectado.
 export const rutasValoracionesRecibidas = Router();

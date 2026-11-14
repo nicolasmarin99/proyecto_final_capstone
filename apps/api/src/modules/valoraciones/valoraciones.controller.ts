@@ -1,7 +1,14 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaIdPrestador, esquemaIdValoracion, esquemaObjecion, esquemaPaginaValoraciones, esquemaValoracion } from "./valoraciones.schema.js";
-import { mia, objetar, publicas, recibidas, valorar } from "./valoraciones.service.js";
+import {
+  esquemaIdPrestador,
+  esquemaIdServicio,
+  esquemaIdValoracion,
+  esquemaObjecion,
+  esquemaPaginaValoraciones,
+  esquemaValoracion,
+} from "./valoraciones.schema.js";
+import { mia, objetar, publicasDePrestador, publicasDeServicio, recibidas, valorar } from "./valoraciones.service.js";
 
 /** Sin try/catch: Express 5 entrega los rechazos al manejador central. El usuario sale del token. */
 function idDelUsuario(req: Request): string {
@@ -12,7 +19,7 @@ function idDelUsuario(req: Request): string {
 }
 
 export async function crear(req: Request, res: Response) {
-  const { id } = esquemaIdPrestador.parse(req.params);
+  const { id } = esquemaIdServicio.parse(req.params);
   const datos = esquemaValoracion.parse(req.body);
   const valoracion = await valorar(idDelUsuario(req), id, datos);
 
@@ -20,17 +27,24 @@ export async function crear(req: Request, res: Response) {
 }
 
 export async function obtenerPropia(req: Request, res: Response) {
-  const { id } = esquemaIdPrestador.parse(req.params);
+  const { id } = esquemaIdServicio.parse(req.params);
 
   res.set("Cache-Control", "no-store");
   res.status(200).json(await mia(idDelUsuario(req), id));
 }
 
-export async function listarPublicas(req: Request, res: Response) {
+export async function listarDeServicio(req: Request, res: Response) {
+  const { id } = esquemaIdServicio.parse(req.params);
+  const { pagina, porPagina } = esquemaPaginaValoraciones.parse(req.query);
+
+  res.status(200).json(await publicasDeServicio(id, pagina, porPagina));
+}
+
+export async function listarDePrestador(req: Request, res: Response) {
   const { id } = esquemaIdPrestador.parse(req.params);
   const { pagina, porPagina } = esquemaPaginaValoraciones.parse(req.query);
 
-  res.status(200).json(await publicas(id, pagina, porPagina));
+  res.status(200).json(await publicasDePrestador(id, pagina, porPagina));
 }
 
 export async function listarRecibidas(req: Request, res: Response) {

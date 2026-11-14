@@ -1,7 +1,7 @@
 import { ErrorHttp } from "../../shared/errores.js";
 import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { urlMiniatura } from "../imagenes/imagenes.urls.js";
-import { resumenDe } from "../valoraciones/valoraciones.resumen.js";
+import { resumenDe, resumenesDeServicios } from "../valoraciones/valoraciones.resumen.js";
 import { contarServiciosVisiblesDe, esServicioVisible, serviciosVisiblesDe } from "../servicios/servicios.visibilidad.js";
 import { existeComuna } from "../territorio/territorio.repository.js";
 import {
@@ -98,7 +98,7 @@ export async function definirComunasAtencion(usuarioId: string, comunaIds: numbe
  *   que hubo una relación, y de él colgará la valoración.
  * - Nadie se contacta a sí mismo: ensuciaría la reputación.
  */
-export async function obtenerContacto(usuarioId: string, prestadorId: string, servicioId: string | undefined) {
+export async function obtenerContacto(usuarioId: string, prestadorId: string, servicioId: string) {
   const prestador = await buscarPrestadorParaContacto(prestadorId);
 
   if (!prestador || (await contarServiciosVisiblesDe(prestadorId)) === 0) {
@@ -109,19 +109,17 @@ export async function obtenerContacto(usuarioId: string, prestadorId: string, se
     throw new ErrorHttp(400, "AUTOCONTACTO", "No puedes contactarte a ti mismo.");
   }
 
-  if (servicioId !== undefined) {
-    const servicio = await buscarServicioParaContacto(servicioId);
-
-    if (!servicio || servicio.prestadorId !== prestadorId || !(await esServicioVisible(servicioId))) {
-      throw datoInvalido("servicio", "Ese servicio no está publicado por este prestador.");
-    }
+  // Siempre por un servicio: el contacto es lo que después habilita a valorar ESE servicio.
+  const servicio = await buscarServicioParaContacto(servicioId);
+  if (!servicio || servicio.prestadorId !== prestadorId || !(await esServicioVisible(servicioId))) {
+    throw datoInvalido("servicio", "Ese servicio no está publicado por este prestador.");
   }
 
   if (!prestador.telefono) {
     throw new ErrorHttp(409, "SIN_TELEFONO", "Este prestador todavía no registró un teléfono de contacto.");
   }
 
-  await registrarContacto({ clienteId: usuarioId, prestadorId, servicioId: servicioId ?? null });
+  await registrarContacto({ clienteId: usuarioId, prestadorId, servicioId });
 
   return { telefono: prestador.telefono };
 }
@@ -145,12 +143,13 @@ export async function obtenerPerfilPublico(prestadorId: string) {
   const ids = await serviciosVisiblesDe(prestadorId);
   if (ids.length === 0) throw prestadorNoEncontrado();
 
-  const [prestador, servicios, certificaciones, cursos, valoraciones] = await Promise.all([
+  const [prestador, servicios, certificaciones, cursos, valoraciones, porServicio] = await Promise.all([
     buscarPrestadorPublico(prestadorId),
     buscarServiciosParaPerfil(ids),
     certificacionesPublicasDe(prestadorId),
     cursosPublicosDe(prestadorId),
-    resumenDe(prestadorId),
+    resumenDe({ prestadorId }),
+    resumenesDeServicios(ids),
   ]);
   if (!prestador) throw prestadorNoEncontrado();
 
@@ -167,7 +166,8 @@ export async function obtenerPerfilPublico(prestadorId: string) {
     conCertificaciones: certificaciones.length > 0,
     certificaciones,
     cursos,
-    // Conteo y, con 3 o más publicadas, promedio y distribución por estrella.
+    // General (todos sus servicios): conteo y, con 3 o más publicadas,
+    // promedio y distribución por estrella.
     valoraciones,
     servicios: ids.flatMap((id) => {
       const servicio = porId.get(id);
@@ -183,6 +183,8 @@ export async function obtenerPerfilPublico(prestadorId: string) {
           precioHasta: servicio.precioHasta,
           unidadPrecio: servicio.unidadPrecio,
           imagen: imagen ? urlMiniatura(imagen.identificador) : null,
+          // Las de ese servicio, con la misma regla del mínimo de 3.
+          valoraciones: porServicio.get(servicio.id) ?? { cantidad: 0, promedio: null },
         },
       ];
     }),

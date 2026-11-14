@@ -95,16 +95,19 @@ export function Distribucion({ resumen }: { resumen: ResumenValoraciones }) {
 }
 
 /**
- * Sección completa de valoraciones de un prestador: resumen, distribución
- * y lista paginada. Pública. `version` se incrementa para volver a cargar
- * (por ejemplo, después de que el cliente valora).
+ * Sección completa de valoraciones: resumen, distribución y lista paginada.
+ * Pública. De un servicio (su página: solo las suyas) o de un prestador (su
+ * perfil: todas, cada una con el servicio que valora). `version` se
+ * incrementa para volver a cargar (por ejemplo, después de que el cliente valora).
  */
-export function ValoracionesDelPrestador({
-  prestadorId,
+export function ValoracionesPublicas({
+  fuente,
+  id,
   cliente,
   version = 0,
 }: {
-  prestadorId: string;
+  fuente: "servicio" | "prestador";
+  id: string;
   cliente: ClienteApi;
   version?: number;
 }) {
@@ -117,7 +120,7 @@ export function ValoracionesDelPrestador({
     let cancelado = false;
     setError(false);
     cliente
-      .listarValoraciones(prestadorId, pagina)
+      .listarValoraciones(fuente === "servicio" ? { servicioId: id } : { prestadorId: id }, pagina)
       .then((respuesta) => {
         if (!cancelado) setDatos(respuesta);
       })
@@ -127,15 +130,16 @@ export function ValoracionesDelPrestador({
     return () => {
       cancelado = true;
     };
-  }, [cliente, prestadorId, pagina, version]);
+  }, [cliente, fuente, id, pagina, version]);
 
   const paginas = datos ? Math.max(1, Math.ceil(datos.total / datos.porPagina)) : 1;
 
   return (
     <section id="valoraciones" aria-labelledby={idTitulo} className="mt-8 scroll-mt-6">
       <h2 id={idTitulo} className="font-titulos text-lg font-bold">
-        Valoraciones
+        {fuente === "servicio" ? "Valoraciones de este servicio" : "Valoraciones"}
       </h2>
+      {fuente === "prestador" && <p className="mt-1 text-sm text-texto-suave">De todos sus servicios. Cada una indica qué servicio se valoró.</p>}
 
       {error && <p className="mt-2 text-sm text-texto-suave">No fue posible cargar las valoraciones.</p>}
       {!error && !datos && <p className="mt-2 text-sm text-texto-suave">Cargando valoraciones…</p>}
@@ -178,6 +182,10 @@ export function ValoracionesDelPrestador({
                         {fecha.format(new Date(valoracion.creadaEn))}
                         {valoracion.editada && " · Editada"}
                       </p>
+                      {/* En el perfil se mezclan servicios: cada una dice cuál valora. */}
+                      {fuente === "prestador" && valoracion.servicio && (
+                        <p className="mt-1 text-xs font-semibold text-primario">Servicio: {valoracion.servicio.titulo}</p>
+                      )}
                       {valoracion.comentario && (
                         <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-line text-noche">{valoracion.comentario}</p>
                       )}

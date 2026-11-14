@@ -213,11 +213,11 @@ model Categoria {
 }
 
 model Servicio {
-  id                     String                   @id @default(uuid())
-  prestadorId            String                   @map("prestador_id")
-  prestador              PerfilPrestador          @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
-  categoriaId            String                   @map("categoria_id")
-  categoria              Categoria                @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  id                     String                      @id @default(uuid())
+  prestadorId            String                      @map("prestador_id")
+  prestador              PerfilPrestador             @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+  categoriaId            String                      @map("categoria_id")
+  categoria              Categoria                   @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
   titulo                 String
   descripcion            String
   /// Pesos chilenos, enteros: el peso no tiene decimales y un entero evita
@@ -225,11 +225,11 @@ model Servicio {
   /// Nombre que escribe el prestador cuando su oficio no está en la lista
   /// y elige la categoría «Otros». Nulo en cualquier otra categoría: lo
   /// impone la API, porque un CHECK no puede mirar la tabla categorias.
-  categoriaPersonalizada String?                  @map("categoria_personalizada")
-  precioDesde            Int?                     @map("precio_desde")
-  precioHasta            Int?                     @map("precio_hasta")
-  unidadPrecio           UnidadPrecio?            @map("unidad_precio")
-  estado                 EstadoServicio           @default(BORRADOR)
+  categoriaPersonalizada String?                     @map("categoria_personalizada")
+  precioDesde            Int?                        @map("precio_desde")
+  precioHasta            Int?                        @map("precio_hasta")
+  unidadPrecio           UnidadPrecio?               @map("unidad_precio")
+  estado                 EstadoServicio              @default(BORRADOR)
   /// Columna generada por la base a partir de título y descripción (ver la
   /// migración del catálogo). Prisma no la escribe nunca: solo existe para
   /// la búsqueda de texto completo con $queryRaw.
@@ -237,7 +237,7 @@ model Servicio {
   /// El dbgenerated repite, carácter por carácter, la expresión tal como
   /// PostgreSQL la guarda. Sin él, Prisma cree que la expresión es un
   /// default sobrante y la próxima migración intentaría borrarlo.
-  busqueda               Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
+  busqueda               Unsupported("tsvector")?    @default(dbgenerated("(setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(titulo, ''::text)), 'A'::\"char\") || setweight(to_tsvector('espanol_sin_tildes'::regconfig, COALESCE(descripcion, ''::text)), 'B'::\"char\"))"))
   /// Vector del significado del servicio (búsqueda semántica, pgvector).
   /// Prisma no tiene el tipo vector: se escribe y se consulta solo con
   /// $queryRaw parametrizado (servicios.indexacion.ts y el buscador). Nulo
@@ -248,14 +248,15 @@ model Servicio {
   /// SHA-256 del texto que se vectorizó (y del proveedor que lo hizo). Si al
   /// editar el texto no cambió, el vector no se recalcula. Un CHECK exige
   /// que vector, hash y fecha estén los tres o ninguno.
-  embeddingTextoHash     String?                  @map("embedding_texto_hash")
-  embeddingActualizadoEn DateTime?                @map("embedding_actualizado_en")
-  creadoEn               DateTime                 @default(now()) @map("creado_en")
-  actualizadoEn          DateTime                 @updatedAt @map("actualizado_en")
+  embeddingTextoHash     String?                     @map("embedding_texto_hash")
+  embeddingActualizadoEn DateTime?                   @map("embedding_actualizado_en")
+  creadoEn               DateTime                    @default(now()) @map("creado_en")
+  actualizadoEn          DateTime                    @updatedAt @map("actualizado_en")
 
-  contactos Contacto[]
-  denuncias Denuncia[]
-  imagenes  ImagenServicio[]
+  contactos    Contacto[]
+  denuncias    Denuncia[]
+  imagenes     ImagenServicio[]
+  valoraciones Valoracion[]
 
   /// Destino de la clave compuesta de contactos (servicio del mismo prestador).
   @@unique([id, prestadorId])
@@ -564,7 +565,9 @@ model Contacto {
   cliente     Usuario         @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   prestadorId String          @map("prestador_id")
   prestador   PerfilPrestador @relation(fields: [prestadorId], references: [id], onDelete: Restrict)
-  /// Opcional: el contacto puede ser desde el perfil y no desde un servicio.
+  /// Nulo solo en contactos antiguos, hechos desde el perfil: desde las
+  /// valoraciones por servicio, la API exige indicar el servicio (y una
+  /// valoración exige un contacto CON servicio, ver Valoracion).
   /// La clave compuesta (servicioId, prestadorId) obliga a que el servicio
   /// sea de este mismo prestador. Es RESTRICT y no SET NULL: con una clave
   /// compuesta, SET NULL intentaría anular también prestadorId. Además un
@@ -580,7 +583,7 @@ model Contacto {
   valoraciones Valoracion[]
 
   /// Destino de la clave foránea compuesta de valoraciones (ver abajo).
-  @@unique([id, clienteId, prestadorId])
+  @@unique([id, clienteId, prestadorId, servicioId])
   @@index([clienteId])
   @@index([prestadorId])
   @@index([servicioId])
@@ -599,7 +602,14 @@ model Valoracion {
   contactoId    String           @unique @map("contacto_id")
   clienteId     String           @map("cliente_id")
   prestadorId   String           @map("prestador_id")
-  contacto      Contacto         @relation(fields: [contactoId, clienteId, prestadorId], references: [id, clienteId, prestadorId], onDelete: Restrict)
+  /// El servicio valorado. La clave compuesta hacia contactos obliga a que
+  /// sea EXACTAMENTE el servicio del contacto que habilita la valoración:
+  /// nadie valora un servicio que no contactó, aunque sea del mismo
+  /// prestador. RESTRICT al actualizar: un contacto no cambia de servicio
+  /// bajo una valoración.
+  servicioId    String           @map("servicio_id")
+  contacto      Contacto         @relation(fields: [contactoId, clienteId, prestadorId, servicioId], references: [id, clienteId, prestadorId, servicioId], onDelete: Restrict, onUpdate: Restrict, map: "valoraciones_contacto_id_cliente_id_prestador_id_servicio_id_fk")
+  servicio      Servicio         @relation(fields: [servicioId, prestadorId], references: [id, prestadorId], onDelete: Restrict, onUpdate: Restrict)
   /// 1 a 5, impuesto con CHECK.
   calificacion  Int
   comentario    String?
@@ -616,8 +626,11 @@ model Valoracion {
   denuncias  Denuncia[]
   decisiones DecisionReporte[]
 
-  @@unique([clienteId, prestadorId])
+  /// Una por cliente y SERVICIO: quien contactó dos servicios del mismo
+  /// prestador puede valorar cada uno.
+  @@unique([clienteId, servicioId])
   @@index([prestadorId, estado])
+  @@index([servicioId, estado])
   @@map("valoraciones")
 }
 

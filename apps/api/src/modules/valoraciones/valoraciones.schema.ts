@@ -12,12 +12,13 @@ import { z } from "zod";
 
 /** Ids de la URL. Sin exigir formato UUID: un id con otra forma no existe (404). */
 export const esquemaIdPrestador = z.object({ id: z.string().min(1).max(64) });
+export const esquemaIdServicio = z.object({ id: z.string().min(1).max(64) });
 export const esquemaIdValoracion = z.object({ id: z.string().min(1).max(64) });
 
 /**
- * POST /prestadores/:id/valoraciones — { calificacion, comentario? }
+ * POST /servicios/:id/valoraciones — { calificacion, comentario? }
  *
- * No declara cliente, prestador, contacto ni estado: Zod descarta lo que no
+ * No declara cliente, servicio, contacto ni estado: Zod descarta lo que no
  * está declarado. Quién valora sale del token, a quién de la URL, y el
  * estado (PUBLICADA) lo fija el servidor.
  */
@@ -50,7 +51,7 @@ export const esquemaValoracion = z
 
 export type DatosValoracion = z.infer<typeof esquemaValoracion>;
 
-/** GET /prestadores/:id/valoraciones?pagina=1 */
+/** GET /servicios/:id/valoraciones?pagina=1 y GET /prestadores/:id/valoraciones?pagina=1 */
 export const esquemaPaginaValoraciones = z.object({
   pagina: z.coerce.number().int("La página debe ser un número entero.").min(1, "La página parte en 1.").default(1),
   porPagina: z.coerce

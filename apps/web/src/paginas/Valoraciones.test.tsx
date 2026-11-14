@@ -34,6 +34,8 @@ function servicio(valoraciones: object) {
     categoria: { slug: "gasfiteria", nombre: "Gasfitería" },
     categoriaPersonalizada: null,
     imagenes: [],
+    // Las de ESTE servicio.
+    valoraciones,
     prestador: {
       id: "perfil-1",
       nombre: "Pedro Soto",
@@ -41,7 +43,6 @@ function servicio(valoraciones: object) {
       conCertificaciones: false,
       certificaciones: [],
       cursos: [],
-      valoraciones,
     },
   };
 }
@@ -49,8 +50,8 @@ function servicio(valoraciones: object) {
 const LISTA = {
   resumen: TRES,
   valoraciones: [
-    { id: "v1", calificacion: 5, comentario: "Impecable, muy puntual.", creadaEn: "2026-11-01T12:00:00Z", editada: true, cliente: { nombre: "Camila", foto: null } },
-    { id: "v2", calificacion: 4, comentario: null, creadaEn: "2026-10-20T12:00:00Z", editada: false, cliente: { nombre: "Matías", foto: null } },
+    { id: "v1", calificacion: 5, comentario: "Impecable, muy puntual.", creadaEn: "2026-11-01T12:00:00Z", editada: true, servicio: { id: "s1", titulo: "Gasfitería a domicilio" }, cliente: { nombre: "Camila", foto: null } },
+    { id: "v2", calificacion: 4, comentario: null, creadaEn: "2026-10-20T12:00:00Z", editada: false, servicio: { id: "s2", titulo: "Destape de cañerías" }, cliente: { nombre: "Matías", foto: null } },
   ],
   pagina: 1,
   porPagina: 10,
@@ -80,11 +81,12 @@ function simularApi({ usuario = null, resumen = TRES, mia, respuestaValorar, rec
     }
     if (url === "/api/auth/yo") return json({ usuario });
     if (url === "/api/servicios/s1") return json({ servicio: servicio(resumen) });
+    if (url.startsWith("/api/servicios/s1/valoraciones?")) return json({ ...LISTA, resumen });
     if (url.startsWith("/api/prestadores/perfil-1/valoraciones?")) return json({ ...LISTA, resumen });
-    if (url === "/api/prestadores/perfil-1/valoraciones/mia" && metodo === "GET") {
+    if (url === "/api/servicios/s1/valoraciones/mia" && metodo === "GET") {
       return json(mia ?? { valoracion: null, puedeValorar: false, motivo: "SIN_CONTACTO", plazoHasta: null });
     }
-    if (url === "/api/prestadores/perfil-1/valoraciones" && metodo === "POST") {
+    if (url === "/api/servicios/s1/valoraciones" && metodo === "POST") {
       return (
         respuestaValorar ??
         json({ valoracion: { id: "nueva", calificacion: 4, comentario: null, estado: "PUBLICADA", ocultaPorModeracion: false, creadaEn: "2026-11-10T12:00:00Z", editada: false } }, 201)
@@ -198,7 +200,8 @@ describe("Resumen de valoraciones", () => {
       precioHasta: null,
       unidadPrecio: null,
       imagen: null,
-      prestador: { nombre: "Pedro Soto", comunas: [], comunasRestantes: 0, conCertificaciones: false, valoraciones: { cantidad: 5, promedio: 4.6 } },
+      prestador: { nombre: "Pedro Soto", comunas: [], comunasRestantes: 0, conCertificaciones: false },
+      valoraciones: { cantidad: 5, promedio: 4.6 },
       coincidencia: null,
     };
     const { rerender } = render(
@@ -210,7 +213,7 @@ describe("Resumen de valoraciones", () => {
 
     rerender(
       <MemoryRouter>
-        <TarjetaResultado resultado={{ ...resultado, prestador: { ...resultado.prestador, valoraciones: { cantidad: 1, promedio: null } } }} />
+        <TarjetaResultado resultado={{ ...resultado, valoraciones: { cantidad: 1, promedio: null } }} />
       </MemoryRouter>,
     );
     expect(screen.getByText("1 valoración")).toBeInTheDocument();
@@ -230,8 +233,8 @@ describe("Formulario para valorar", () => {
     simularApi({ usuario: null });
     renderizar("/servicios/s1");
 
-    const seccion = await screen.findByRole("region", { name: /valorar a pedro soto/i });
-    expect(within(seccion).getByText(/valoran quienes contactaron/i)).toBeInTheDocument();
+    const seccion = await screen.findByRole("region", { name: /valorar este servicio/i });
+    expect(within(seccion).getByText(/valoran este servicio quienes contactaron/i)).toBeInTheDocument();
     expect(within(seccion).queryByRole("radio")).not.toBeInTheDocument();
   });
 
@@ -239,8 +242,8 @@ describe("Formulario para valorar", () => {
     simularApi({ usuario: clienteUsuario });
     renderizar("/servicios/s1");
 
-    const seccion = await screen.findByRole("region", { name: /valorar a pedro soto/i });
-    expect(await within(seccion).findByText(/primero contáctalo/i)).toBeInTheDocument();
+    const seccion = await screen.findByRole("region", { name: /valorar este servicio/i });
+    expect(await within(seccion).findByText(/primero contacta a pedro soto/i)).toBeInTheDocument();
     expect(within(seccion).queryByRole("radio")).not.toBeInTheDocument();
     expect(within(seccion).queryByText("Camila")).not.toBeInTheDocument();
   });
@@ -278,7 +281,7 @@ describe("Formulario para valorar", () => {
     fireEvent.click(within(confirmacion).getByRole("button", { name: "Sí, publicar" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(/tu valoración ya está publicada/i);
-    const [llamada] = llamadas("POST", /\/api\/prestadores\/perfil-1\/valoraciones$/);
+    const [llamada] = llamadas("POST", /\/api\/servicios\/s1\/valoraciones$/);
     expect(JSON.parse(String(llamada?.[1]?.body))).toEqual({ calificacion: 4, comentario: "Muy buen trabajo, recomendado." });
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /publicar|guardar|retirar/i })).not.toBeInTheDocument();
@@ -322,7 +325,7 @@ describe("Formulario para valorar", () => {
     });
     renderizar("/servicios/s1");
 
-    const seccion = await screen.findByRole("region", { name: "Tu valoración" });
+    const seccion = await screen.findByRole("region", { name: "Tu valoración de este servicio" });
     expect(within(seccion).getByText("Cumplió, pero tarde.")).toBeInTheDocument();
     expect(within(seccion).getByText("3 de 5")).toBeInTheDocument();
     expect(within(seccion).getByText(/no se pueden editar ni retirar/i)).toBeInTheDocument();
@@ -446,5 +449,29 @@ describe("Valoraciones objetadas en la cola del administrador", () => {
     fireEvent.change(within(tarjeta).getByLabelText("Motivo de la decisión"), { target: { value: "Contiene un insulto directo." } });
     fireEvent.click(within(tarjeta).getByRole("button", { name: "Ocultar valoración" }));
     await waitFor(() => expect(llamadas("PATCH", /\/api\/admin\/reportes\/valoraciones\/v9\/ocultar$/)).toHaveLength(1));
+  });
+});
+
+describe("Valoraciones por servicio", () => {
+  it("la página del servicio pide y muestra solo las de ese servicio", async () => {
+    simularApi({ resumen: TRES });
+    renderizar("/servicios/s1");
+
+    const seccion = await screen.findByRole("region", { name: "Valoraciones de este servicio" });
+    expect(await within(seccion).findByText("Camila")).toBeInTheDocument();
+    expect(llamadas("GET", /\/api\/servicios\/s1\/valoraciones\?/)).not.toHaveLength(0);
+    expect(llamadas("GET", /\/api\/prestadores\/perfil-1\/valoraciones\?/)).toHaveLength(0);
+    // En la página de un servicio no hace falta repetir de qué servicio es cada una.
+    expect(within(seccion).queryByText(/^Servicio:/)).not.toBeInTheDocument();
+  });
+
+  it("el perfil junta las de todos sus servicios y cada una dice qué servicio valora", async () => {
+    simularApi({ resumen: TRES });
+    renderizar("/prestadores/perfil-1");
+
+    const lista = await screen.findByRole("list", { name: "Lista de valoraciones" });
+    expect(within(lista).getByText("Servicio: Gasfitería a domicilio")).toBeInTheDocument();
+    expect(within(lista).getByText("Servicio: Destape de cañerías")).toBeInTheDocument();
+    expect(screen.getByText(/de todos sus servicios/i)).toBeInTheDocument();
   });
 });

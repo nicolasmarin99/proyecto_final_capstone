@@ -238,6 +238,7 @@ function TarjetaValoracion({
         <div className="min-w-0">
           <p className="text-xs font-bold tracking-[0.8px] text-primario uppercase">Valoración objetada</p>
           <h3 className="font-titulos text-base font-bold text-noche">Sobre {valoracion.prestador}</h3>
+          {valoracion.servicio && <p className="text-sm text-texto-suave">Servicio: {valoracion.servicio}</p>}
         </div>
         <span className="inline-flex items-center gap-1.5 text-sm">
           <Estrellas valor={valoracion.calificacion} tamano={14} />

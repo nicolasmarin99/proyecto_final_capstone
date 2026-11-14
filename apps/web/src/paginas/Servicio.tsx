@@ -9,7 +9,7 @@ import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { ReportarServicio } from "../componentes/ReportarServicio";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
-import { ResumenEnLinea, ValoracionesDelPrestador } from "../componentes/Valoraciones";
+import { ResumenEnLinea, ValoracionesPublicas } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 /** Mensaje inicial de WhatsApp: dice desde dónde y por qué servicio escribe. */
@@ -136,9 +136,9 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                     {servicio.prestador.nombre}
                   </Link>
                 </p>
-                {/* Junto al nombre: el resumen, que lleva a la lista de esta misma página. */}
+                {/* Las de ESTE servicio; lleva a la lista de esta misma página. */}
                 <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">
-                  <ResumenEnLinea resumen={servicio.prestador.valoraciones} />
+                  <ResumenEnLinea resumen={servicio.valoraciones} />
                 </a>
                 {servicio.prestador.conCertificaciones && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -195,9 +195,8 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                   </Link>
                 </section>
 
-                <ValoracionesDelPrestador prestadorId={servicio.prestador.id} cliente={cliente} version={versionValoraciones} />
+                <ValoracionesPublicas fuente="servicio" id={servicio.id} cliente={cliente} version={versionValoraciones} />
                 <FormularioValoracion
-                  prestadorId={servicio.prestador.id}
                   nombrePrestador={servicio.prestador.nombre}
                   servicioId={servicio.id}
                   cliente={cliente}

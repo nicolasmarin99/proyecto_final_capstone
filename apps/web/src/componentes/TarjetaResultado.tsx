@@ -63,7 +63,7 @@ export function TarjetaResultado({ resultado }: { resultado: ResultadoBusqueda }
             {prestador.nombre}
           </p>
           <p className="mt-1">
-            <ResumenEnLinea resumen={prestador.valoraciones} tamano="chico" />
+            <ResumenEnLinea resumen={resultado.valoraciones} tamano="chico" />
           </p>
           {prestador.comunas.length > 0 && (
             <p className="mt-1 flex items-start gap-1.5 text-sm text-texto-suave">

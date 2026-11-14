@@ -174,8 +174,9 @@ export interface ServicioPublico extends Precio {
     certificaciones: CertificacionPublica[];
     /** Cursos aprobados: se muestran aparte y no encienden el sello. */
     cursos: CursoPublico[];
-    valoraciones: ResumenValoraciones;
   };
+  /** Las valoraciones de ESTE servicio (las de todos están en el perfil del prestador). */
+  valoraciones: ResumenValoraciones;
   /** Solo las visibles, en el orden que eligió el prestador. La primera es la portada. */
   imagenes: ImagenPublica[];
 }
@@ -212,8 +213,9 @@ export interface ResultadoBusqueda extends Precio {
     comunasRestantes: number;
     /** Tiene al menos una certificación aprobada y vigente. */
     conCertificaciones: boolean;
-    valoraciones: ResumenCorto;
   };
+  /** Las valoraciones de este servicio. */
+  valoraciones: ResumenCorto;
   coincidencia: CoincidenciaBusqueda | null;
 }
 
@@ -224,6 +226,8 @@ export interface ServicioDelPrestador extends Precio {
   categoria: Categoria;
   categoriaPersonalizada: string | null;
   imagen: string | null;
+  /** Las valoraciones de este servicio. */
+  valoraciones: ResumenCorto;
 }
 
 /** /prestadores/:id: nunca teléfono, correo ni RUT. */
@@ -235,6 +239,7 @@ export interface PrestadorPublico {
   conCertificaciones: boolean;
   certificaciones: CertificacionPublica[];
   cursos: CursoPublico[];
+  /** General: todos sus servicios juntos. */
   valoraciones: ResumenValoraciones;
   servicios: ServicioDelPrestador[];
 }
@@ -262,15 +267,25 @@ export interface ResumenValoraciones extends ResumenCorto {
   distribucion: Record<Estrella, number> | null;
 }
 
-/** Una valoración pública: del cliente, solo el nombre de pila. */
+/** El servicio que califica una valoración. */
+export interface ServicioValorado {
+  id: string;
+  titulo: string;
+}
+
+/** Una valoración pública: del cliente, solo el nombre de pila. Cada una califica un servicio. */
 export interface ValoracionPublica {
   id: string;
   calificacion: number;
   comentario: string | null;
   creadaEn: string;
   editada: boolean;
+  servicio: ServicioValorado | null;
   cliente: { nombre: string; foto: string | null };
 }
+
+/** De dónde se listan: un servicio (su página) o un prestador (su perfil, todos sus servicios). */
+export type FuenteValoraciones = { servicioId: string } | { prestadorId: string };
 
 export interface PaginaValoraciones {
   resumen: ResumenValoraciones;
@@ -310,6 +325,7 @@ export interface ValoracionRecibida {
   estado: "PUBLICADA" | "OCULTA";
   creadaEn: string;
   editada: boolean;
+  servicio: ServicioValorado | null;
   cliente: { nombre: string };
   objecion: {
     motivo: MotivoObjecion;
@@ -350,7 +366,16 @@ export interface FilaColaReportes {
 /** Una valoración objetada por su prestador, en la misma cola. Del cliente, nada. */
 export interface CasoValoracion {
   tipo: "VALORACION";
-  valoracion: { id: string; calificacion: number; comentario: string | null; estado: string; editada: boolean; prestador: string };
+  valoracion: {
+    id: string;
+    calificacion: number;
+    comentario: string | null;
+    estado: string;
+    editada: boolean;
+    prestador: string;
+    /** Título del servicio valorado. */
+    servicio: string | null;
+  };
   objecion: { motivo: MotivoObjecion; comentario: string | null };
   primerReporte: string;
   esperaMinutos: number | null;
@@ -714,8 +739,13 @@ function leerValoracionPublica(valor: unknown): ValoracionPublica | null {
     comentario: typeof valor.comentario === "string" ? valor.comentario : null,
     creadaEn: valor.creadaEn,
     editada: valor.editada === true,
+    servicio: leerServicioValorado(valor.servicio),
     cliente: { nombre: valor.cliente.nombre, foto: typeof valor.cliente.foto === "string" ? valor.cliente.foto : null },
   };
+}
+
+function leerServicioValorado(valor: unknown): ServicioValorado | null {
+  return esObjeto(valor) && typeof valor.id === "string" && typeof valor.titulo === "string" ? { id: valor.id, titulo: valor.titulo } : null;
 }
 
 function leerValoracionPropia(valor: unknown): ValoracionPropia | null {
@@ -751,6 +781,7 @@ function leerValoracionRecibida(valor: unknown): ValoracionRecibida | null {
     estado: valor.estado === "OCULTA" ? "OCULTA" : "PUBLICADA",
     creadaEn: valor.creadaEn,
     editada: valor.editada === true,
+    servicio: leerServicioValorado(valor.servicio),
     cliente: { nombre: valor.cliente.nombre },
     objecion:
       objecion && esMotivoObjecion(objecion.motivo) && typeof objecion.estado === "string" && typeof objecion.enviadaEn === "string"
@@ -790,6 +821,7 @@ function leerCasoValoracion(valor: unknown): CasoValoracion | null {
       estado,
       editada: valor.valoracion.editada === true,
       prestador,
+      servicio: typeof valor.valoracion.servicio === "string" ? valor.valoracion.servicio : null,
     },
     objecion: { motivo: valor.objecion.motivo, comentario: typeof valor.objecion.comentario === "string" ? valor.objecion.comentario : null },
     primerReporte: valor.primerReporte,
@@ -999,8 +1031,8 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
       conCertificaciones: conCertificaciones === true,
       certificaciones: leerLista(certificaciones, leerCertificacionPublica),
       cursos: leerLista(cursos, leerCursoPublico),
-      valoraciones: leerResumenValoraciones(valor.prestador.valoraciones),
     },
+    valoraciones: leerResumenValoraciones(valor.valoraciones),
   };
 }
 
@@ -1031,8 +1063,8 @@ function leerResultadoBusqueda(valor: unknown): ResultadoBusqueda | null {
       comunas: leerLista(comunas, leerComunaResumida),
       comunasRestantes: typeof comunasRestantes === "number" ? comunasRestantes : 0,
       conCertificaciones: conCertificaciones === true,
-      valoraciones: leerResumenCorto(valor.prestador.valoraciones),
     },
+    valoraciones: leerResumenCorto(valor.valoraciones),
     coincidencia:
       valor.coincidencia === "texto" || valor.coincidencia === "significado" || valor.coincidencia === "ambas" ? valor.coincidencia : null,
   };
@@ -1050,6 +1082,7 @@ function leerServicioDelPrestador(valor: unknown): ServicioDelPrestador | null {
     categoriaPersonalizada: typeof valor.categoriaPersonalizada === "string" ? valor.categoriaPersonalizada : null,
     ...leerPrecio(valor),
     imagen: typeof valor.imagen === "string" ? valor.imagen : null,
+    valoraciones: leerResumenCorto(valor.valoraciones),
   };
 }
 
@@ -1775,9 +1808,16 @@ export function crearClienteApi() {
       });
     },
 
-    /** Lista pública de valoraciones de un prestador, con su resumen. Sin sesión. */
-    async listarValoraciones(prestadorId: string, pagina = 1): Promise<PaginaValoraciones> {
-      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones?pagina=${pagina}`);
+    /**
+     * Lista pública de valoraciones, con su resumen. Sin sesión. De un
+     * servicio (su página) o de un prestador (su perfil: todos sus servicios).
+     */
+    async listarValoraciones(fuente: FuenteValoraciones, pagina = 1): Promise<PaginaValoraciones> {
+      const base =
+        "servicioId" in fuente
+          ? `/servicios/${encodeURIComponent(fuente.servicioId)}`
+          : `/prestadores/${encodeURIComponent(fuente.prestadorId)}`;
+      const cuerpo = await peticion(`${base}/valoraciones?pagina=${pagina}`);
       if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
         throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       }
@@ -1790,8 +1830,9 @@ export function crearClienteApi() {
       };
     },
 
-    async miValoracion(prestadorId: string): Promise<MiValoracion> {
-      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones/mia`, { autenticada: true });
+    /** La valoración propia de ese servicio y si se puede valorar hoy. */
+    async miValoracion(servicioId: string): Promise<MiValoracion> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/valoraciones/mia`, { autenticada: true });
       if (!esObjeto(cuerpo)) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       const motivo = cuerpo.motivo;
       return {
@@ -1802,9 +1843,9 @@ export function crearClienteApi() {
       };
     },
 
-    /** Publica la valoración propia, que queda definitiva. El estado lo fija el servidor. */
-    async valorar(prestadorId: string, datos: { calificacion: number; comentario: string | null }): Promise<ValoracionPropia> {
-      const cuerpo = await peticion(`/prestadores/${encodeURIComponent(prestadorId)}/valoraciones`, {
+    /** Publica la valoración propia de ese servicio, que queda definitiva. El estado lo fija el servidor. */
+    async valorar(servicioId: string, datos: { calificacion: number; comentario: string | null }): Promise<ValoracionPropia> {
+      const cuerpo = await peticion(`/servicios/${encodeURIComponent(servicioId)}/valoraciones`, {
         metodo: "POST",
         cuerpo: datos,
         autenticada: true,

@@ -59,33 +59,88 @@ async function tipoCredencial(codigo: string) {
 }
 
 describe("valoraciones", () => {
-  it("rechaza una segunda valoración del mismo cliente al mismo prestador", async () => {
+  /** Un servicio publicado del prestador. */
+  async function crearServicio(prestadorId: string, titulo = "Gasfitería a domicilio") {
+    return prisma.servicio.create({
+      data: { prestadorId, categoriaId: (await categoria("gasfiteria")).id, titulo, descripcion: "Trabajos garantizados.", estado: "PUBLICADO" },
+    });
+  }
+
+  /** Un contacto de ese cliente POR ESE servicio. */
+  async function contactoPorServicio(clienteId: string, prestadorId: string, servicioId: string) {
+    return prisma.contacto.create({ data: { clienteId, prestadorId, servicioId, canal: "WHATSAPP" } });
+  }
+
+  it("rechaza una segunda valoración del mismo cliente al mismo SERVICIO", async () => {
     const cliente = await crearUsuario();
     const prestador = await crearPrestador();
+    const servicio = await crearServicio(prestador.id);
     // Dos contactos distintos: el UNIQUE por contacto no alcanza a frenar
-    // esto, tiene que hacerlo el UNIQUE por par cliente-prestador.
-    const primero = await crearContacto(cliente.id, prestador.id);
-    const segundo = await crearContacto(cliente.id, prestador.id);
+    // esto, tiene que hacerlo el UNIQUE por par cliente-servicio.
+    const primero = await contactoPorServicio(cliente.id, prestador.id, servicio.id);
+    const segundo = await contactoPorServicio(cliente.id, prestador.id, servicio.id);
 
     await prisma.valoracion.create({
-      data: { contactoId: primero.id, clienteId: cliente.id, prestadorId: prestador.id, calificacion: 5 },
+      data: { contactoId: primero.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: servicio.id, calificacion: 5 },
     });
 
     await expect(
       prisma.valoracion.create({
-        data: { contactoId: segundo.id, clienteId: cliente.id, prestadorId: prestador.id, calificacion: 4 },
+        data: { contactoId: segundo.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: servicio.id, calificacion: 4 },
       }),
-    ).rejects.toThrow("valoraciones_cliente_id_prestador_id_key");
+    ).rejects.toThrow("valoraciones_cliente_id_servicio_id_key");
+  });
+
+  it("acepta valoraciones del mismo cliente a dos servicios distintos del mismo prestador", async () => {
+    const cliente = await crearUsuario();
+    const prestador = await crearPrestador();
+    const uno = await crearServicio(prestador.id, "Calefont");
+    const otro = await crearServicio(prestador.id, "Destapes");
+    const contactoUno = await contactoPorServicio(cliente.id, prestador.id, uno.id);
+    const contactoOtro = await contactoPorServicio(cliente.id, prestador.id, otro.id);
+
+    await prisma.valoracion.create({ data: { contactoId: contactoUno.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: uno.id, calificacion: 5 } });
+    await prisma.valoracion.create({ data: { contactoId: contactoOtro.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: otro.id, calificacion: 2 } });
+
+    expect(await prisma.valoracion.count({ where: { clienteId: cliente.id } })).toBe(2);
+  });
+
+  it("rechaza una valoración de un servicio distinto al de su contacto, aunque sea del mismo prestador", async () => {
+    const cliente = await crearUsuario();
+    const prestador = await crearPrestador();
+    const contactado = await crearServicio(prestador.id, "Calefont");
+    const otro = await crearServicio(prestador.id, "Destapes");
+    const contacto = await contactoPorServicio(cliente.id, prestador.id, contactado.id);
+
+    await expect(
+      prisma.valoracion.create({
+        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: otro.id, calificacion: 5 },
+      }),
+    ).rejects.toThrow("valoraciones_contacto_id_cliente_id_prestador_id_servicio_id_fk");
+  });
+
+  it("rechaza una valoración cuyo contacto no tiene servicio", async () => {
+    const cliente = await crearUsuario();
+    const prestador = await crearPrestador();
+    const servicio = await crearServicio(prestador.id);
+    const sinServicio = await crearContacto(cliente.id, prestador.id);
+
+    await expect(
+      prisma.valoracion.create({
+        data: { contactoId: sinServicio.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: servicio.id, calificacion: 5 },
+      }),
+    ).rejects.toThrow("valoraciones_contacto_id_cliente_id_prestador_id_servicio_id_fk");
   });
 
   it.each([0, 6])("rechaza una calificación de %i", async (calificacion) => {
     const cliente = await crearUsuario();
     const prestador = await crearPrestador();
-    const contacto = await crearContacto(cliente.id, prestador.id);
+    const servicio = await crearServicio(prestador.id);
+    const contacto = await contactoPorServicio(cliente.id, prestador.id, servicio.id);
 
     await expect(
       prisma.valoracion.create({
-        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, calificacion },
+        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: servicio.id, calificacion },
       }),
     ).rejects.toThrow("valoraciones_calificacion_1_a_5");
   });
@@ -94,22 +149,44 @@ describe("valoraciones", () => {
     const cliente = await crearUsuario();
     const prestador = await crearPrestador();
     const otroPrestador = await crearPrestador();
-    const contacto = await crearContacto(cliente.id, prestador.id);
+    const servicio = await crearServicio(prestador.id);
+    const contacto = await contactoPorServicio(cliente.id, prestador.id, servicio.id);
 
     await expect(
       prisma.valoracion.create({
-        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: otroPrestador.id, calificacion: 5 },
+        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: otroPrestador.id, servicioId: servicio.id, calificacion: 5 },
       }),
-    ).rejects.toThrow("valoraciones_contacto_id_cliente_id_prestador_id_fkey");
+    ).rejects.toThrow(/valoraciones_\w*_fk/);
+  });
+
+  it("un contacto no puede cambiar de servicio debajo de su valoración", async () => {
+    const cliente = await crearUsuario();
+    const prestador = await crearPrestador();
+    const uno = await crearServicio(prestador.id, "Calefont");
+    const otro = await crearServicio(prestador.id, "Destapes");
+    const contacto = await contactoPorServicio(cliente.id, prestador.id, uno.id);
+    await prisma.valoracion.create({ data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, servicioId: uno.id, calificacion: 4 } });
+
+    await expect(prisma.contacto.update({ where: { id: contacto.id }, data: { servicioId: otro.id } })).rejects.toThrow(
+      "valoraciones_contacto_id_cliente_id_prestador_id_servicio_id_fk",
+    );
   });
 
   describe("una valoración publicada es definitiva", () => {
     async function valoracionPublicada() {
       const cliente = await crearUsuario();
       const prestador = await crearPrestador();
-      const contacto = await crearContacto(cliente.id, prestador.id);
+      const servicio = await crearServicio(prestador.id);
+      const contacto = await contactoPorServicio(cliente.id, prestador.id, servicio.id);
       return prisma.valoracion.create({
-        data: { contactoId: contacto.id, clienteId: cliente.id, prestadorId: prestador.id, calificacion: 2, comentario: "Llegó tarde y no avisó." },
+        data: {
+          contactoId: contacto.id,
+          clienteId: cliente.id,
+          prestadorId: prestador.id,
+          servicioId: servicio.id,
+          calificacion: 2,
+          comentario: "Llegó tarde y no avisó.",
+        },
       });
     }
 
@@ -128,6 +205,17 @@ describe("valoraciones", () => {
         comentario: "Llegó tarde y no avisó.",
         editadaEn: null,
       });
+    });
+
+    it("la base rechaza moverla a otro servicio", async () => {
+      const valoracion = await valoracionPublicada();
+      const otro = await crearServicio(valoracion.prestadorId, "Otro servicio");
+
+      // Por SQL directo: así la prueba llega al trigger, más allá de las claves foráneas.
+      await expect(
+        prisma.$executeRaw`UPDATE valoraciones SET servicio_id = ${otro.id} WHERE id = ${valoracion.id}`,
+      ).rejects.toThrow("valoraciones_contenido_inmutable");
+      expect((await prisma.valoracion.findUniqueOrThrow({ where: { id: valoracion.id } })).servicioId).toBe(valoracion.servicioId);
     });
 
     it("la moderación sí puede cambiar el estado", async () => {

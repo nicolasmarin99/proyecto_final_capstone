@@ -5,7 +5,7 @@ import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../comp
 import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
-import { ResumenEnLinea, ValoracionesDelPrestador } from "../componentes/Valoraciones";
+import { ResumenEnLinea, ValoracionesPublicas } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
 /**
@@ -133,8 +133,8 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
                   </section>
                 )}
 
-                {/* Resumen, distribución por estrella y la lista paginada. */}
-                <ValoracionesDelPrestador prestadorId={prestador.id} cliente={cliente} />
+                {/* General (todos sus servicios): resumen, distribución y la lista, cada una con su servicio. */}
+                <ValoracionesPublicas fuente="prestador" id={prestador.id} cliente={cliente} />
 
                 <section aria-labelledby="titulo-servicios" className="mt-8 border-t border-borde pt-6">
                   <h2 id="titulo-servicios" className="font-titulos text-lg font-bold">
@@ -158,6 +158,10 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
                             <span className="block text-xs font-bold text-primario">{nombreCategoria(servicio)}</span>
                             <span className="block font-semibold break-words text-noche group-hover:text-primario">{servicio.titulo}</span>
                             <span className="mt-0.5 block text-sm text-texto-suave">{textoPrecio(servicio)}</span>
+                            {/* Las de ese servicio, con la misma regla del mínimo de 3. */}
+                            <span className="mt-1 block">
+                              <ResumenEnLinea resumen={servicio.valoraciones} tamano="chico" />
+                            </span>
                           </span>
                         </Link>
                       </li>

@@ -260,7 +260,7 @@ export async function publico(id: string) {
   const [certificaciones, cursos, valoraciones] = await Promise.all([
     certificacionesPublicasDe(servicio.prestador.id),
     cursosPublicosDe(servicio.prestador.id),
-    resumenDe(servicio.prestador.id),
+    resumenDe({ servicioId: servicio.id }),
   ]);
 
   return {
@@ -276,6 +276,9 @@ export async function publico(id: string) {
     actualizadoEn: servicio.actualizadoEn,
     // Solo las visibles (lo filtra la consulta), en el orden que eligió el prestador.
     imagenes: servicio.imagenes.map((imagen) => imagenPublica(imagen.id, imagen.identificador)),
+    // Las de ESTE servicio: conteo y, con 3 o más publicadas, promedio y
+    // distribución. Las de todos sus servicios están en el perfil.
+    valoraciones,
     prestador: {
       id: servicio.prestador.id,
       nombre: servicio.prestador.usuario.nombre,
@@ -289,8 +292,6 @@ export async function publico(id: string) {
       certificaciones,
       // Los cursos aprobados, aparte: no encienden el sello.
       cursos,
-      // Junto al nombre: conteo y, con 3 o más publicadas, promedio y distribución.
-      valoraciones,
     },
   };
 }
@@ -435,8 +436,9 @@ export async function buscar(filtros: FiltrosBusqueda) {
           comunas,
           comunasRestantes: Math.max(0, fila.totalComunas - comunas.length),
           conCertificaciones: fila.conCertificaciones,
-          valoraciones: resumenCorto(fila.valoracionesCantidad, fila.valoracionesSuma),
         },
+        // Las de este servicio (no las del prestador en general).
+        valoraciones: resumenCorto(fila.valoracionesCantidad, fila.valoracionesSuma),
         // «significado»: apareció sin compartir palabras con la búsqueda. La
         // web lo indica para que se entienda por qué está. null sin texto.
         coincidencia: coincidencia(fila),
