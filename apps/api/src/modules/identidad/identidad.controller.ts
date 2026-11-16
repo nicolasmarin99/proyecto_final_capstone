@@ -44,9 +44,9 @@ export async function estadoPropio(req: Request, res: Response) {
 }
 
 export async function cola(req: Request, res: Response) {
-  const { estado, pagina, porPagina } = esquemaConsultaCola.parse(req.query);
+  const { estado, prestador, pagina, porPagina } = esquemaConsultaCola.parse(req.query);
 
-  res.status(200).json(await obtenerCola(estado, pagina, porPagina));
+  res.status(200).json(await obtenerCola(estado, pagina, porPagina, prestador));
 }
 
 export async function documento(req: Request, res: Response) {

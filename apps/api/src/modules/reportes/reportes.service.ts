@@ -103,6 +103,7 @@ export async function miReporte(usuarioId: string, servicioId: string) {
 export async function cola(filtros: FiltrosCola) {
   const filas = await colaAgrupada({
     estado: filtros.estado,
+    prestadorId: filtros.prestador ?? null,
     umbralPrioridad: PERSONAS_PRIORIDAD_ALTA,
     limite: filtros.porPagina,
     desplazamiento: (filtros.pagina - 1) * filtros.porPagina,

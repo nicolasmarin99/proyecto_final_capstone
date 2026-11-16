@@ -128,8 +128,8 @@ export async function certificacionesDe(prestadorId: string) {
 }
 
 /** Cola de revisión. Incluye nombre y RUT de la cuenta: el administrador los compara con el documento. */
-export async function colaCertificaciones(estado: EstadoCredencial, pagina: number, porPagina: number) {
-  const where = { ...noEsIdentidad, estado };
+export async function colaCertificaciones(estado: EstadoCredencial, pagina: number, porPagina: number, prestadorId?: string) {
+  const where = { ...noEsIdentidad, estado, ...(prestadorId ? { prestadorId } : {}) };
   const [certificaciones, total] = await Promise.all([
     prisma.credencial.findMany({
       where,

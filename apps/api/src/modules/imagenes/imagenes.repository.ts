@@ -160,16 +160,37 @@ export async function ocultarImagen(
   );
 }
 
+/**
+ * «Por revisar»: visible y sin revisión. Una oculta no está pendiente: ya
+ * se decidió sobre ella. La misma condición, en SQL, cuenta los pendientes
+ * por prestador (admin.repository.ts).
+ */
+const condicionSinRevisar = { estado: "VISIBLE", revisadaEn: null } as const;
+
+/** Marca como revisadas, de esos ids, las que estaban por revisar. Devuelve cuántas. */
+export async function marcarImagenesRevisadas(ids: string[], administradorId: string): Promise<number> {
+  const { count } = await prisma.imagenServicio.updateMany({
+    where: { id: { in: ids }, ...condicionSinRevisar },
+    data: { revisadaEn: new Date(), revisadaPorId: administradorId },
+  });
+  return count;
+}
+
 /** Listado para moderación: las más recientes primero, con su servicio y prestador. */
 export async function listarImagenesParaModerar(filtros: {
   estado?: EstadoImagen;
   servicioId?: string;
+  prestadorId?: string;
+  /** Solo las pendientes de revisión (ver condicionSinRevisar). */
+  sinRevisar?: boolean;
   pagina: number;
   porPagina: number;
 }) {
   const where = {
     ...(filtros.estado ? { estado: filtros.estado } : {}),
     ...(filtros.servicioId ? { servicioId: filtros.servicioId } : {}),
+    ...(filtros.prestadorId ? { servicio: { prestadorId: filtros.prestadorId } } : {}),
+    ...(filtros.sinRevisar ? condicionSinRevisar : {}),
   };
 
   const [imagenes, total] = await Promise.all([
@@ -181,6 +202,7 @@ export async function listarImagenesParaModerar(filtros: {
       select: {
         ...seleccionImagen,
         creadoEn: true,
+        revisadaEn: true,
         servicio: {
           select: { id: true, titulo: true, estado: true, prestador: { select: { usuario: { select: { nombre: true } } } } },
         },

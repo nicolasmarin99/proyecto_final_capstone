@@ -5,6 +5,7 @@ import { crearClienteApi, type ClienteApi } from "../api/cliente";
 import { ProveedorAuth } from "../auth/ContextoAuth";
 import { AreaPrestador } from "../componentes/AreaPrestador";
 import { RutaProtegida } from "../componentes/RutaProtegida";
+import { abrirPrestador, cuerpoPendientes } from "./panelAdmin.pruebas";
 import PaginaAdmin from "./Admin";
 import PaginaPrestador from "./Prestador";
 import PaginaMisCertificaciones from "./mi/MisCertificaciones";
@@ -122,6 +123,11 @@ function simularApi({ usuario = prestador, propias = [], respuestaSubida, cola =
     }
     if (url.startsWith("/api/admin/identidades?")) return json({ identidades: [], pagina: 1, porPagina: 10, total: 0 });
     if (url.startsWith("/api/admin/reportes")) return json({ servicios: [], pagina: 1, porPagina: 10, total: 0 });
+    if (url.startsWith("/api/admin/pendientes")) {
+      // El panel agrupa por prestador: todo lo pendiente de la cola es de Pedro Soto.
+      const quedan = cola.filter((fila) => !resueltas.has(fila.id));
+      return json(cuerpoPendientes(quedan.length > 0 ? [{ id: "perfil-1", nombre: "Pedro Soto", pendientes: { certificaciones: quedan.length } }] : []));
+    }
     if (url.startsWith("/api/admin/certificaciones?")) {
       const quedan = cola.filter((fila) => !resueltas.has(fila.id));
       return json({
@@ -274,6 +280,7 @@ describe("Cola de certificaciones del administrador", () => {
   it("muestra lo declarado, pide el documento a demanda y aprueba", async () => {
     simularApi({ usuario: admin, cola: [certificacion("PENDIENTE")] });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
     const solicitud = await within(seccion).findByRole("article", { name: "Instalador de gas autorizado (SEC)" });
@@ -293,6 +300,7 @@ describe("Cola de certificaciones del administrador", () => {
   it("rechazar exige un motivo y lo envía", async () => {
     simularApi({ usuario: admin, cola: [certificacion("PENDIENTE")] });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
     fireEvent.click(await within(seccion).findByRole("button", { name: "Rechazar" }));
@@ -412,6 +420,7 @@ describe("Cursos", () => {
   horas: 120,
 })] });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const seccion = await screen.findByRole("region", { name: "Certificaciones y cursos" });
     const solicitud = await within(seccion).findByRole("article", { name: "Instalaciones eléctricas domiciliarias" });

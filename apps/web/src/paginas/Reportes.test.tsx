@@ -1,3 +1,4 @@
+import { abrirPrestador, cuerpoPendientes } from "./panelAdmin.pruebas";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +59,11 @@ function simularApi({ usuario = CLIENTE, miReporte = null, respuestaReporte }: E
     if (url === "/api/admin/resumen") return json({ resumen: { totalUsuarios: 3, porRol: { CLIENTE: 1, PRESTADOR: 1, ADMINISTRADOR: 1 } } });
     if (url.startsWith("/api/admin/identidades")) return json({ identidades: [], pagina: 1, porPagina: 10, total: 0 });
     if (url.startsWith("/api/admin/imagenes")) return json({ imagenes: [], pagina: 1, porPagina: 20, total: 0 });
-    if (url === "/api/admin/reportes?estado=pendientes") {
+    // El panel agrupa por prestador: los dos servicios reportados son de Pedro Soto.
+    if (url.startsWith("/api/admin/pendientes")) {
+      return json(cuerpoPendientes([{ id: "perfil-1", nombre: "Pedro Soto", pendientes: { reportes: 2 } }]));
+    }
+    if (url === "/api/admin/reportes?estado=pendientes&prestador=perfil-1") {
       return json({
         casos: [
           {
@@ -235,6 +240,7 @@ describe("Reportes en el panel de administración", () => {
   it("muestra la cola agrupada, con la prioridad alta destacada y el tiempo de espera", async () => {
     simularApi({ usuario: ADMIN });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const seccion = await screen.findByRole("region", { name: "Reportes" });
     const urgente = await within(seccion).findByRole("article", { name: "Reportes de «Gasfitería a domicilio»" });
@@ -251,6 +257,7 @@ describe("Reportes en el panel de administración", () => {
   it("el detalle muestra los reportes sin quién los hizo, y ocultar exige motivo", async () => {
     simularApi({ usuario: ADMIN });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
     const urgente = await screen.findByRole("article", { name: "Reportes de «Gasfitería a domicilio»" });
 
     fireEvent.click(within(urgente).getByRole("button", { name: "Revisar" }));
@@ -275,6 +282,7 @@ describe("Reportes en el panel de administración", () => {
   it("desestimar también exige motivo", async () => {
     simularApi({ usuario: ADMIN });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
     const urgente = await screen.findByRole("article", { name: "Reportes de «Gasfitería a domicilio»" });
     fireEvent.click(within(urgente).getByRole("button", { name: "Revisar" }));
 

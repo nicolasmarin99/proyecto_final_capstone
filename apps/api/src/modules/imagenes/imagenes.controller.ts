@@ -1,8 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
 import { exigirDueno } from "../servicios/servicios.service.js";
-import { esquemaIdImagen, esquemaIdServicio, esquemaIdsImagen, esquemaListadoAdmin, esquemaOcultar, esquemaOrden } from "./imagenes.schema.js";
-import { eliminarImagen, listarParaModerar, ocultar, ordenarImagenes, subirImagen } from "./imagenes.service.js";
+import {
+  esquemaIdImagen,
+  esquemaIdServicio,
+  esquemaIdsImagen,
+  esquemaListadoAdmin,
+  esquemaOcultar,
+  esquemaOrden,
+  esquemaRevisadas,
+} from "./imagenes.schema.js";
+import { eliminarImagen, listarParaModerar, marcarRevisadas, ocultar, ordenarImagenes, subirImagen } from "./imagenes.service.js";
 
 /** Sin try/catch: Express 5 entrega los rechazos al manejador central. El usuario sale del token. */
 function idDelUsuario(req: Request): string {
@@ -52,6 +60,12 @@ export async function ordenar(req: Request, res: Response) {
 
 export async function listarAdmin(req: Request, res: Response) {
   res.status(200).json(await listarParaModerar(esquemaListadoAdmin.parse(req.query)));
+}
+
+export async function revisadasAdmin(req: Request, res: Response) {
+  const { ids } = esquemaRevisadas.parse(req.body);
+
+  res.status(200).json({ revisadas: await marcarRevisadas(ids, idDelUsuario(req)) });
 }
 
 export async function ocultarAdmin(req: Request, res: Response) {

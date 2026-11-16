@@ -100,6 +100,8 @@ export type ImagenPropia =
 /** Imagen en el panel de moderación, con su servicio y prestador. */
 export type ImagenModeracion = ImagenPropia & {
   subidaEn: string;
+  /** Visible y sin que un administrador la haya revisado. */
+  porRevisar: boolean;
   ocultadaPor: string | null;
   servicio: { id: string; titulo: string; prestador: string };
 };
@@ -497,6 +499,53 @@ export interface ColaCertificaciones {
 export interface ResumenAdmin {
   totalUsuarios: number;
   porRol: Record<string, number>;
+}
+
+/** Cuánto tiene por revisar un prestador, de cada tipo. */
+export interface ConteoPendientes {
+  identidad: number;
+  certificaciones: number;
+  cursos: number;
+  reportes: number;
+  imagenes: number;
+}
+
+/** Un prestador con algo por revisar en el panel de administración. */
+export interface PrestadorConPendientes {
+  /** Id de su perfil: el filtro `prestador` de cada cola. */
+  id: string;
+  nombre: string;
+  pendientes: ConteoPendientes;
+  total: number;
+  /** Desde cuándo espera lo más antiguo. */
+  esperandoDesde: string;
+}
+
+export interface PaginaPendientes {
+  prestadores: PrestadorConPendientes[];
+  pagina: number;
+  porPagina: number;
+  /** Prestadores con pendientes, en total. */
+  total: number;
+}
+
+function leerPrestadorConPendientes(valor: unknown): PrestadorConPendientes | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.nombre !== "string" || !esObjeto(valor.pendientes)) return null;
+  const numero = (dato: unknown) => (typeof dato === "number" && dato > 0 ? dato : 0);
+  const pendientes = {
+    identidad: numero(valor.pendientes.identidad),
+    certificaciones: numero(valor.pendientes.certificaciones),
+    cursos: numero(valor.pendientes.cursos),
+    reportes: numero(valor.pendientes.reportes),
+    imagenes: numero(valor.pendientes.imagenes),
+  };
+  return {
+    id: valor.id,
+    nombre: valor.nombre,
+    pendientes,
+    total: pendientes.identidad + pendientes.certificaciones + pendientes.cursos + pendientes.reportes + pendientes.imagenes,
+    esperandoDesde: typeof valor.esperandoDesde === "string" ? valor.esperandoDesde : "",
+  };
 }
 
 interface OpcionesPeticion {
@@ -942,6 +991,7 @@ function leerImagenModeracion(valor: unknown): ImagenModeracion | null {
   return {
     ...propia,
     subidaEn: valor.subidaEn,
+    porRevisar: valor.porRevisar === true,
     ocultadaPor: typeof valor.ocultadaPor === "string" ? valor.ocultadaPor : null,
     servicio: { id, titulo, prestador },
   };
@@ -1507,8 +1557,10 @@ export function crearClienteApi() {
       return identidad;
     },
 
-    async listarIdentidades(pagina: number, porPagina: number): Promise<ColaIdentidades> {
+    /** Identidades pendientes; con `prestadorId`, solo las de ese prestador. */
+    async listarIdentidades(pagina: number, porPagina: number, prestadorId?: string): Promise<ColaIdentidades> {
       const consulta = new URLSearchParams({ estado: "PENDIENTE", pagina: String(pagina), porPagina: String(porPagina) });
+      if (prestadorId) consulta.set("prestador", prestadorId);
       const cuerpo = await peticion(`/admin/identidades?${consulta.toString()}`, { autenticada: true });
 
       if (
@@ -1584,8 +1636,10 @@ export function crearClienteApi() {
       return certificacion;
     },
 
-    async listarCertificacionesPendientes(pagina: number, porPagina: number): Promise<ColaCertificaciones> {
+    /** Certificaciones y cursos pendientes; con `prestadorId`, solo los de ese prestador. */
+    async listarCertificacionesPendientes(pagina: number, porPagina: number, prestadorId?: string): Promise<ColaCertificaciones> {
       const consulta = new URLSearchParams({ estado: "PENDIENTE", pagina: String(pagina), porPagina: String(porPagina) });
+      if (prestadorId) consulta.set("prestador", prestadorId);
       const cuerpo = await peticion(`/admin/certificaciones?${consulta.toString()}`, { autenticada: true });
 
       if (
@@ -1725,10 +1779,12 @@ export function crearClienteApi() {
     },
 
     async listarImagenesModeracion(
-      filtros: { estado?: EstadoImagen; pagina?: number } = {},
+      filtros: { estado?: EstadoImagen; pagina?: number; prestadorId?: string; sinRevisar?: boolean } = {},
     ): Promise<{ imagenes: ImagenModeracion[]; total: number; pagina: number; porPagina: number }> {
       const consulta = new URLSearchParams();
       if (filtros.estado) consulta.set("estado", filtros.estado);
+      if (filtros.prestadorId) consulta.set("prestador", filtros.prestadorId);
+      if (filtros.sinRevisar) consulta.set("sinRevisar", "true");
       if (filtros.pagina) consulta.set("pagina", String(filtros.pagina));
       const texto = consulta.toString();
       const cuerpo = await peticion(texto ? `/admin/imagenes?${texto}` : "/admin/imagenes", { autenticada: true });
@@ -1737,6 +1793,13 @@ export function crearClienteApi() {
         throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       }
       return { imagenes: leerLista(cuerpo.imagenes, leerImagenModeracion), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
+    },
+
+    /** «Las miré y están bien»: dejan de figurar como pendientes. Devuelve cuántas se marcaron. */
+    async marcarImagenesRevisadas(ids: string[]): Promise<number> {
+      const cuerpo = await peticion("/admin/imagenes/revisadas", { metodo: "PATCH", cuerpo: { ids }, autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.revisadas !== "number") throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return cuerpo.revisadas;
     },
 
     async ocultarImagen(imagenId: string, motivo: string): Promise<ImagenPropia> {
@@ -1773,9 +1836,10 @@ export function crearClienteApi() {
     },
 
     async colaReportes(
-      filtros: { estado: "pendientes" | "resueltos"; pagina?: number },
+      filtros: { estado: "pendientes" | "resueltos"; pagina?: number; prestadorId?: string },
     ): Promise<{ casos: CasoCola[]; total: number; pagina: number; porPagina: number }> {
       const consulta = new URLSearchParams({ estado: filtros.estado });
+      if (filtros.prestadorId) consulta.set("prestador", filtros.prestadorId);
       if (filtros.pagina) consulta.set("pagina", String(filtros.pagina));
       const cuerpo = await peticion(`/admin/reportes?${consulta.toString()}`, { autenticada: true });
       if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
@@ -1907,6 +1971,20 @@ export function crearClienteApi() {
       }
 
       return cuerpo.telefono;
+    },
+
+    /** Prestadores con algo por revisar y cuánto de cada tipo: el panel organizado por prestador. */
+    async pendientesPorPrestador(pagina = 1): Promise<PaginaPendientes> {
+      const cuerpo = await peticion(`/admin/pendientes?pagina=${pagina}`, { autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return {
+        prestadores: leerLista(cuerpo.prestadores, leerPrestadorConPendientes),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
     },
 
     async obtenerResumenAdmin(): Promise<ResumenAdmin> {

@@ -167,8 +167,8 @@ export async function obtenerEstadoPropio(usuarioId: string) {
   };
 }
 
-export async function obtenerCola(estado: EstadoCredencial, pagina: number, porPagina: number) {
-  const { filas, total } = await listarIdentidades(estado, (pagina - 1) * porPagina, porPagina);
+export async function obtenerCola(estado: EstadoCredencial, pagina: number, porPagina: number, prestadorId?: string) {
+  const { filas, total } = await listarIdentidades(estado, (pagina - 1) * porPagina, porPagina, prestadorId);
 
   return {
     identidades: filas.map((fila) => ({
@@ -178,6 +178,7 @@ export async function obtenerCola(estado: EstadoCredencial, pagina: number, porP
       enviadaEn: fila.creadoEn,
       revisadaEn: fila.fechaConsulta,
       prestador: {
+        id: fila.prestador.id,
         nombre: fila.prestador.usuario.nombre,
         rut: fila.prestador.usuario.rut,
         comuna: fila.prestador.comuna.nombre,

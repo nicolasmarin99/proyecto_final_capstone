@@ -6,6 +6,7 @@ import { ProveedorAuth } from "../auth/ContextoAuth";
 import { AreaPrestador } from "../componentes/AreaPrestador";
 import { RutaProtegida } from "../componentes/RutaProtegida";
 import { TarjetaResultado } from "../componentes/TarjetaResultado";
+import { abrirPrestador, cuerpoPendientes } from "./panelAdmin.pruebas";
 import PaginaAdmin from "./Admin";
 import PaginaPrestador from "./Prestador";
 import PaginaServicio from "./Servicio";
@@ -121,7 +122,10 @@ function simularApi({ usuario = null, resumen = TRES, mia, respuestaValorar, rec
     if (url.startsWith("/api/admin/identidades")) return json({ identidades: [], pagina: 1, porPagina: 10, total: 0 });
     if (url.startsWith("/api/admin/imagenes")) return json({ imagenes: [], pagina: 1, porPagina: 20, total: 0 });
     if (url.startsWith("/api/admin/certificaciones")) return json({ certificaciones: [], pagina: 1, porPagina: 10, total: 0 });
-    if (url === "/api/admin/reportes?estado=pendientes") return json({ casos: cola, pagina: 1, porPagina: 20, total: cola.length });
+    if (url.startsWith("/api/admin/pendientes")) {
+      return json(cuerpoPendientes(cola.length > 0 ? [{ id: "perfil-1", nombre: "Pedro Soto", pendientes: { reportes: cola.length } }] : []));
+    }
+    if (url === "/api/admin/reportes?estado=pendientes&prestador=perfil-1") return json({ casos: cola, pagina: 1, porPagina: 20, total: cola.length });
     if (url === "/api/admin/reportes?estado=resueltos") return json({ casos: [], pagina: 1, porPagina: 20, total: 0 });
     if (/\/api\/admin\/reportes\/valoraciones\/[^/]+\/(desestimar|ocultar)$/.test(url)) {
       return json({ valoracion: { id: "v9", estado: "OCULTA" }, accion: "OCULTAR_VALORACION", motivo: "x" });
@@ -434,6 +438,7 @@ describe("Valoraciones objetadas en la cola del administrador", () => {
   it("muestra el texto, la calificación y el motivo; ocultar exige motivo", async () => {
     simularApi({ usuario: admin, cola: [CASO] });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const tarjeta = await screen.findByRole("article", { name: "Valoración objetada por Pedro Soto" });
     expect(within(tarjeta).getByText("«Pésimo, es un ladrón.»")).toBeInTheDocument();

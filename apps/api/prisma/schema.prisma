@@ -82,6 +82,7 @@ model Usuario {
   eventosSeguridad        EventoSeguridad[]
   accesosDocumento        AccesoDocumento[]
   moderacionesImagen      ModeracionImagen[]
+  imagenesRevisadas       ImagenServicio[]     @relation("ImagenesRevisadas")
   decisionesReporte       DecisionReporte[]
 
   @@index([rol])
@@ -310,6 +311,13 @@ model ImagenServicio {
   /// Posición en la galería, desde 0. La primera es la portada y la miniatura.
   orden         Int
   estado        EstadoImagen @default(VISIBLE)
+  /// Cuándo y quién la revisó desde el panel de administración. Nulos: sin
+  /// revisar. La foto se publica igual al subirla; esto solo ordena el
+  /// trabajo del administrador («N imágenes por revisar» = VISIBLE y sin
+  /// revisar). Un CHECK exige los dos o ninguno.
+  revisadaEn    DateTime?    @map("revisada_en")
+  revisadaPorId String?      @map("revisada_por_id")
+  revisadaPor   Usuario?     @relation("ImagenesRevisadas", fields: [revisadaPorId], references: [id], onDelete: Restrict)
   creadoEn      DateTime     @default(now()) @map("creado_en")
 
   @@index([servicioId, orden])

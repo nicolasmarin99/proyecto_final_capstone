@@ -127,6 +127,8 @@ export interface FilaCola {
  */
 export async function colaAgrupada(filtro: {
   estado: "pendientes" | "resueltos";
+  /** Solo los casos de ese prestador (sus servicios reportados y las valoraciones que objetó), o null: todos. */
+  prestadorId: string | null;
   umbralPrioridad: number;
   limite: number;
   desplazamiento: number;
@@ -159,6 +161,7 @@ export async function colaAgrupada(filtro: {
       JOIN perfiles_prestador p  ON p.id = s.prestador_id
       JOIN usuarios u            ON u.id = p.usuario_id
       WHERE d.servicio_id IS NOT NULL AND ${enEstado}
+        AND (${filtro.prestadorId}::text IS NULL OR s.prestador_id = ${filtro.prestadorId}::text)
       GROUP BY s.id, s.titulo, s.estado, u.nombre
 
       UNION ALL
@@ -185,6 +188,7 @@ export async function colaAgrupada(filtro: {
       JOIN perfiles_prestador p  ON p.id = v.prestador_id
       JOIN usuarios u            ON u.id = p.usuario_id
       WHERE d.valoracion_id IS NOT NULL AND ${enEstado}
+        AND (${filtro.prestadorId}::text IS NULL OR v.prestador_id = ${filtro.prestadorId}::text)
     )
     SELECT casos.*, count(*) OVER ()::int AS total
     FROM casos

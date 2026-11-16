@@ -52,6 +52,8 @@ export const esquemaDecision = z.object({
 /** GET /admin/reportes?estado=pendientes|resueltos&pagina=1&porPagina=20 */
 export const esquemaCola = z.object({
   estado: z.enum(["pendientes", "resueltos"], { error: "El estado debe ser pendientes o resueltos." }).default("pendientes"),
+  // Solo lo de ese prestador (id de su perfil): el panel agrupa por prestador.
+  prestador: z.string().min(1).max(64).optional(),
   pagina: z.coerce.number().int("La página debe ser un número entero.").min(1, "La página parte en 1.").default(1),
   porPagina: z.coerce
     .number()

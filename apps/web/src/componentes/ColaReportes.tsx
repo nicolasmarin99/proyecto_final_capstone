@@ -8,6 +8,7 @@ import { Estrellas } from "./Valoraciones";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
 import { Icono } from "./iconos";
+import { Titulo } from "./Titulo";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" });
 
@@ -126,7 +127,7 @@ function DetalleCaso({
         </Link>
       </p>
 
-      <h4 className="mt-3 text-sm font-semibold text-noche">Reportes ({mostrados.length})</h4>
+      <Titulo profundidad={2} className="mt-3 text-sm font-semibold text-noche">Reportes ({mostrados.length})</Titulo>
       <ul className="mt-2 space-y-2">
         {mostrados.map((reporte) => (
           <li key={reporte.id} className="rounded-chico border border-borde bg-blanco p-3 text-sm">
@@ -145,7 +146,7 @@ function DetalleCaso({
 
       {detalle.decisiones.length > 0 && (
         <>
-          <h4 className="mt-4 text-sm font-semibold text-noche">Decisiones anteriores</h4>
+          <Titulo profundidad={2} className="mt-4 text-sm font-semibold text-noche">Decisiones anteriores</Titulo>
           <ul className="mt-2 space-y-1.5 text-sm">
             {detalle.decisiones.map((decision) => (
               <li key={decision.decididaEn} className="text-texto-suave">
@@ -237,7 +238,7 @@ function TarjetaValoracion({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold tracking-[0.8px] text-primario uppercase">Valoración objetada</p>
-          <h3 className="font-titulos text-base font-bold text-noche">Sobre {valoracion.prestador}</h3>
+          <Titulo profundidad={1} className="font-titulos text-base font-bold text-noche">Sobre {valoracion.prestador}</Titulo>
           {valoracion.servicio && <p className="text-sm text-texto-suave">Servicio: {valoracion.servicio}</p>}
         </div>
         <span className="inline-flex items-center gap-1.5 text-sm">
@@ -316,10 +317,30 @@ function TarjetaValoracion({
  *
  * Los reportes no ocultan nada por sí solos: toda decisión la toma una
  * persona desde acá, con un motivo.
+ *
+ * Tres usos:
+ * - con `prestadorId`: solo los pendientes de ese prestador (sus servicios
+ *   reportados y las valoraciones que objetó), desplegados dentro de él;
+ * - con `historial`: solo los casos ya resueltos, de todos, para consulta;
+ * - sin ninguno: la cola completa, con el selector de pendientes y resueltos.
  */
-export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
+export function ColaReportes({
+  cliente,
+  prestadorId,
+  alCambiar,
+  historial = false,
+}: {
+  cliente: ClienteApi;
+  /** Solo lo de ese prestador (id de su perfil): la cola va desplegada dentro de él. */
+  prestadorId?: string;
+  /** Avisa que algo se resolvió, para actualizar los conteos del prestador. */
+  alCambiar?(): void;
+  /** Solo los casos resueltos (sin selector). */
+  historial?: boolean;
+}) {
   const idTitulo = useId();
-  const [estado, setEstado] = useState<"pendientes" | "resueltos">("pendientes");
+  const estadoFijo = prestadorId ? "pendientes" : historial ? "resueltos" : null;
+  const [estado, setEstado] = useState<"pendientes" | "resueltos">(estadoFijo ?? "pendientes");
   const [filas, setFilas] = useState<CasoCola[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -329,13 +350,13 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
   const cargar = useCallback(async () => {
     setError(null);
     try {
-      const datos = await cliente.colaReportes({ estado });
+      const datos = await cliente.colaReportes({ estado, prestadorId });
       setFilas(datos.casos);
       setTotal(datos.total);
     } catch {
       setError("No fue posible cargar los reportes.");
     }
-  }, [cliente, estado]);
+  }, [cliente, estado, prestadorId]);
 
   useEffect(() => {
     setFilas(null);
@@ -344,30 +365,33 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
   }, [cargar]);
 
   return (
-    <section aria-labelledby={idTitulo} className="mt-8 border-t border-borde pt-6">
-      <h2 id={idTitulo} className="font-titulos text-lg font-bold text-noche">
-        Reportes
-      </h2>
+    <section aria-labelledby={idTitulo} className={prestadorId ? "mt-6" : "mt-8 border-t border-borde pt-6"}>
+      <Titulo profundidad={0} id={idTitulo} className="font-titulos text-lg font-bold text-noche">
+        {historial ? "Reportes resueltos" : "Reportes"}
+      </Titulo>
       <p className="mt-1 text-sm text-texto-suave">
-        Los reportes no ocultan nada por sí solos: ordenan la revisión. Con {PERSONAS_PRIORIDAD_ALTA} o más personas distintas,
-        el caso pasa a prioridad alta.
+        {historial
+          ? "Los casos ya decididos, de todos los prestadores, con la decisión que se tomó y su motivo."
+          : `Los reportes no ocultan nada por sí solos: ordenan la revisión. Con ${PERSONAS_PRIORIDAD_ALTA} o más personas distintas, el caso pasa a prioridad alta.`}
       </p>
 
-      <div role="group" aria-label="Estado de los reportes" className="mt-4 inline-flex rounded-boton border border-borde-fuerte bg-blanco p-1">
-        {(["pendientes", "resueltos"] as const).map((opcion) => (
-          <button
-            key={opcion}
-            type="button"
-            aria-pressed={estado === opcion}
-            onClick={() => setEstado(opcion)}
-            className={`min-h-10 cursor-pointer rounded-chico px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primario ${
-              estado === opcion ? "bg-primario text-blanco" : "text-noche hover:bg-niebla"
-            }`}
-          >
-            {opcion === "pendientes" ? "Pendientes" : "Resueltos"}
-          </button>
-        ))}
-      </div>
+      {estadoFijo === null && (
+        <div role="group" aria-label="Estado de los reportes" className="mt-4 inline-flex rounded-boton border border-borde-fuerte bg-blanco p-1">
+          {(["pendientes", "resueltos"] as const).map((opcion) => (
+            <button
+              key={opcion}
+              type="button"
+              aria-pressed={estado === opcion}
+              onClick={() => setEstado(opcion)}
+              className={`min-h-10 cursor-pointer rounded-chico px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primario ${
+                estado === opcion ? "bg-primario text-blanco" : "text-noche hover:bg-niebla"
+              }`}
+            >
+              {opcion === "pendientes" ? "Pendientes" : "Resueltos"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Una sola región en vivo, siempre presente, que se ve cuando tiene algo que decir. */}
       <p role="status" className={aviso ? "mt-3 rounded-chico border border-borde bg-hielo/60 px-3 py-2 text-sm text-noche" : "sr-only"}>
@@ -386,7 +410,11 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
       {filas && filas.length > 0 && (
         <>
           <p className="mt-3 text-sm text-texto-suave">
-            {total === 1 ? "1 caso" : `${total} casos`} {estado === "pendientes" ? "esperando revisión" : "resueltos"}
+            {estado === "pendientes"
+              ? `${total === 1 ? "1 caso" : `${total} casos`} esperando revisión`
+              : total === 1
+                ? "1 caso resuelto"
+                : `${total} casos resueltos`}
           </p>
           <ul className="mt-3 space-y-3">
             {filas.map((fila) => {
@@ -400,6 +428,7 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
                       alDecidir={(mensaje) => {
                         setAviso(mensaje);
                         void cargar();
+                        alCambiar?.();
                       }}
                     />
                   </li>
@@ -415,7 +444,7 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="font-titulos text-base font-bold text-noche">{fila.servicio.titulo}</h3>
+                        <Titulo profundidad={1} className="font-titulos text-base font-bold text-noche">{fila.servicio.titulo}</Titulo>
                         <p className="text-sm text-texto-suave">{fila.servicio.prestador}</p>
                       </div>
                       {alta && (
@@ -467,6 +496,7 @@ export function ColaReportes({ cliente }: { cliente: ClienteApi }) {
                           setAviso(mensaje);
                           setAbierto(null);
                           void cargar();
+                          alCambiar?.();
                         }}
                       />
                     )}

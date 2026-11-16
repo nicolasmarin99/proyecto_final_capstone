@@ -117,8 +117,8 @@ export async function contarCargasDesde(prestadorId: string, desde: Date) {
  * Trae lo mínimo para decidir: nombre y RUT (lo que se compara con la
  * cédula) y la comuna. Ni el correo ni el teléfono hacen falta.
  */
-export async function listarIdentidades(estado: EstadoCredencial, salto: number, cantidad: number) {
-  const where = { ...deIdentidad, estado };
+export async function listarIdentidades(estado: EstadoCredencial, salto: number, cantidad: number, prestadorId?: string) {
+  const where = { ...deIdentidad, estado, ...(prestadorId ? { prestadorId } : {}) };
 
   const [filas, total] = await Promise.all([
     prisma.credencial.findMany({
@@ -130,6 +130,7 @@ export async function listarIdentidades(estado: EstadoCredencial, salto: number,
         ...seleccionEstado,
         prestador: {
           select: {
+            id: true,
             comuna: { select: { nombre: true } },
             usuario: { select: { nombre: true, rut: true } },
           },
