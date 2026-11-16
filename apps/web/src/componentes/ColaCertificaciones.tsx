@@ -3,6 +3,7 @@ import { formatearRut, LARGO_MAXIMO_MOTIVO_RECHAZO_CERTIFICACION, LARGO_MINIMO_M
 import { ErrorApi, type CertificacionEnCola, type ClienteApi } from "../api/cliente";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
+import { Titulo } from "./Titulo";
 import { formatearDia } from "./Certificaciones";
 
 const POR_PAGINA = 10;
@@ -91,9 +92,9 @@ function SolicitudCertificacion({
   return (
     <article aria-labelledby={idNombre} className="rounded-medio border border-borde p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 id={idNombre} className="font-titulos text-base font-bold break-words text-noche">
+        <Titulo profundidad={1} id={idNombre} className="font-titulos text-base font-bold break-words text-noche">
           {solicitud.nombre}
-        </h3>
+        </Titulo>
         <p className="text-sm text-texto-suave">Enviada el {formatoFecha.format(new Date(solicitud.enviadaEn))}</p>
       </div>
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -203,8 +204,21 @@ function SolicitudCertificacion({
   );
 }
 
-/** Cola de certificaciones pendientes, de la más antigua a la más nueva. */
-export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
+/**
+ * Cola de certificaciones y cursos pendientes, de la más antigua a la más
+ * nueva. Con `prestadorId`, solo los de ese prestador.
+ */
+export function ColaCertificaciones({
+  cliente,
+  prestadorId,
+  alCambiar,
+}: {
+  cliente: ClienteApi;
+  /** Solo lo de ese prestador (id de su perfil): la cola va desplegada dentro de él. */
+  prestadorId?: string;
+  /** Avisa que algo se resolvió, para actualizar los conteos del prestador. */
+  alCambiar?(): void;
+}) {
   const idTitulo = useId();
   const [pagina, setPagina] = useState(1);
   const [solicitudes, setSolicitudes] = useState<CertificacionEnCola[] | null>(null);
@@ -216,14 +230,14 @@ export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
     async (numero: number) => {
       setError(null);
       try {
-        const cola = await cliente.listarCertificacionesPendientes(numero, POR_PAGINA);
+        const cola = await cliente.listarCertificacionesPendientes(numero, POR_PAGINA, prestadorId);
         setSolicitudes(cola.certificaciones);
         setTotal(cola.total);
       } catch (causa) {
         setError(mensajeDeError(causa, "No fue posible cargar las certificaciones pendientes."));
       }
     },
-    [cliente],
+    [cliente, prestadorId],
   );
 
   useEffect(() => {
@@ -234,6 +248,7 @@ export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
     const quedan = (solicitudes ?? []).filter((solicitud) => solicitud.id !== id);
 
     setAviso(mensaje);
+    alCambiar?.();
     setTotal((actual) => Math.max(0, actual - 1));
     setSolicitudes(quedan);
 
@@ -247,10 +262,10 @@ export function ColaCertificaciones({ cliente }: { cliente: ClienteApi }) {
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   return (
-    <section aria-labelledby={idTitulo} className="mt-8 border-t border-borde pt-6">
-      <h2 id={idTitulo} className="font-titulos text-lg font-bold text-noche">
+    <section aria-labelledby={idTitulo} className={prestadorId ? "mt-6" : "mt-8 border-t border-borde pt-6"}>
+      <Titulo profundidad={0} id={idTitulo} className="font-titulos text-lg font-bold text-noche">
         Certificaciones y cursos
-      </h2>
+      </Titulo>
       <p className="mt-1 text-sm text-texto-suave">
         Compara el documento con lo que declaró el prestador y, si puedes, con el registro del emisor. Al
         aprobar una certificación, su perfil y sus servicios muestran «Prestador con certificaciones»; un

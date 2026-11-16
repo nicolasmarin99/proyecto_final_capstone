@@ -5,6 +5,7 @@ import { crearClienteApi, type ClienteApi } from "../api/cliente";
 import { ProveedorAuth } from "../auth/ContextoAuth";
 import { AreaPrestador } from "../componentes/AreaPrestador";
 import { RutaProtegida } from "../componentes/RutaProtegida";
+import { abrirPrestador, cuerpoPendientes } from "./panelAdmin.pruebas";
 import PaginaAdmin from "./Admin";
 import PaginaPerfil from "./Perfil";
 import PaginaMiIdentidad from "./mi/MiIdentidad";
@@ -59,6 +60,11 @@ function simularApi({ usuario = prestador, estadoIdentidad = null, respuestaSubi
     }
     if (url === "/api/admin/resumen") {
       return json({ resumen: { totalUsuarios: 2, porRol: { CLIENTE: 0, PRESTADOR: 1, ADMINISTRADOR: 1 } } });
+    }
+    if (url.startsWith("/api/admin/pendientes")) {
+      // El panel agrupa por prestador: cada solicitud pendiente es de uno distinto.
+      const pendientes = cola.filter((fila) => !resueltas.has(fila.id));
+      return json(cuerpoPendientes(pendientes.map((fila) => ({ id: `perfil-${fila.id}`, nombre: fila.nombre, pendientes: { identidad: 1 } }))));
     }
     if (url.startsWith("/api/admin/identidades?")) {
       return json({
@@ -216,9 +222,26 @@ describe("Verificación de identidad del prestador", () => {
 describe("Cola de revisión del administrador", () => {
   const COLA = [{ id: "c1", nombre: "Pedro Soto", rut: "12345678-5" }];
 
+  it("el prestador aparece con lo que tiene por revisar, y su cola solo se pide al abrirlo", async () => {
+    simularApi({ usuario: admin, cola: COLA });
+    renderizar("/admin");
+
+    const boton = await screen.findByRole("button", { name: /pedro soto/i, expanded: false });
+    expect(boton).toHaveTextContent("Por revisar: Verificación de identidad");
+    expect(screen.queryByRole("article", { name: /pedro soto/i })).not.toBeInTheDocument();
+    expect(llamadas("GET", /\/api\/admin\/identidades\?/)).toHaveLength(0);
+
+    fireEvent.click(boton);
+
+    expect(await screen.findByRole("article", { name: /pedro soto/i })).toBeInTheDocument();
+    const [llamada] = llamadas("GET", /\/api\/admin\/identidades\?/);
+    expect(String(llamada?.[0])).toContain("prestador=perfil-c1");
+  });
+
   it("lista las pendientes con nombre y RUT", async () => {
     simularApi({ usuario: admin, cola: COLA });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
 
     const fila = await screen.findByRole("article", { name: /pedro soto/i });
     expect(within(fila).getByText("12.345.678-5")).toBeInTheDocument();
@@ -227,6 +250,7 @@ describe("Cola de revisión del administrador", () => {
   it("muestra el documento con la URL firmada, solo cuando se pide", async () => {
     simularApi({ usuario: admin, cola: COLA });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
     const fila = await screen.findByRole("article", { name: /pedro soto/i });
 
     expect(within(fila).queryByRole("img")).not.toBeInTheDocument();
@@ -240,6 +264,7 @@ describe("Cola de revisión del administrador", () => {
   it("aprobar llama a la API y saca la solicitud de la cola", async () => {
     simularApi({ usuario: admin, cola: COLA });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
     const fila = await screen.findByRole("article", { name: /pedro soto/i });
 
     fireEvent.click(within(fila).getByRole("button", { name: /aprobar/i }));
@@ -251,6 +276,7 @@ describe("Cola de revisión del administrador", () => {
   it("rechazar exige escribir el motivo antes de enviar", async () => {
     simularApi({ usuario: admin, cola: COLA });
     renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
     const fila = await screen.findByRole("article", { name: /pedro soto/i });
 
     fireEvent.click(within(fila).getByRole("button", { name: /^rechazar$/i }));
@@ -272,6 +298,7 @@ describe("Cola de revisión del administrador", () => {
     simularApi({ usuario: admin, cola: [] });
     renderizar("/admin");
 
-    expect(await screen.findByText(/no hay identidades pendientes/i)).toBeInTheDocument();
+    expect(await screen.findByText("No hay nada pendiente de revisión.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Prestadores con pendientes" })).not.toBeInTheDocument();
   });
 });

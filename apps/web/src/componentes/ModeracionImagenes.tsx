@@ -5,6 +5,7 @@ import { ErrorApi, type ClienteApi, type ImagenModeracion } from "../api/cliente
 import { Boton } from "./Boton";
 import { Icono } from "./iconos";
 import { CampoAreaTexto } from "./CampoAreaTexto";
+import { Titulo } from "./Titulo";
 
 const fechaCorta = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium" });
 
@@ -120,9 +121,24 @@ function ImagenModerable({
  * por servicio. Ocultar no borra el archivo: la imagen deja de mostrarse en
  * la página pública y en la búsqueda, y queda registrado quién, cuándo y por
  * qué. El prestador ve el motivo en su formulario.
+ *
+ * Con `prestadorId` muestra solo las fotos POR REVISAR de ese prestador
+ * (visibles y que ningún administrador ha mirado) y agrega «Marcar como
+ * revisadas»: las fotos siguen publicadas y dejan de figurar como pendientes.
  */
-export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
+export function ModeracionImagenes({
+  cliente,
+  prestadorId,
+  alCambiar,
+}: {
+  cliente: ClienteApi;
+  /** Solo lo de ese prestador (id de su perfil): la cola va desplegada dentro de él. */
+  prestadorId?: string;
+  /** Avisa que algo se resolvió, para actualizar los conteos del prestador. */
+  alCambiar?(): void;
+}) {
   const idTitulo = useId();
+  const [marcando, setMarcando] = useState(false);
   const [imagenes, setImagenes] = useState<ImagenModeracion[]>([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -135,7 +151,7 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
       setCargando(true);
       setError(null);
       try {
-        const datos = await cliente.listarImagenesModeracion({ pagina: numero });
+        const datos = await cliente.listarImagenesModeracion({ pagina: numero, prestadorId, sinRevisar: prestadorId !== undefined });
         setImagenes((actuales) => (numero === 1 ? datos.imagenes : [...actuales, ...datos.imagenes]));
         setTotal(datos.total);
         setPagina(numero);
@@ -145,12 +161,31 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
         setCargando(false);
       }
     },
-    [cliente],
+    [cliente, prestadorId],
   );
 
   useEffect(() => {
     void cargar(1);
   }, [cargar]);
+
+  // Solo las que están a la vista y siguen por revisar: una foto subida
+  // mientras el administrador revisaba no se marca sin que la haya mirado.
+  const porRevisar = imagenes.filter((imagen) => imagen.porRevisar && imagen.estado === "VISIBLE");
+
+  async function marcarRevisadas() {
+    setMarcando(true);
+    setError(null);
+    try {
+      const cantidad = await cliente.marcarImagenesRevisadas(porRevisar.map((imagen) => imagen.id));
+      setAviso(cantidad === 1 ? "1 imagen marcada como revisada." : `${cantidad} imágenes marcadas como revisadas.`);
+      await cargar(1);
+      alCambiar?.();
+    } catch {
+      setError("No fue posible marcar las imágenes como revisadas.");
+    } finally {
+      setMarcando(false);
+    }
+  }
 
   // Agrupadas por servicio: los servicios con la foto más reciente primero, y
   // dentro de cada uno, las fotos en el orden de su galería.
@@ -161,15 +196,20 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
   for (const delServicio of grupos.values()) delServicio.sort((a, b) => a.orden - b.orden);
 
   return (
-    <section aria-labelledby={idTitulo} className="mt-8 border-t border-borde pt-6">
-      <h2 id={idTitulo} className="font-titulos text-lg font-bold text-noche">
-        Imágenes de servicios
-      </h2>
+    <section aria-labelledby={idTitulo} className={prestadorId ? "mt-6" : "mt-8 border-t border-borde pt-6"}>
+      <Titulo profundidad={0} id={idTitulo} className="font-titulos text-lg font-bold text-noche">
+        {prestadorId ? "Imágenes por revisar" : "Imágenes de servicios"}
+      </Titulo>
       <p className="mt-1 text-sm text-texto-suave">
         Oculta las fotos que muestren la dirección, la cara o datos de un cliente, o que no correspondan al servicio.
+        {prestadorId && " Si están bien, márcalas como revisadas: siguen publicadas y dejan de figurar como pendientes."}
       </p>
 
-      <p role="status" className="sr-only">
+      {/* Una sola región en vivo, siempre presente, que se ve cuando tiene algo que decir. */}
+      <p
+        role="status"
+        className={aviso && prestadorId ? "mt-3 rounded-chico border border-exito-700/20 bg-exito-50 px-4 py-3 text-sm text-exito-700" : "sr-only"}
+      >
         {aviso}
       </p>
 
@@ -179,7 +219,9 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
         </p>
       )}
 
-      {!cargando && !error && imagenes.length === 0 && <p className="mt-4 text-sm text-texto-suave">Todavía no hay imágenes de servicios.</p>}
+      {!cargando && !error && imagenes.length === 0 && (
+        <p className="mt-4 text-sm text-texto-suave">{prestadorId ? "No quedan imágenes por revisar." : "Todavía no hay imágenes de servicios."}</p>
+      )}
 
       <div className="mt-4 space-y-6">
         {[...grupos.entries()].map(([servicioId, delServicio]) => {
@@ -187,12 +229,12 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
           if (!primera) return null;
           return (
             <article key={servicioId} aria-label={`Imágenes de «${primera.servicio.titulo}»`}>
-              <h3 className="text-sm font-semibold text-noche">
+              <Titulo profundidad={1} className="text-sm font-semibold text-noche">
                 <Link to={`/servicios/${servicioId}`} className="hover:text-primario">
                   {primera.servicio.titulo}
                 </Link>{" "}
                 <span className="font-normal text-texto-suave">· {primera.servicio.prestador}</span>
-              </h3>
+              </Titulo>
               <ul className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {delServicio.map((imagen) => (
                   <ImagenModerable
@@ -201,8 +243,10 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
                     posicion={imagen.orden + 1}
                     cliente={cliente}
                     alOcultar={(actualizada) => {
-                      setImagenes((actuales) => actuales.map((otra) => (otra.id === actualizada.id ? actualizada : otra)));
+                      // Oculta: ya se decidió sobre ella, deja de estar por revisar.
+                      setImagenes((actuales) => actuales.map((otra) => (otra.id === actualizada.id ? { ...actualizada, porRevisar: false } : otra)));
                       setAviso(`Imagen de «${actualizada.servicio.titulo}» oculta.`);
+                      alCambiar?.();
                     }}
                   />
                 ))}
@@ -213,6 +257,16 @@ export function ModeracionImagenes({ cliente }: { cliente: ClienteApi }) {
       </div>
 
       {cargando && <p className="mt-4 text-sm text-texto-suave">Cargando imágenes…</p>}
+
+      {prestadorId && porRevisar.length > 0 && (
+        <Boton type="button" cargando={marcando} className="mt-4 h-auto! min-h-12 px-4 py-2.5 sm:w-auto! sm:px-6" onClick={() => void marcarRevisadas()}>
+          {marcando
+            ? "Marcando…"
+            : porRevisar.length === 1
+              ? "Marcar la imagen como revisada"
+              : `Marcar las ${porRevisar.length} imágenes como revisadas`}
+        </Boton>
+      )}
 
       {!cargando && imagenes.length < total && (
         <Boton type="button" variante="secundario" className="mt-4" onClick={() => void cargar(pagina + 1)}>

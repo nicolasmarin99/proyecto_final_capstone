@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { EstadoCredencial } from "../../generated/prisma/client.js";
 
-/** Cola de revisión: GET /admin/identidades?estado=PENDIENTE&pagina=1&porPagina=20 */
+/** Cola de revisión: GET /admin/identidades?estado=PENDIENTE&prestador=...&pagina=1&porPagina=20 */
 export const esquemaConsultaCola = z.object({
   estado: z.enum(EstadoCredencial, { error: "Estado no válido." }).default(EstadoCredencial.PENDIENTE),
+  // Solo lo de ese prestador (id de su perfil): el panel agrupa por prestador.
+  prestador: z.string().min(1).max(64).optional(),
   pagina: z.coerce.number().int("La página debe ser un número entero.").min(1, "La página parte en 1.").default(1),
   porPagina: z.coerce
     .number()

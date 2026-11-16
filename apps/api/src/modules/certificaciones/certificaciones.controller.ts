@@ -35,9 +35,9 @@ export async function listarPropias(req: Request, res: Response) {
 }
 
 export async function listarCola(req: Request, res: Response) {
-  const { estado, pagina, porPagina } = esquemaColaCertificaciones.parse(req.query);
+  const { estado, prestador, pagina, porPagina } = esquemaColaCertificaciones.parse(req.query);
 
-  res.status(200).json(await cola(estado, pagina, porPagina));
+  res.status(200).json(await cola(estado, pagina, porPagina, prestador));
 }
 
 export async function documento(req: Request, res: Response) {

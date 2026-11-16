@@ -29,10 +29,17 @@ export const esquemaOcultar = z.object({
     .max(LARGO_MAXIMO_MOTIVO_OCULTAR, `El motivo no puede superar los ${LARGO_MAXIMO_MOTIVO_OCULTAR} caracteres.`),
 });
 
-/** GET /admin/imagenes?estado=VISIBLE&servicio=...&pagina=1&porPagina=20 */
+/** GET /admin/imagenes?estado=VISIBLE&servicio=...&prestador=...&sinRevisar=true&pagina=1&porPagina=20 */
 export const esquemaListadoAdmin = z.object({
   estado: z.enum(EstadoImagen, { error: "Estado no válido." }).optional(),
   servicio: z.string().min(1).max(64).optional(),
+  // Solo lo de ese prestador (id de su perfil): el panel agrupa por prestador.
+  prestador: z.string().min(1).max(64).optional(),
+  // Solo las pendientes de revisión: visibles y que ningún administrador ha revisado.
+  sinRevisar: z
+    .enum(["true", "false"], { error: "sinRevisar debe ser true o false." })
+    .default("false")
+    .transform((valor) => valor === "true"),
   pagina: z.coerce.number().int("La página debe ser un número entero.").min(1, "La página parte en 1.").default(1),
   porPagina: z.coerce
     .number()
@@ -43,3 +50,15 @@ export const esquemaListadoAdmin = z.object({
 });
 
 export type ListadoAdmin = z.infer<typeof esquemaListadoAdmin>;
+
+/**
+ * PATCH /admin/imagenes/revisadas — { ids }. Se marcan las imágenes que el
+ * administrador TUVO A LA VISTA, por id: una foto subida mientras revisaba
+ * no queda marcada sin que nadie la haya mirado.
+ */
+export const esquemaRevisadas = z.object({
+  ids: z
+    .array(z.string().min(1).max(64), { error: "Indica las imágenes revisadas." })
+    .min(1, "Indica al menos una imagen.")
+    .max(50, "No más de 50 imágenes por vez."),
+});

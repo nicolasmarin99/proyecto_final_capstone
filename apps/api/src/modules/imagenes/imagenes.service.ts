@@ -12,6 +12,7 @@ import {
   eliminarImagenYCompactar,
   listarImagenesDe,
   listarImagenesParaModerar,
+  marcarImagenesRevisadas,
   motivosDe,
   ocultarImagen,
   reordenarImagenes,
@@ -192,10 +193,21 @@ export async function ocultar(imagenId: string, administradorId: string, motivo:
   return imagenPropia(actualizada, motivo);
 }
 
+/**
+ * Marca como revisadas las imágenes indicadas: solo las VISIBLES que nadie
+ * había revisado. Devuelve cuántas se marcaron. No cambia nada de lo que ve
+ * el público: es el control del administrador sobre qué le falta mirar.
+ */
+export async function marcarRevisadas(ids: string[], administradorId: string): Promise<number> {
+  return marcarImagenesRevisadas(ids, administradorId);
+}
+
 export async function listarParaModerar(filtros: ListadoAdmin) {
   const { imagenes, total } = await listarImagenesParaModerar({
     estado: filtros.estado,
     servicioId: filtros.servicio,
+    prestadorId: filtros.prestador,
+    sinRevisar: filtros.sinRevisar,
     pagina: filtros.pagina,
     porPagina: filtros.porPagina,
   });
@@ -206,6 +218,8 @@ export async function listarParaModerar(filtros: ListadoAdmin) {
     imagenes: imagenes.map((imagen) => ({
       ...imagenPropia(imagen, moderaciones.get(imagen.id)?.motivo ?? null),
       subidaEn: imagen.creadoEn,
+      // Pendiente de revisión: visible y sin que un administrador la haya mirado.
+      porRevisar: imagen.estado === "VISIBLE" && imagen.revisadaEn === null,
       ocultadaEn: moderaciones.get(imagen.id)?.creadoEn ?? null,
       ocultadaPor: moderaciones.get(imagen.id)?.administrador ?? null,
       servicio: {

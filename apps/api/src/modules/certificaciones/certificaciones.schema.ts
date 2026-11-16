@@ -115,9 +115,11 @@ export const esquemaCertificacion = z
 
 export type DatosCertificacion = z.infer<typeof esquemaCertificacion>;
 
-/** GET /admin/certificaciones?estado=PENDIENTE&pagina=1&porPagina=10 */
+/** GET /admin/certificaciones?estado=PENDIENTE&prestador=...&pagina=1&porPagina=10 */
 export const esquemaColaCertificaciones = z.object({
   estado: z.enum(EstadoCredencial, { error: "Estado no válido." }).default(EstadoCredencial.PENDIENTE),
+  // Solo lo de ese prestador (id de su perfil): el panel agrupa por prestador.
+  prestador: z.string().min(1).max(64).optional(),
   pagina: z.coerce.number().int("La página debe ser un número entero.").min(1, "La página parte en 1.").default(1),
   porPagina: z.coerce
     .number()

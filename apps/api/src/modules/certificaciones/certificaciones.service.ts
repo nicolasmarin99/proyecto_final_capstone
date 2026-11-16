@@ -163,8 +163,8 @@ export async function propias(usuarioId: string) {
 
 // ─── Administración ────────────────────────────────────────────────────────
 
-export async function cola(estado: EstadoCredencial, pagina: number, porPagina: number) {
-  const { certificaciones, total } = await colaCertificaciones(estado, pagina, porPagina);
+export async function cola(estado: EstadoCredencial, pagina: number, porPagina: number, prestadorId?: string) {
+  const { certificaciones, total } = await colaCertificaciones(estado, pagina, porPagina, prestadorId);
   return {
     certificaciones: certificaciones.map((certificacion) => ({
       ...vista(certificacion),

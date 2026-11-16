@@ -6,7 +6,7 @@ import { autenticar } from "../../middlewares/autenticar.js";
 import { ErrorHttp } from "../../shared/errores.js";
 import { autorizar } from "../auth/auth.autorizar.js";
 import { exigirCorreoVerificado } from "../auth/auth.exigirCorreoVerificado.js";
-import { eliminar, listarAdmin, ocultarAdmin, ordenar, soloDuenoDelServicio, subir } from "./imagenes.controller.js";
+import { eliminar, listarAdmin, revisadasAdmin, ocultarAdmin, ordenar, soloDuenoDelServicio, subir } from "./imagenes.controller.js";
 
 const leerImagen = multer({
   storage: multer.memoryStorage(),
@@ -55,4 +55,6 @@ export const rutasImagenesAdmin = Router();
 
 rutasImagenesAdmin.use(autenticar, autorizar(Rol.ADMINISTRADOR));
 rutasImagenesAdmin.get("/", listarAdmin);
+// «Las miré y están bien»: dejan de figurar como pendientes del prestador.
+rutasImagenesAdmin.patch("/revisadas", revisadasAdmin);
 rutasImagenesAdmin.patch("/:id/ocultar", ocultarAdmin);
