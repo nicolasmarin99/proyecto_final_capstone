@@ -1,5 +1,10 @@
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
-import type { AlmacenamientoDocumentos, ArchivoAGuardar, TipoDocumento } from "./almacenamiento.tipos.js";
+import { DocumentoNoEncontrado, type AlmacenamientoDocumentos, type ArchivoAGuardar, type DocumentoLeido, type TipoDocumento } from "./almacenamiento.tipos.js";
+
+/** Vigencia de la URL con que el propio servidor descarga un documento para leerlo. */
+const SEGUNDOS_PARA_LEER = 60;
+/** Tiempo máximo de esa descarga. */
+const TIEMPO_LIMITE_LECTURA_MS = 15_000;
 
 const TIPO_MIME: Record<TipoDocumento, string> = {
   jpg: "image/jpeg",
@@ -85,6 +90,25 @@ export class AlmacenamientoCloudinary implements AlmacenamientoDocumentos {
       // Que el navegador lo muestre en vez de descargarlo.
       attachment: false,
     });
+  }
+
+  /**
+   * Descarga el documento para la lectura automática. Usa la misma URL
+   * firmada que ve el administrador: la imagen que Cloudinary genera (la
+   * primera página si es PDF), nunca el archivo original. La URL vive un
+   * minuto, no se guarda ni se registra, y solo la usa este servidor.
+   */
+  async leer(id: string): Promise<DocumentoLeido> {
+    const url = await this.urlFirmada(id, SEGUNDOS_PARA_LEER);
+    const respuesta = await fetch(url, { signal: AbortSignal.timeout(TIEMPO_LIMITE_LECTURA_MS) });
+
+    if (respuesta.status === 404) throw new DocumentoNoEncontrado(id);
+    if (!respuesta.ok) {
+      // Solo el código: la URL lleva la firma y no puede terminar en un log.
+      throw new Error(`Cloudinary respondió ${respuesta.status} al descargar el documento ${id}.`);
+    }
+
+    return { contenido: Buffer.from(await respuesta.arrayBuffer()), tipoMime: "image/jpeg" };
   }
 
   /**

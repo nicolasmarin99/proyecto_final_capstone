@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaConsultaCola, esquemaIdIdentidad, esquemaRechazo } from "./identidad.schema.js";
+import { esquemaAprobacion, esquemaConsultaCola, esquemaIdIdentidad, esquemaRechazo } from "./identidad.schema.js";
 import {
   aprobarIdentidad,
   cargarDocumento,
@@ -61,13 +61,15 @@ export async function documento(req: Request, res: Response) {
 
 export async function aprobar(req: Request, res: Response) {
   const { id } = esquemaIdIdentidad.parse(req.params);
+  // Sin cuerpo también vale: es el panel de siempre, sin lectura automática.
+  const { revision } = esquemaAprobacion.parse(req.body ?? {});
 
-  res.status(200).json({ identidad: await aprobarIdentidad(id, idDelUsuario(req)) });
+  res.status(200).json({ identidad: await aprobarIdentidad(id, idDelUsuario(req), revision) });
 }
 
 export async function rechazar(req: Request, res: Response) {
   const { id } = esquemaIdIdentidad.parse(req.params);
-  const { motivo } = esquemaRechazo.parse(req.body);
+  const { motivo, revision } = esquemaRechazo.parse(req.body);
 
-  res.status(200).json({ identidad: await rechazarIdentidad(id, idDelUsuario(req), motivo) });
+  res.status(200).json({ identidad: await rechazarIdentidad(id, idDelUsuario(req), motivo, revision) });
 }

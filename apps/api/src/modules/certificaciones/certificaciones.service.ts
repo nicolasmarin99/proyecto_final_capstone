@@ -1,3 +1,5 @@
+import { RevisionIncompleta, type RevisionCampo } from "../lectura-documentos/lectura.repository.js";
+import { iniciarLectura } from "../lectura-documentos/lectura.service.js";
 import { randomUUID } from "node:crypto";
 import { CODIGO_CERTIFICACION_OTRA, CODIGO_CURSO, MAXIMO_CERTIFICACIONES_POR_DIA } from "@localcl/shared";
 import type { EstadoCredencial } from "../../generated/prisma/client.js";
@@ -147,6 +149,9 @@ export async function enviar(usuarioId: string, datos: DatosCertificacion, conte
       await almacenamiento.eliminar(id);
       throw errorDeEnvio(resultado);
     }
+    // Lectura automática, en segundo plano: no espera al lector ni puede
+    // hacer fallar el envío. Solo precarga la revisión; no aprueba nada.
+    await iniciarLectura(id, tipo.codigo);
     return vista(certificacion);
   } catch (error) {
     // Fallo de la base: el archivo no puede quedar sin certificación que lo explique.
@@ -213,6 +218,15 @@ async function resolver(id: string, decision: DecisionCertificacion) {
     certificacion = await resolverCertificacion(id, decision, () => almacenamiento.eliminar(id));
   } catch (error) {
     if (error instanceof ErrorHttp) throw error;
+    if (error instanceof RevisionIncompleta) {
+      // Hay una lectura automática y no se revisó campo por campo: no se aprueba en bloque.
+      throw new ErrorHttp(
+        400,
+        "REVISION_INCOMPLETA",
+        "Confirma o corrige cada campo de la lectura automática antes de aprobar.",
+        error.faltan.map((campo) => ({ campo, mensaje: "Falta confirmar o corregir este campo." })),
+      );
+    }
     // Solo el id: ni la respuesta del proveedor ni URLs.
     console.error("No se pudo resolver la certificación", { id, estado: decision.estado }, error instanceof Error ? error.name : "");
     throw new ErrorHttp(
@@ -230,10 +244,15 @@ async function resolver(id: string, decision: DecisionCertificacion) {
   return vista(certificacion);
 }
 
-export async function aprobar(id: string, administradorId: string) {
-  return resolver(id, { estado: "VERIFICADA", administradorId });
+/**
+ * Aprobar es SIEMPRE una acción de un administrador autenticado: solo se
+ * llama desde PATCH /admin/certificaciones/:id/aprobar. La lectura
+ * automática no la llama ni puede: solo sugiere campos.
+ */
+export async function aprobar(id: string, administradorId: string, revision?: readonly RevisionCampo[]) {
+  return resolver(id, { estado: "VERIFICADA", administradorId, revision });
 }
 
-export async function rechazar(id: string, administradorId: string, motivo: string) {
-  return resolver(id, { estado: "RECHAZADA", administradorId, motivo });
+export async function rechazar(id: string, administradorId: string, motivo: string, revision?: readonly RevisionCampo[]) {
+  return resolver(id, { estado: "RECHAZADA", administradorId, motivo, revision });
 }

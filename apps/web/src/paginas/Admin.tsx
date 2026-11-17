@@ -37,7 +37,7 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
   }, [cliente]);
 
   return (
-    <Pagina titulo="Panel de administración" ancho="amplio">
+    <Pagina titulo="Panel de administración" ancho="panel">
       <div className="mt-6">
         {error && (
           <p

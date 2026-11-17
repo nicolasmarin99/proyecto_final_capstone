@@ -1,3 +1,4 @@
+import { rutasExtraccionesAdmin } from "./modules/lectura-documentos/lectura.routes.js";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -50,6 +51,8 @@ app.use("/prestadores/yo/certificaciones", rutasCertificacionesPrestador);
 app.use("/prestadores/yo/valoraciones", rutasValoracionesRecibidas);
 app.use("/valoraciones", rutasValoraciones);
 app.use("/admin/certificaciones", rutasCertificacionesAdmin);
+// Lo que la lectura automática leyó de un documento: solo administradores.
+app.use("/admin/extracciones", rutasExtraccionesAdmin);
 app.use("/certificaciones", rutasCatalogoCertificaciones);
 app.use("/admin", rutasAdmin);
 app.use("/servicios", rutasServicios);

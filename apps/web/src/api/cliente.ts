@@ -501,6 +501,67 @@ export interface ResumenAdmin {
   porRol: Record<string, number>;
 }
 
+/** Un campo que la lectura automática leyó del documento. */
+export interface CampoLeido {
+  campo: "nombre" | "rut" | "titulo" | "institucion" | "fechaEmision" | "fechaVencimiento";
+  valor: string;
+  /** 0 a 1, declarada por el lector. */
+  confianza: number;
+  /** Bajo el umbral configurado: se destaca. */
+  confianzaBaja: boolean;
+}
+
+/** Diferencia entre lo leído del documento y lo declarado en la cuenta. No bloquea: se muestra antes de decidir. */
+export interface AlertaLectura {
+  campo: "rut" | "nombre";
+  mensaje: string;
+  declarado: string;
+  leido: string;
+}
+
+/** Lo que la lectura automática leyó de un documento. Solo sugiere: decide el administrador. */
+export interface ExtraccionDocumento {
+  tipo: "CEDULA" | "CERTIFICADO" | "CURSO";
+  estado: "PENDIENTE" | "EXTRAIDA" | "FALLIDA";
+  modelo: string | null;
+  campos: CampoLeido[];
+  alertas: AlertaLectura[];
+}
+
+/** Lo que hizo el administrador con cada campo leído. */
+export type RevisionLectura = { campo: CampoLeido["campo"]; resultado: "ACEPTADO" | "CORREGIDO" }[];
+
+const CAMPOS_LEIDOS: readonly string[] = ["nombre", "rut", "titulo", "institucion", "fechaEmision", "fechaVencimiento"];
+
+function esCampoLeido(valor: unknown): valor is CampoLeido["campo"] {
+  return typeof valor === "string" && CAMPOS_LEIDOS.includes(valor);
+}
+
+function leerExtraccion(valor: unknown): ExtraccionDocumento | null {
+  if (!esObjeto(valor)) return null;
+  const { tipo, estado } = valor;
+  if ((tipo !== "CEDULA" && tipo !== "CERTIFICADO" && tipo !== "CURSO") || (estado !== "PENDIENTE" && estado !== "EXTRAIDA" && estado !== "FALLIDA")) return null;
+  return {
+    tipo,
+    estado,
+    modelo: typeof valor.modelo === "string" ? valor.modelo : null,
+    campos: leerLista(valor.campos, (campo): CampoLeido | null =>
+      esObjeto(campo) && esCampoLeido(campo.campo) && typeof campo.valor === "string" && typeof campo.confianza === "number"
+        ? { campo: campo.campo, valor: campo.valor, confianza: campo.confianza, confianzaBaja: campo.confianzaBaja === true }
+        : null,
+    ),
+    alertas: leerLista(valor.alertas, (alerta): AlertaLectura | null =>
+      esObjeto(alerta) &&
+      (alerta.campo === "rut" || alerta.campo === "nombre") &&
+      typeof alerta.mensaje === "string" &&
+      typeof alerta.declarado === "string" &&
+      typeof alerta.leido === "string"
+        ? { campo: alerta.campo, mensaje: alerta.mensaje, declarado: alerta.declarado, leido: alerta.leido }
+        : null,
+    ),
+  };
+}
+
 /** Cuánto tiene por revisar un prestador, de cada tipo. */
 export interface ConteoPendientes {
   identidad: number;
@@ -1595,16 +1656,31 @@ export function crearClienteApi() {
       return { url: cuerpo.url, expiraEn: cuerpo.expiraEn };
     },
 
-    async aprobarIdentidad(id: string): Promise<void> {
-      await peticion(`/admin/identidades/${encodeURIComponent(id)}/aprobar`, { metodo: "PATCH", autenticada: true });
-    },
-
-    async rechazarIdentidad(id: string, motivo: string): Promise<void> {
-      await peticion(`/admin/identidades/${encodeURIComponent(id)}/rechazar`, {
+    /** `revision`: qué hizo con cada campo de la lectura automática (sin ella, el flujo manual de siempre). */
+    async aprobarIdentidad(id: string, revision?: RevisionLectura): Promise<void> {
+      await peticion(`/admin/identidades/${encodeURIComponent(id)}/aprobar`, {
         metodo: "PATCH",
-        cuerpo: { motivo },
+        ...(revision ? { cuerpo: { revision } } : {}),
         autenticada: true,
       });
+    },
+
+    async rechazarIdentidad(id: string, motivo: string, revision?: RevisionLectura): Promise<void> {
+      await peticion(`/admin/identidades/${encodeURIComponent(id)}/rechazar`, {
+        metodo: "PATCH",
+        cuerpo: revision ? { motivo, revision } : { motivo },
+        autenticada: true,
+      });
+    },
+
+    /**
+     * Lo que la lectura automática leyó del documento de esa solicitud, o
+     * null si no hay lectura (apagada o anterior a esta función).
+     */
+    async obtenerExtraccion(credencialId: string): Promise<ExtraccionDocumento | null> {
+      const cuerpo = await peticion(`/admin/extracciones/${encodeURIComponent(credencialId)}`, { autenticada: true });
+      if (!esObjeto(cuerpo)) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return leerExtraccion(cuerpo.extraccion);
     },
 
     /** Catálogo del formulario. Público. */
@@ -1671,14 +1747,18 @@ export function crearClienteApi() {
       return { url: cuerpo.url, expiraEn: cuerpo.expiraEn };
     },
 
-    async aprobarCertificacion(id: string): Promise<void> {
-      await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/aprobar`, { metodo: "PATCH", autenticada: true });
+    async aprobarCertificacion(id: string, revision?: RevisionLectura): Promise<void> {
+      await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/aprobar`, {
+        metodo: "PATCH",
+        ...(revision ? { cuerpo: { revision } } : {}),
+        autenticada: true,
+      });
     },
 
-    async rechazarCertificacion(id: string, motivo: string): Promise<void> {
+    async rechazarCertificacion(id: string, motivo: string, revision?: RevisionLectura): Promise<void> {
       await peticion(`/admin/certificaciones/${encodeURIComponent(id)}/rechazar`, {
         metodo: "PATCH",
-        cuerpo: { motivo },
+        cuerpo: revision ? { motivo, revision } : { motivo },
         autenticada: true,
       });
     },

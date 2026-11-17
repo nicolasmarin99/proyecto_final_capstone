@@ -85,6 +85,10 @@ jobs:
       # deriva los vectores de un hash del texto, sin red. tests/setup.ts lo
       # fuerza igual; acá se deja explícito y sin clave.
       EMBEDDINGS_PROVEEDOR: determinista
+      # Tampoco se envía ningún documento a Google: la lectura queda apagada
+      # (tests/setup.ts lo fuerza; solo su propia prueba usa el lector
+      # determinista, sin red).
+      LECTURA_PROVEEDOR: ninguno
 
     steps:
       - name: Descargar código

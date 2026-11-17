@@ -496,8 +496,9 @@ model Credencial {
   creadoEn               DateTime            @default(now()) @map("creado_en")
   actualizadoEn          DateTime            @updatedAt @map("actualizado_en")
 
-  eventos EventoCredencial[]
-  accesos AccesoDocumento[]
+  eventos    EventoCredencial[]
+  extraccion ExtraccionDocumento?
+  accesos    AccesoDocumento[]
 
   @@index([prestadorId, estado])
   @@index([tipoId])
@@ -543,6 +544,79 @@ model AccesoDocumento {
   @@index([credencialId, creadoEn])
   @@index([administradorId, creadoEn])
   @@map("accesos_documento")
+}
+
+/// Qué documento lee la lectura automática; fija qué campos se extraen.
+enum TipoDocumentoLectura {
+  CEDULA
+  CERTIFICADO
+  CURSO
+
+  @@map("tipo_documento_lectura")
+}
+
+enum EstadoExtraccion {
+  PENDIENTE
+  EXTRAIDA
+  FALLIDA
+
+  @@map("estado_extraccion")
+}
+
+enum ResultadoRevisionCampo {
+  ACEPTADO
+  CORREGIDO
+
+  @@map("resultado_revision_campo")
+}
+
+/// Lo que la lectura automática leyó de un documento, para precargar la
+/// revisión del administrador. NO decide nada: el estado de la credencial lo
+/// cambia solo un administrador.
+///
+/// Vive mientras vive el documento: se borra en la misma transacción en que
+/// se resuelve la solicitud y se elimina el archivo (y por CASCADE si se
+/// borrara la credencial). De una cédula solo guarda nombre y RUT: lo
+/// impone un CHECK (extracciones_documento_cedula_minima).
+model ExtraccionDocumento {
+  id           String               @id @default(uuid())
+  credencialId String               @unique @map("credencial_id")
+  credencial   Credencial           @relation(fields: [credencialId], references: [id], onDelete: Cascade)
+  tipo         TipoDocumentoLectura
+  estado       EstadoExtraccion     @default(PENDIENTE)
+  /// [{ campo, valor, confianza }]. Nulo mientras no esté EXTRAIDA.
+  campos       Json?
+  modelo       String?
+  intentos     Int                  @default(0)
+  /// Motivo corto del último fallo; nunca contenido del documento.
+  error        String?
+  creadoEn     DateTime             @default(now()) @map("creado_en")
+  extraidaEn   DateTime?            @map("extraida_en")
+
+  @@index([estado, creadoEn])
+  @@map("extracciones_documento")
+}
+
+/// Precisión de la lectura automática: por cada campo que revisó un
+/// administrador, si lo aceptó tal cual o lo corrigió. Sin valores y sin
+/// vínculo con la credencial ni con la persona: se conserva después de
+/// borrar el documento porque no contiene datos personales. Solo admite
+/// inserciones (trigger rechazar_modificacion_bitacora).
+model RevisionExtraccion {
+  id            String                 @id @default(uuid())
+  /// Agrupa los campos de un mismo documento. Un identificador al azar.
+  lote          String
+  tipoDocumento TipoDocumentoLectura   @map("tipo_documento")
+  campo         String
+  confianza     Float
+  resultado     ResultadoRevisionCampo
+  modelo        String
+  /// Cómo terminó la solicitud: VERIFICADA o RECHAZADA.
+  decision      EstadoCredencial
+  creadoEn      DateTime               @default(now()) @map("creado_en")
+
+  @@index([tipoDocumento, campo])
+  @@map("revisiones_extraccion")
 }
 
 // ─── Reputación ──────────────────────────────────────────────────────────

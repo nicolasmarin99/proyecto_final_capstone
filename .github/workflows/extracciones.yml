@@ -1,0 +1,86 @@
+name: Lectura de documentos pendientes
+
+# Lee los documentos (cédulas, certificados, cursos) cuya lectura automática
+# quedó pendiente o falló al subirlos. Solo PRECARGA campos para el
+# administrador: no aprueba ni rechaza nada.
+#
+# Corre cada noche y también se puede disparar a mano desde la pestaña
+# Actions («Run workflow»).
+
+on:
+  schedule:
+    # 03:00 UTC = medianoche en Chile continental (en horario de verano, UTC-3).
+    # GitHub puede atrasar unos minutos las corridas programadas.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+# Si una corrida sigue en curso cuando empieza la siguiente, la nueva espera:
+# dos a la vez leerían los mismos documentos.
+concurrency:
+  group: extracciones
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  procesar:
+    name: Procesar extracciones pendientes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Todo lo sensible viene de los Secrets del repositorio (Settings →
+    # Secrets and variables → Actions). NUNCA se escribe un valor aquí.
+    env:
+      NODE_ENV: production
+      # La base de producción (Neon).
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # La lectura usa Gemini; la búsqueda no participa de este script.
+      LECTURA_PROVEEDOR: gemini
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Los documentos están en Cloudinary, privados: el script los descarga
+      # con una URL firmada, así que necesita las credenciales de la cuenta.
+      ALMACENAMIENTO_TRANSPORTE: produccion
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar paquete compartido
+        run: npm run build --workspace=@localcl/shared
+
+      - name: Generar cliente de Prisma
+        run: npm run prisma:generate --workspace=@localcl/api
+
+      # Falla con un mensaje claro si falta un secreto, en vez de un error
+      # críptico más adelante. Solo dice CUÁL falta: nunca imprime un valor.
+      - name: Comprobar que los secretos están configurados
+        run: |
+          faltan=""
+          for nombre in DATABASE_URL GEMINI_API_KEY CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET; do
+            if [ -z "${!nombre}" ]; then faltan="$faltan $nombre"; fi
+          done
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos en el repositorio:$faltan"
+            exit 1
+          fi
+
+      - name: Leer documentos pendientes
+        run: |
+          # env.ts exige un JWT_SECRET para arrancar, pero este script no firma
+          # ni verifica tokens: se genera uno al azar que muere con el job, en
+          # vez de copiar el secreto real de la API a otro lugar.
+          export JWT_SECRET="$(openssl rand -base64 48)"
+          npm run extracciones:procesar --workspace=@localcl/api

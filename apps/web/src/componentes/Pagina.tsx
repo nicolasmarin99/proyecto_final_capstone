@@ -16,12 +16,15 @@ export function Pagina({
 }: {
   titulo: string;
   children: ReactNode;
-  /** "amplio" para contenido que no cabe en una columna angosta, como la cola de revisión. */
-  ancho?: "normal" | "amplio";
+  /**
+   * "amplio" para contenido que no cabe en una columna angosta; "panel" para
+   * el de administración, con el documento y sus datos lado a lado.
+   */
+  ancho?: "normal" | "amplio" | "panel";
 }) {
   return (
     <main className="flex flex-1 items-center justify-center bg-niebla bg-[radial-gradient(var(--color-malla)_1.4px,transparent_1.6px)] bg-size-[28px_28px] px-4 py-10 sm:p-6">
-      <div className={`w-full ${ancho === "amplio" ? "max-w-3xl" : "max-w-md"} motion-safe:animate-aparecer rounded-grande border border-borde bg-blanco p-6 shadow-tarjeta sm:p-8`}>
+      <div className={`w-full ${ancho === "panel" ? "max-w-6xl" : ancho === "amplio" ? "max-w-3xl" : "max-w-md"} motion-safe:animate-aparecer rounded-grande border border-borde bg-blanco p-6 shadow-tarjeta sm:p-8`}>
         <h1 className="font-titulos text-titulo font-bold tracking-[-0.5px] text-noche">{titulo}</h1>
         {children}
       </div>

@@ -21,11 +21,21 @@ export interface ArchivoAGuardar {
  *   del archivo), nunca el original, y que deja de servir pasada `duracionSegundos`.
  * - eliminar() es idempotente: borrar algo que ya no está no es un error,
  *   para poder reintentar sin miedo.
+ * - leer() entrega el contenido AL SERVIDOR (nunca a un cliente): lo usa la
+ *   lectura automática para precargar la revisión. Lanza
+ *   DocumentoNoEncontrado si el archivo ya no está.
  */
 export interface AlmacenamientoDocumentos {
   guardar(archivo: ArchivoAGuardar): Promise<void>;
   urlFirmada(id: string, duracionSegundos: number): Promise<string>;
+  leer(id: string): Promise<DocumentoLeido>;
   eliminar(id: string): Promise<void>;
+}
+
+/** El contenido de un documento y su tipo MIME real. */
+export interface DocumentoLeido {
+  contenido: Buffer;
+  tipoMime: "image/jpeg" | "image/png" | "application/pdf";
 }
 
 /** El documento pedido ya no existe (se eliminó tras la revisión o nunca se guardó). */

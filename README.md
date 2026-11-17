@@ -226,6 +226,35 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/localcl_test" npx pr
 
 > El archivo `.env` está excluido del repositorio mediante `.gitignore`. Nunca subas credenciales reales a GitHub.
 
+#### Lectura automática de documentos (Gemini)
+
+La revisión de identidades, certificaciones y cursos puede precargar los
+datos del documento con Gemini (`gemini-3.5-flash-lite`). **Nunca aprueba
+nada:** el administrador confirma o corrige cada campo y decide. Se configura
+con estas variables:
+
+```env
+LECTURA_PROVEEDOR="gemini"        # "ninguno" la apaga (valor por defecto)
+LECTURA_MODELO="gemini-3.5-flash-lite"
+LECTURA_UMBRAL_CONFIANZA=0.7      # bajo esto, el campo se destaca en el panel
+GEMINI_API_KEY="..."              # solo en el panel del servicio, nunca aquí
+```
+
+Los documentos que no se alcanzaron a leer al subirlos los procesa cada noche
+(03:00 UTC) el workflow `.github/workflows/extracciones.yml`, que lee
+`DATABASE_URL`, `GEMINI_API_KEY` y las tres credenciales de Cloudinary desde
+los Secrets del repositorio. A mano: `npm run extracciones:procesar --workspace=@localcl/api`.
+
+> **Decisión de privacidad registrada (17-11-2026).** La lectura usa una clave
+> de Gemini en el **nivel gratuito**. En ese nivel, Google puede usar lo que se
+> le envía —imágenes de cédulas, certificados y cursos de los prestadores, con
+> su nombre y RUT— para mejorar sus productos, y personas pueden revisarlo
+> ([condiciones](https://ai.google.dev/gemini-api/terms)). Con facturación
+> activa, Google no lo hace. El responsable del proyecto eligió el nivel
+> gratuito conociendo este riesgo. Para revertirlo sin cambiar código: activar
+> la facturación del proyecto de Google Cloud (la misma clave pasa a ser de
+> pago) o poner `LECTURA_PROVEEDOR="ninguno"`.
+
 ### 4. Preparar el esquema y los datos de prueba
 
 ```bash
