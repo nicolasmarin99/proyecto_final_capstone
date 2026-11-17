@@ -37,10 +37,12 @@ interface Escenario {
   estadoIdentidad?: ReturnType<typeof identidad> | null;
   respuestaSubida?: Response;
   cola?: { id: string; nombre: string; rut: string }[];
+  /** Respuesta de GET /admin/extracciones/:id (la lectura automática). */
+  extraccion?: unknown;
 }
 
 /** Simula la API respondiendo según método y ruta. */
-function simularApi({ usuario = prestador, estadoIdentidad = null, respuestaSubida, cola = [] }: Escenario = {}) {
+function simularApi({ usuario = prestador, estadoIdentidad = null, respuestaSubida, cola = [], extraccion = null }: Escenario = {}) {
   // Como la API real: una solicitud aprobada o rechazada deja de estar en la cola.
   const resueltas = new Set<string>();
 
@@ -81,6 +83,7 @@ function simularApi({ usuario = prestador, estadoIdentidad = null, respuestaSubi
         total: cola.filter((fila) => !resueltas.has(fila.id)).length,
       });
     }
+    if (url.startsWith("/api/admin/extracciones/")) return json({ extraccion });
     if (/\/api\/admin\/identidades\/[^/]+\/documento$/.test(url)) {
       return json({ url: "https://api.cloudinary.com/firmada/x.jpg", expiraEn: "2026-10-10T12:05:00.000Z" });
     }
@@ -300,5 +303,112 @@ describe("Cola de revisión del administrador", () => {
 
     expect(await screen.findByText("No hay nada pendiente de revisión.")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Prestadores con pendientes" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Lectura automática en la revisión de identidad", () => {
+  const COLA = [{ id: "c1", nombre: "Pedro Soto", rut: "12345678-5" }];
+  const LEIDA = {
+    tipo: "CEDULA",
+    estado: "EXTRAIDA",
+    modelo: "gemini-3.5-flash-lite",
+    campos: [
+      { campo: "nombre", valor: "SOTO PÉREZ PEDRO", confianza: 0.95, confianzaBaja: false },
+      { campo: "rut", valor: "9.876.543-3", confianza: 0.41, confianzaBaja: true },
+    ],
+    alertas: [{ campo: "rut", mensaje: "El RUT leído del documento NO coincide con el RUT de la cuenta.", declarado: "12345678-5", leido: "9.876.543-3" }],
+  };
+
+  async function abrirSolicitud(extraccion: unknown) {
+    simularApi({ usuario: admin, cola: COLA, extraccion });
+    renderizar("/admin");
+    await abrirPrestador(/pedro soto/i);
+    return screen.findByRole("article", { name: /pedro soto/i });
+  }
+
+  it("muestra cada dato leído como sugerencia automática, destaca la confianza baja y la alerta antes de decidir", async () => {
+    const solicitud = await abrirSolicitud(LEIDA);
+
+    const alerta = await within(solicitud).findByRole("alert");
+    expect(alerta).toHaveTextContent("El RUT leído del documento NO coincide con el RUT de la cuenta.");
+    expect(alerta).toHaveTextContent("9.876.543-3");
+    const campos = within(solicitud).getByRole("list", { name: "Campos leídos" });
+    expect(within(campos).getAllByText("Sugerencia automática")).toHaveLength(2);
+    expect(within(campos).getByText(/confianza baja \(41 %\)/i)).toBeInTheDocument();
+    expect(within(campos).getByLabelText("RUT")).toHaveValue("9.876.543-3");
+    // La alerta va antes de los botones de decisión.
+    const aprobar = within(solicitud).getByRole("button", { name: "Aprobar" });
+    expect(alerta.compareDocumentPosition(aprobar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("no hay «aceptar todo»: aprobar está deshabilitado hasta confirmar o corregir cada campo, uno por uno", async () => {
+    const solicitud = await abrirSolicitud(LEIDA);
+    const campos = await within(solicitud).findByRole("list", { name: "Campos leídos" });
+
+    expect(within(solicitud).queryByRole("button", { name: /aceptar todo|confirmar todo/i })).not.toBeInTheDocument();
+    // La solicitud se entera de la lectura un render después de mostrarla.
+    await waitFor(() => expect(within(solicitud).getByRole("button", { name: "Aprobar" })).toBeDisabled());
+    expect(within(solicitud).getByText(/2 pendientes/)).toBeInTheDocument();
+
+    const [confirmarNombre] = within(campos).getAllByRole("button", { name: "Confirmar: coincide con el documento" });
+    fireEvent.click(confirmarNombre as HTMLElement);
+
+    expect(within(campos).getByText("Confirmado por ti")).toBeInTheDocument();
+    expect(within(campos).getAllByText("Sugerencia automática")).toHaveLength(1);
+    expect(within(solicitud).getByRole("button", { name: "Aprobar" })).toBeDisabled();
+    expect(await within(solicitud).findByText(/\(1 pendiente\)/)).toBeInTheDocument();
+  });
+
+  it("corregir un campo lo marca como corregido, y al aprobar se envía qué se aceptó y qué se corrigió (sin los valores)", async () => {
+    const solicitud = await abrirSolicitud(LEIDA);
+    const campos = await within(solicitud).findByRole("list", { name: "Campos leídos" });
+
+    fireEvent.click(within(campos).getAllByRole("button", { name: "Confirmar: coincide con el documento" })[0] as HTMLElement);
+    fireEvent.change(within(campos).getByLabelText("RUT"), { target: { value: "12.345.678-5" } });
+    fireEvent.click(within(campos).getByRole("button", { name: "Guardar corrección" }));
+    expect(within(campos).getByText("Corregido por ti")).toBeInTheDocument();
+    expect(within(campos).queryByText("Sugerencia automática")).not.toBeInTheDocument();
+
+    const aprobar = within(solicitud).getByRole("button", { name: "Aprobar" });
+    expect(aprobar).toBeEnabled();
+    fireEvent.click(aprobar);
+
+    await waitFor(() => expect(llamadas("PATCH", /\/c1\/aprobar$/)).toHaveLength(1));
+    const cuerpo = JSON.parse(String(llamadas("PATCH", /aprobar$/)[0]?.[1]?.body));
+    expect(cuerpo).toEqual({
+      revision: [
+        { campo: "nombre", resultado: "ACEPTADO" },
+        { campo: "rut", resultado: "CORREGIDO" },
+      ],
+    });
+    expect(JSON.stringify(cuerpo)).not.toContain("12.345.678-5");
+  });
+
+  it("«Volver a revisar» devuelve el campo a sugerencia y vuelve a bloquear la aprobación", async () => {
+    const solicitud = await abrirSolicitud({ ...LEIDA, campos: [LEIDA.campos[0]], alertas: [] });
+    const campos = await within(solicitud).findByRole("list", { name: "Campos leídos" });
+
+    fireEvent.click(within(campos).getByRole("button", { name: "Confirmar: coincide con el documento" }));
+    expect(within(solicitud).getByRole("button", { name: "Aprobar" })).toBeEnabled();
+    fireEvent.click(within(campos).getByRole("button", { name: "Volver a revisar" }));
+
+    expect(within(campos).getByText("Sugerencia automática")).toBeInTheDocument();
+    expect(within(solicitud).getByRole("button", { name: "Aprobar" })).toBeDisabled();
+  });
+
+  it.each([
+    ["falló", { tipo: "CEDULA", estado: "FALLIDA", modelo: null, campos: [], alertas: [] }, /no pudo leer este documento/i],
+    ["está pendiente", { tipo: "CEDULA", estado: "PENDIENTE", modelo: null, campos: [], alertas: [] }, /todavía está en curso/i],
+    ["no existe", null, /sin lectura automática/i],
+  ])("si la lectura %s, el formulario manual funciona igual: aprobar habilitado y sin revisión", async (_caso, extraccion, texto) => {
+    const solicitud = await abrirSolicitud(extraccion);
+
+    expect(await within(solicitud).findByText(texto)).toBeInTheDocument();
+    const aprobar = within(solicitud).getByRole("button", { name: "Aprobar" });
+    expect(aprobar).toBeEnabled();
+    fireEvent.click(aprobar);
+
+    await waitFor(() => expect(llamadas("PATCH", /\/c1\/aprobar$/)).toHaveLength(1));
+    expect(llamadas("PATCH", /aprobar$/)[0]?.[1]?.body).toBeUndefined();
   });
 });

@@ -1,3 +1,4 @@
+import { esquemaRevision } from "../lectura-documentos/lectura.schema.js";
 import { z } from "zod";
 import { EstadoCredencial } from "../../generated/prisma/client.js";
 
@@ -36,4 +37,8 @@ export const esquemaRechazo = z.object({
     .trim()
     .min(10, "Explica el motivo en al menos 10 caracteres, para que el prestador sepa qué corregir.")
     .max(500, "El motivo no puede superar los 500 caracteres."),
+  revision: esquemaRevision,
 });
+
+/** PATCH /admin/identidades/:id/aprobar — { revision? }: qué hizo con cada campo de la lectura automática. */
+export const esquemaAprobacion = z.object({ revision: esquemaRevision });

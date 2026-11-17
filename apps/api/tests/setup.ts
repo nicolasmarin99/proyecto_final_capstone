@@ -15,6 +15,11 @@ process.env.ALMACENAMIENTO_PUBLICO_TRANSPORTE = "memoria";
 // proveedor determinista (un hash del texto, sin red), diga lo que diga
 // .env.test, y sin clave. Las pruebas del adaptador de Gemini simulan fetch.
 process.env.EMBEDDINGS_PROVEEDOR = "determinista";
+// Lectura de documentos: APAGADA en todas las pruebas, como un despliegue sin
+// configurar, y nunca hacia Google. Así cada prueba de identidad y de
+// certificaciones prueba el flujo manual de siempre. Solo la prueba de la
+// lectura (lectura.documentos.test.ts) enciende el lector determinista, sin red.
+process.env.LECTURA_PROVEEDOR = "ninguno";
 process.env.GEMINI_API_KEY = "";
 
 // Segunda barrera: si algo intentara salir igual hacia Google, falla en el

@@ -15,7 +15,9 @@
     "seed:maestros": "tsx prisma/seed-maestros.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
     "embeddings:regenerar": "tsx src/scripts/regenerarEmbeddings.ts",
-    "embeddings:regenerar:dist": "node dist/scripts/regenerarEmbeddings.js"
+    "embeddings:regenerar:dist": "node dist/scripts/regenerarEmbeddings.js",
+    "extracciones:procesar": "tsx src/scripts/procesarExtracciones.ts",
+    "extracciones:procesar:dist": "node dist/scripts/procesarExtracciones.js"
   },
   "keywords": [],
   "author": "",

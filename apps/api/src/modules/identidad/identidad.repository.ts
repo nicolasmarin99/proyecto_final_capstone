@@ -1,3 +1,4 @@
+import { cerrarExtraccion, type RevisionCampo } from "../lectura-documentos/lectura.repository.js";
 import { prisma } from "../../db.js";
 import type { EstadoCredencial } from "../../generated/prisma/client.js";
 
@@ -152,9 +153,13 @@ export async function registrarAccesoDocumento(credencialId: string, administrad
   await prisma.accesoDocumento.create({ data: { credencialId, administradorId } });
 }
 
-export type DecisionIdentidad =
+export type DecisionIdentidad = (
   | { estado: "VERIFICADA"; administradorId: string }
-  | { estado: "RECHAZADA"; administradorId: string; motivo: string };
+  | { estado: "RECHAZADA"; administradorId: string; motivo: string }
+) & {
+  /** Lo que el administrador hizo con cada campo de la lectura automática, si la había. */
+  revision?: readonly RevisionCampo[];
+};
 
 /**
  * Aprueba o rechaza una identidad PENDIENTE, en una sola transacción:
@@ -210,6 +215,11 @@ export async function resolverIdentidad(
     if (decision.estado === "VERIFICADA") {
       await tx.usuario.update({ where: { id: credencial.prestador.usuarioId }, data: { rutVerificado: true } });
     }
+
+    // La extracción de la cédula se borra en esta misma transacción, junto
+    // con el documento: el RUT leído no queda guardado en otra tabla. Antes
+    // registra, sin valores, qué campos aceptó o corrigió el administrador.
+    await cerrarExtraccion(tx, id, decision.estado, decision.revision);
 
     await antesDeConfirmar();
 

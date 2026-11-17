@@ -2,10 +2,11 @@ import {
   DocumentoNoEncontrado,
   type AlmacenamientoDocumentos,
   type ArchivoAGuardar,
+  type DocumentoLeido,
   type TipoDocumento,
 } from "./almacenamiento.tipos.js";
 
-const TIPO_MIME: Record<TipoDocumento, string> = {
+const TIPO_MIME: Record<TipoDocumento, DocumentoLeido["tipoMime"]> = {
   jpg: "image/jpeg",
   png: "image/png",
   pdf: "application/pdf",
@@ -38,6 +39,16 @@ export class AlmacenamientoEnMemoria implements AlmacenamientoDocumentos {
     }
 
     return `data:${TIPO_MIME[archivo.tipo]};base64,${archivo.contenido.toString("base64")}`;
+  }
+
+  async leer(id: string): Promise<DocumentoLeido> {
+    const archivo = this.archivos.get(id);
+
+    if (!archivo) {
+      throw new DocumentoNoEncontrado(id);
+    }
+
+    return { contenido: Buffer.from(archivo.contenido), tipoMime: TIPO_MIME[archivo.tipo] };
   }
 
   async eliminar(id: string): Promise<void> {

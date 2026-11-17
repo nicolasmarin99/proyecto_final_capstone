@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { EstadoCredencial } from "../../generated/prisma/client.js";
 import { ErrorHttp } from "../../shared/errores.js";
 import { DocumentoNoEncontrado, obtenerAlmacenamiento } from "../almacenamiento/index.js";
+import { RevisionIncompleta, type RevisionCampo } from "../lectura-documentos/lectura.repository.js";
+import { iniciarLectura } from "../lectura-documentos/lectura.service.js";
 import { DocumentoMalFormado, detectarTipo, quitarMetadatos } from "./identidad.documento.js";
 import {
   buscarIdentidad,
@@ -21,6 +23,9 @@ import {
 /** Cargas permitidas por cuenta en la ventana móvil de 24 horas. */
 export const MAXIMO_CARGAS_24H = 3;
 const VENTANA_MS = 24 * 60 * 60 * 1000;
+
+/** El tipo de credencial de la cédula (para saber qué documento lee la lectura automática). */
+const CODIGO_TIPO_IDENTIDAD = "IDENTIDAD";
 
 /** Vigencia de la URL firmada que ve el administrador. */
 const DURACION_URL_SEGUNDOS = 5 * 60;
@@ -132,6 +137,10 @@ export async function cargarDocumento(usuarioId: string, contenido: Buffer) {
       throw errorDeCarga(resultado);
     }
 
+    // Lectura automática, en segundo plano: no espera al lector ni puede
+    // hacer fallar la carga. Solo precarga la revisión; no aprueba nada.
+    await iniciarLectura(id, CODIGO_TIPO_IDENTIDAD);
+
     return credencial;
   } catch (error) {
     if (!(error instanceof ErrorHttp)) {
@@ -239,6 +248,15 @@ async function resolver(id: string, decision: DecisionIdentidad) {
     credencial = await resolverIdentidad(id, decision, () => almacenamiento.eliminar(id));
   } catch (error) {
     if (error instanceof ErrorHttp) throw error;
+    if (error instanceof RevisionIncompleta) {
+      // Hay una lectura automática y no se revisó campo por campo: no se aprueba en bloque.
+      throw new ErrorHttp(
+        400,
+        "REVISION_INCOMPLETA",
+        "Confirma o corrige cada campo de la lectura automática antes de aprobar.",
+        error.faltan.map((campo) => ({ campo, mensaje: "Falta confirmar o corregir este campo." })),
+      );
+    }
     // Solo el id: ni la respuesta del proveedor ni URLs.
     console.error("No se pudo resolver la identidad", { id, estado: decision.estado }, error);
     throw new ErrorHttp(
@@ -263,10 +281,15 @@ async function resolver(id: string, decision: DecisionIdentidad) {
   };
 }
 
-export async function aprobarIdentidad(id: string, administradorId: string) {
-  return resolver(id, { estado: "VERIFICADA", administradorId });
+/**
+ * Aprobar es SIEMPRE una acción de un administrador autenticado: esta
+ * función solo se llama desde PATCH /admin/identidades/:id/aprobar. La
+ * lectura automática no la llama ni puede: solo sugiere campos.
+ */
+export async function aprobarIdentidad(id: string, administradorId: string, revision?: readonly RevisionCampo[]) {
+  return resolver(id, { estado: "VERIFICADA", administradorId, revision });
 }
 
-export async function rechazarIdentidad(id: string, administradorId: string, motivo: string) {
-  return resolver(id, { estado: "RECHAZADA", administradorId, motivo });
+export async function rechazarIdentidad(id: string, administradorId: string, motivo: string, revision?: readonly RevisionCampo[]) {
+  return resolver(id, { estado: "RECHAZADA", administradorId, motivo, revision });
 }

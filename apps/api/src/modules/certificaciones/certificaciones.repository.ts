@@ -1,3 +1,4 @@
+import { cerrarExtraccion, type RevisionCampo } from "../lectura-documentos/lectura.repository.js";
 import { prisma } from "../../db.js";
 import { Prisma, type EstadoCredencial } from "../../generated/prisma/client.js";
 
@@ -154,9 +155,13 @@ export async function registrarAccesoDocumento(credencialId: string, administrad
   await prisma.accesoDocumento.create({ data: { credencialId, administradorId } });
 }
 
-export type DecisionCertificacion =
+export type DecisionCertificacion = (
   | { estado: "VERIFICADA"; administradorId: string }
-  | { estado: "RECHAZADA"; administradorId: string; motivo: string };
+  | { estado: "RECHAZADA"; administradorId: string; motivo: string }
+) & {
+  /** Lo que el administrador hizo con cada campo de la lectura automática, si la había. */
+  revision?: readonly RevisionCampo[];
+};
 
 /**
  * Aprueba o rechaza una certificación PENDIENTE, todo o nada:
@@ -220,6 +225,10 @@ export async function resolverCertificacion(id: string, decision: DecisionCertif
         motivo: decision.estado === "RECHAZADA" ? decision.motivo : null,
       },
     });
+
+    // La extracción se borra con el documento, en esta misma transacción.
+    // Antes registra, sin valores, qué campos aceptó o corrigió el administrador.
+    await cerrarExtraccion(tx, id, decision.estado, decision.revision);
 
     await antesDeConfirmar();
 

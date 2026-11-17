@@ -1,3 +1,4 @@
+import { esquemaRevision } from "../lectura-documentos/lectura.schema.js";
 import {
   CODIGO_CERTIFICACION_OTRA,
   CODIGO_CURSO,
@@ -140,4 +141,8 @@ export const esquemaRechazoCertificacion = z.object({
       `Explica el motivo en al menos ${LARGO_MINIMO_MOTIVO_RECHAZO_CERTIFICACION} caracteres, para que el prestador sepa qué corregir.`,
     )
     .max(LARGO_MAXIMO_MOTIVO_RECHAZO_CERTIFICACION, `El motivo no puede superar los ${LARGO_MAXIMO_MOTIVO_RECHAZO_CERTIFICACION} caracteres.`),
+  revision: esquemaRevision,
 });
+
+/** PATCH /admin/certificaciones/:id/aprobar — { revision? }: qué hizo con cada campo de la lectura automática. */
+export const esquemaAprobacionCertificacion = z.object({ revision: esquemaRevision });

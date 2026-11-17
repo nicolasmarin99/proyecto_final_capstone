@@ -102,6 +102,28 @@ const esquema = z.object({
     .min(0, "BUSQUEDA_UMBRAL_SIMILITUD debe ser un número entre 0 y 1.")
     .max(1, "BUSQUEDA_UMBRAL_SIMILITUD debe ser un número entre 0 y 1.")
     .default(0.5),
+
+  // Quién lee los documentos (cédula, certificados, cursos) para precargar la
+  // revisión del administrador. La lectura NUNCA aprueba nada: solo sugiere.
+  // - "ninguno" (predeterminado): lectura apagada. El panel funciona como
+  //   siempre, a mano. Es el valor seguro si nadie configuró nada.
+  // - "gemini": envía la imagen del documento a la API de Google.
+  // - "determinista": no sale a la red y devuelve datos DE EJEMPLO. Es para
+  //   las pruebas (tests/setup.ts lo fuerza) y para ver el panel en
+  //   desarrollo; no se acepta en producción (abajo), porque mostraría datos
+  //   inventados como si se hubieran leído del documento.
+  LECTURA_PROVEEDOR: z.enum(["ninguno", "gemini", "determinista"]).default("ninguno"),
+
+  // Modelo multimodal de Gemini. Estable, acepta imágenes y PDF.
+  LECTURA_MODELO: z.string().min(1).default("gemini-3.5-flash-lite"),
+
+  // Confianza (0 a 1) bajo la cual un campo leído se destaca en el panel
+  // para que el administrador lo mire con más cuidado.
+  LECTURA_UMBRAL_CONFIANZA: z.coerce
+    .number({ error: "LECTURA_UMBRAL_CONFIANZA debe ser un número entre 0 y 1." })
+    .min(0, "LECTURA_UMBRAL_CONFIANZA debe ser un número entre 0 y 1.")
+    .max(1, "LECTURA_UMBRAL_CONFIANZA debe ser un número entre 0 y 1.")
+    .default(0.7),
 })
   // La clave solo es obligatoria cuando se va a usar. Exigirla siempre
   // obligaría a inventar un valor en desarrollo y en CI, y un valor inventado
@@ -129,6 +151,26 @@ const esquema = z.object({
         message:
           "Es obligatoria cuando EMBEDDINGS_PROVEEDOR=gemini. Sin ella cada publicación " +
           "quedaría sin vector y la búsqueda por significado no encontraría nada.",
+      });
+    }
+
+    if (valores.NODE_ENV === "production" && valores.LECTURA_PROVEEDOR === "determinista") {
+      contexto.addIssue({
+        code: "custom",
+        path: ["LECTURA_PROVEEDOR"],
+        message:
+          "\"determinista\" devuelve datos de ejemplo y no se acepta en producción: el administrador " +
+          "los vería como leídos del documento. Usa \"gemini\" o \"ninguno\".",
+      });
+    }
+
+    if (valores.EMBEDDINGS_PROVEEDOR !== "gemini" && valores.LECTURA_PROVEEDOR === "gemini" && valores.GEMINI_API_KEY.length === 0) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["GEMINI_API_KEY"],
+        message:
+          "Es obligatoria cuando LECTURA_PROVEEDOR=gemini. Sin ella toda lectura de " +
+          "documentos fallaría (las solicitudes igual se crean y se revisan a mano).",
       });
     }
 

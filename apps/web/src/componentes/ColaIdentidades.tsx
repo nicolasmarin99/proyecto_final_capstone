@@ -3,6 +3,7 @@ import { formatearRut } from "@localcl/shared";
 import { ErrorApi, type ClienteApi, type IdentidadEnCola } from "../api/cliente";
 import { Boton } from "./Boton";
 import { CampoAreaTexto } from "./CampoAreaTexto";
+import { LecturaDocumento, type EstadoRevision } from "./LecturaDocumento";
 import { Titulo } from "./Titulo";
 
 const POR_PAGINA = 10;
@@ -40,6 +41,9 @@ function SolicitudIdentidad({
   const [errorMotivo, setErrorMotivo] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<"documento" | "aprobar" | "rechazar" | null>(null);
+  // La lectura automática: sin ella (o si falló) se decide como siempre.
+  const [lectura, setLectura] = useState<EstadoRevision>({ conLectura: false, faltan: 0, revision: undefined });
+  const faltaRevisar = lectura.conLectura && lectura.faltan > 0;
 
   const { nombre, rut, comuna } = solicitud.prestador;
 
@@ -60,7 +64,7 @@ function SolicitudIdentidad({
     setError(null);
     setOcupado("aprobar");
     try {
-      await cliente.aprobarIdentidad(solicitud.id);
+      await cliente.aprobarIdentidad(solicitud.id, lectura.revision);
       alResolver(solicitud.id, `Identidad de ${nombre} aprobada. El documento fue eliminado.`);
     } catch (causa) {
       setError(mensajeDeError(causa, "No fue posible aprobar la identidad."));
@@ -77,7 +81,7 @@ function SolicitudIdentidad({
     setError(null);
     setOcupado("rechazar");
     try {
-      await cliente.rechazarIdentidad(solicitud.id, motivo.trim());
+      await cliente.rechazarIdentidad(solicitud.id, motivo.trim(), lectura.revision);
       alResolver(solicitud.id, `Identidad de ${nombre} rechazada. El documento fue eliminado.`);
     } catch (causa) {
       if (causa instanceof ErrorApi && causa.mensajeDe("motivo")) {
@@ -97,89 +101,102 @@ function SolicitudIdentidad({
         </Titulo>
         <p className="text-sm text-texto-suave">Enviada el {formatoFecha.format(new Date(solicitud.enviadaEn))}</p>
       </div>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-texto-suave">RUT de la cuenta</dt>
-        <dd className="font-medium text-noche">{rut ? formatearRut(rut) : "No informado"}</dd>
-        <dt className="text-texto-suave">Comuna</dt>
-        <dd className="text-noche">{comuna}</dd>
-      </dl>
-
-      {documento ? (
-        <figure className="mt-4">
-          {imagenFallo ? (
-            <p className="rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">
-              No se pudo mostrar el documento como imagen. Con el almacenamiento en memoria de desarrollo
-              los PDF no se convierten; en producción Cloudinary entrega siempre una imagen.
-            </p>
+      {/* El documento al lado de los datos: se contrasta sin cambiar de pantalla. */}
+      <div className="mt-3 grid gap-5 lg:grid-cols-2 lg:items-start">
+        <div className="lg:sticky lg:top-4">
+          {documento ? (
+            <figure>
+              {imagenFallo ? (
+                <p className="rounded-chico bg-niebla px-4 py-3 text-sm text-texto-suave">
+                  No se pudo mostrar el documento como imagen. Con el almacenamiento en memoria de desarrollo
+                  los PDF no se convierten; en producción Cloudinary entrega siempre una imagen.
+                </p>
+              ) : (
+                <img
+                  src={documento.url}
+                  alt={`Documento de identidad de ${nombre}`}
+                  // No enviar la página de origen a Cloudinary, y no dejar que el
+                  // navegador ofrezca guardar ni arrastrar la imagen con facilidad.
+                  referrerPolicy="no-referrer"
+                  draggable={false}
+                  onError={() => setImagenFallo(true)}
+                  className="max-h-[480px] w-full rounded-chico border border-borde bg-niebla object-contain"
+                />
+              )}
+              <figcaption className="mt-1.5 text-xs text-texto-suave">
+                El enlace vence a las {formatoHora.format(new Date(documento.expiraEn))}. Esta vista quedó registrada.
+              </figcaption>
+            </figure>
           ) : (
-            <img
-              src={documento.url}
-              alt={`Documento de identidad de ${nombre}`}
-              // No enviar la página de origen a Cloudinary, y no dejar que el
-              // navegador ofrezca guardar ni arrastrar la imagen con facilidad.
-              referrerPolicy="no-referrer"
-              draggable={false}
-              onError={() => setImagenFallo(true)}
-              className="max-h-[480px] w-full rounded-chico border border-borde bg-niebla object-contain"
-            />
+            <Boton
+              type="button"
+              variante="secundario"
+              cargando={ocupado === "documento"}
+              disabled={ocupado !== null}
+              onClick={verDocumento}
+            >
+              {ocupado === "documento" ? "Generando enlace…" : "Ver documento"}
+            </Boton>
           )}
-          <figcaption className="mt-1.5 text-xs text-texto-suave">
-            El enlace vence a las {formatoHora.format(new Date(documento.expiraEn))}. Esta vista quedó registrada.
-          </figcaption>
-        </figure>
-      ) : (
-        <Boton
-          type="button"
-          variante="secundario"
-          cargando={ocupado === "documento"}
-          disabled={ocupado !== null}
-          onClick={verDocumento}
-          className="mt-4"
-        >
-          {ocupado === "documento" ? "Generando enlace…" : "Ver documento"}
-        </Boton>
-      )}
-
-      {error && (
-        <p role="alert" className="motion-safe:animate-aparecer-corto mt-3 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700">
-          {error}
-        </p>
-      )}
-
-      {rechazando ? (
-        <div className="mt-2">
-          <CampoAreaTexto
-            id={`motivo-${solicitud.id}`}
-            etiqueta="Motivo del rechazo"
-            valor={motivo}
-            alCambiar={(valor) => {
-              setMotivo(valor);
-              setErrorMotivo(undefined);
-            }}
-            minimo={MINIMO_MOTIVO}
-            maximo={500}
-            error={errorMotivo}
-            ayuda="El prestador verá este texto. Dile qué corregir, por ejemplo: «la foto está borrosa»."
-          />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setRechazando(false)}>
-              Cancelar
-            </Boton>
-            <Boton type="button" cargando={ocupado === "rechazar"} disabled={ocupado !== null} onClick={rechazar}>
-              {ocupado === "rechazar" ? "Rechazando…" : "Confirmar rechazo"}
-            </Boton>
-          </div>
         </div>
-      ) : (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setRechazando(true)}>
-            Rechazar
-          </Boton>
-          <Boton type="button" cargando={ocupado === "aprobar"} disabled={ocupado !== null} onClick={aprobar}>
-            {ocupado === "aprobar" ? "Aprobando…" : "Aprobar"}
-          </Boton>
+
+        <div className="min-w-0 space-y-4">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-texto-suave">RUT de la cuenta</dt>
+            <dd className="font-medium text-noche">{rut ? formatearRut(rut) : "No informado"}</dd>
+            <dt className="text-texto-suave">Comuna</dt>
+            <dd className="text-noche">{comuna}</dd>
+          </dl>
+
+          <LecturaDocumento credencialId={solicitud.id} cliente={cliente} alCambiar={setLectura} />
+
+          {error && (
+            <p role="alert" className="motion-safe:animate-aparecer-corto mt-3 rounded-chico border border-error-700/20 bg-error-50 px-4 py-3 text-sm font-medium text-error-700">
+              {error}
+            </p>
+          )}
+
+          {rechazando ? (
+            <div className="mt-2">
+              <CampoAreaTexto
+                id={`motivo-${solicitud.id}`}
+                etiqueta="Motivo del rechazo"
+                valor={motivo}
+                alCambiar={(valor) => {
+                  setMotivo(valor);
+                  setErrorMotivo(undefined);
+                }}
+                minimo={MINIMO_MOTIVO}
+                maximo={500}
+                error={errorMotivo}
+                ayuda="El prestador verá este texto. Dile qué corregir, por ejemplo: «la foto está borrosa»."
+              />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setRechazando(false)}>
+                  Cancelar
+                </Boton>
+                <Boton type="button" cargando={ocupado === "rechazar"} disabled={ocupado !== null} onClick={rechazar}>
+                  {ocupado === "rechazar" ? "Rechazando…" : "Confirmar rechazo"}
+                </Boton>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Boton type="button" variante="secundario" disabled={ocupado !== null} onClick={() => setRechazando(true)}>
+                Rechazar
+              </Boton>
+              <Boton type="button" cargando={ocupado === "aprobar"} disabled={ocupado !== null || faltaRevisar} onClick={aprobar}>
+                {ocupado === "aprobar" ? "Aprobando…" : "Aprobar"}
+              </Boton>
+              {faltaRevisar && (
+                <p className="text-sm text-texto-suave sm:col-span-2">
+                  Para aprobar, confirma o corrige cada dato leído ({lectura.faltan} {lectura.faltan === 1 ? "pendiente" : "pendientes"}).
+                </p>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </article>
   );
 }

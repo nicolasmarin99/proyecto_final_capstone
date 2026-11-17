@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
-import { esquemaCertificacion, esquemaColaCertificaciones, esquemaIdCertificacion, esquemaRechazoCertificacion } from "./certificaciones.schema.js";
+import {
+  esquemaAprobacionCertificacion,
+  esquemaCertificacion,
+  esquemaColaCertificaciones,
+  esquemaIdCertificacion,
+  esquemaRechazoCertificacion,
+} from "./certificaciones.schema.js";
 import { aprobar, catalogo, cola, enviar, propias, rechazar, urlDocumento } from "./certificaciones.service.js";
 
 /** Sin try/catch: Express 5 entrega los rechazos al manejador central. El usuario sale del token. */
@@ -51,13 +57,15 @@ export async function documento(req: Request, res: Response) {
 
 export async function aprobarCertificacion(req: Request, res: Response) {
   const { id } = esquemaIdCertificacion.parse(req.params);
+  // Sin cuerpo también vale: es el panel de siempre, sin lectura automática.
+  const { revision } = esquemaAprobacionCertificacion.parse(req.body ?? {});
 
-  res.status(200).json({ certificacion: await aprobar(id, idDelUsuario(req)) });
+  res.status(200).json({ certificacion: await aprobar(id, idDelUsuario(req), revision) });
 }
 
 export async function rechazarCertificacion(req: Request, res: Response) {
   const { id } = esquemaIdCertificacion.parse(req.params);
-  const { motivo } = esquemaRechazoCertificacion.parse(req.body);
+  const { motivo, revision } = esquemaRechazoCertificacion.parse(req.body);
 
-  res.status(200).json({ certificacion: await rechazar(id, idDelUsuario(req), motivo) });
+  res.status(200).json({ certificacion: await rechazar(id, idDelUsuario(req), motivo, revision) });
 }
