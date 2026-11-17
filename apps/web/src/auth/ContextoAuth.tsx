@@ -14,6 +14,8 @@ interface ValorContexto {
   /** true mientras se intenta restaurar la sesión al arrancar la aplicación. */
   cargando: boolean;
   iniciarSesion(correo: string, contrasena: string): Promise<void>;
+  /** Cliente → prestador, con el mismo correo. La sesión sigue, con el rol nuevo. */
+  convertirEnPrestador(rut: string): Promise<void>;
   cerrarSesion(): Promise<void>;
 }
 
@@ -68,6 +70,13 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
     [cliente],
   );
 
+  const convertirEnPrestador = useCallback(
+    async (rut: string) => {
+      setUsuario(await cliente.convertirEnPrestador(rut));
+    },
+    [cliente],
+  );
+
   const cerrarSesion = useCallback(async () => {
     try {
       await cliente.cerrarSesion();
@@ -79,8 +88,8 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
   }, [cliente]);
 
   const valor = useMemo(
-    () => ({ usuario, cliente, cargando, iniciarSesion, cerrarSesion }),
-    [usuario, cliente, cargando, iniciarSesion, cerrarSesion],
+    () => ({ usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion }),
+    [usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion],
   );
 
   // El estado del prestador vive dentro: depende de quién inició sesión, y

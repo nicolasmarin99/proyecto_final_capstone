@@ -4,6 +4,7 @@ import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton, clasesBoton } from "../componentes/Boton";
 import { EstadoPrestador } from "../componentes/EstadoPrestador";
+import { OfrecerServicios } from "../componentes/OfrecerServicios";
 import { Pagina } from "../componentes/Pagina";
 
 export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: ClienteApi }) {
@@ -87,6 +88,8 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
         )}
 
         {perfil?.rol === "PRESTADOR" && <EstadoPrestador cliente={cliente} />}
+        {/* Un cliente que quiere ofrecer servicios: la misma cuenta, no otra. */}
+        {perfil?.rol === "CLIENTE" && <OfrecerServicios correoVerificado={perfil.correoVerificado !== false} />}
       </div>
 
       {/*

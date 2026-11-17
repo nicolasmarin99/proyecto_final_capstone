@@ -458,6 +458,18 @@ describe("Valoraciones objetadas en la cola del administrador", () => {
 });
 
 describe("Valoraciones por servicio", () => {
+  it("un prestador puede valorar un servicio de otro que contrató; el suyo propio, no", async () => {
+    simularApi({ usuario: prestadorUsuario, mia: { valoracion: null, puedeValorar: true, motivo: null, plazoHasta: null } });
+    const { unmount } = renderizar("/servicios/s1");
+    expect(await screen.findByRole("group", { name: "Tu calificación" })).toBeInTheDocument();
+    unmount();
+
+    simularApi({ usuario: prestadorUsuario, mia: { valoracion: null, puedeValorar: false, motivo: "PROPIO", plazoHasta: null } });
+    renderizar("/servicios/s1");
+    expect(await screen.findByText(/este servicio es tuyo/i)).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Tu calificación" })).not.toBeInTheDocument();
+  });
+
   it("la página del servicio pide y muestra solo las de ese servicio", async () => {
     simularApi({ resumen: TRES });
     renderizar("/servicios/s1");

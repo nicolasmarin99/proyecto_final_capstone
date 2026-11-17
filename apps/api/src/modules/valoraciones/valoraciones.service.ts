@@ -114,8 +114,8 @@ function yaValorada(): ErrorHttp {
 /**
  * Publica la valoración del cliente sobre un servicio. Reglas, en este orden:
  * 1. El servicio debe estar visible (404).
- * 2. Nadie se valora a sí mismo (403). Ya lo impide exigir el rol CLIENTE;
- *    se revisa igual por si un día cambian los roles.
+ * 2. Nadie se valora a sí mismo (403): un prestador puede valorar servicios
+ *    de otros que contrató, nunca los suyos.
  * 3. Una por cliente y servicio, y definitiva: si ya existe, 409. Va antes
  *    del plazo para no decirle «plazo vencido» a quien ya valoró.
  * 4. Un contacto registrado POR ESE SERVICIO (403) y dentro de los últimos
@@ -153,7 +153,11 @@ export async function valorar(clienteId: string, servicioId: string, datos: Dato
  * valoraciones de otros.
  */
 export async function mia(clienteId: string, servicioId: string) {
-  await servicioVisible(servicioId);
+  const servicio = await servicioVisible(servicioId);
+  // Un prestador que mira su propio servicio: no hay nada que valorar.
+  if (servicio.prestador.usuarioId === clienteId) {
+    return { valoracion: null, puedeValorar: false, motivo: "PROPIO", plazoHasta: null };
+  }
   const [valoracion, habilitado] = await Promise.all([valoracionDe(clienteId, servicioId), elegibilidad(clienteId, servicioId)]);
 
   return {

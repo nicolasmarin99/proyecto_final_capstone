@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { ErrorHttp } from "../../shared/errores.js";
 import {
   esquemaCambiarContrasena,
+  esquemaConversionPrestador,
   esquemaCorreoSolo,
   esquemaLogin,
   esquemaRegistro,
@@ -12,6 +13,7 @@ import {
 import {
   cambiarContrasena,
   cerrarSesion,
+  convertirEnPrestador,
   iniciarSesion,
   obtenerUsuarioActivo,
   reenviarVerificacion,
@@ -160,4 +162,14 @@ export async function logout(req: Request, res: Response) {
   // revelar si la cookie recibida correspondía a algo.
   res.clearCookie(NOMBRE_COOKIE_REFRESCO, opcionesLimpiezaCookie());
   res.status(204).end();
+}
+
+export async function convertirEnPrestadorControlador(req: Request, res: Response) {
+  if (!req.usuario) {
+    throw new ErrorHttp(401, "TOKEN_INVALIDO", "El token de acceso no es válido.");
+  }
+
+  const { rut } = esquemaConversionPrestador.parse(req.body);
+
+  res.status(200).json(await convertirEnPrestador(req.usuario.id, rut));
 }

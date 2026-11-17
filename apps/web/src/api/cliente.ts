@@ -315,7 +315,7 @@ export interface ValoracionPropia {
 export interface MiValoracion {
   valoracion: ValoracionPropia | null;
   puedeValorar: boolean;
-  motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO" | "YA_VALORADA" | null;
+  motivo: "SIN_CONTACTO" | "PLAZO_VENCIDO" | "YA_VALORADA" | "PROPIO" | null;
   plazoHasta: string | null;
 }
 
@@ -1509,6 +1509,23 @@ export function crearClienteApi() {
       });
     },
 
+    /**
+     * Convierte la cuenta de cliente en una de prestador, con su RUT. La API
+     * devuelve un token nuevo con el rol actualizado: se usa desde ya, sin
+     * volver a iniciar sesión.
+     */
+    async convertirEnPrestador(rut: string): Promise<Usuario> {
+      const sesion = leerSesion(await peticion("/auth/convertir-en-prestador", { metodo: "POST", cuerpo: { rut }, autenticada: true }));
+
+      if (!sesion) {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+
+      tokenAcceso = sesion.accessToken;
+
+      return sesion.usuario;
+    },
+
     async iniciarSesion(correo: string, contrasena: string): Promise<Usuario> {
       const sesion = leerSesion(
         await peticion("/auth/login", { metodo: "POST", cuerpo: { correo, contrasena } }),
@@ -1982,7 +1999,7 @@ export function crearClienteApi() {
       return {
         valoracion: leerValoracionPropia(cuerpo.valoracion),
         puedeValorar: cuerpo.puedeValorar === true,
-        motivo: motivo === "SIN_CONTACTO" || motivo === "PLAZO_VENCIDO" || motivo === "YA_VALORADA" ? motivo : null,
+        motivo: motivo === "SIN_CONTACTO" || motivo === "PLAZO_VENCIDO" || motivo === "YA_VALORADA" || motivo === "PROPIO" ? motivo : null,
         plazoHasta: typeof cuerpo.plazoHasta === "string" ? cuerpo.plazoHasta : null,
       };
     },

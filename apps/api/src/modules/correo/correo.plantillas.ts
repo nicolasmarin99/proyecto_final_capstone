@@ -49,6 +49,9 @@ export function correoIntentoDeRegistro(para: string): CorreoSaliente {
       "No hicimos ningún cambio y tu cuenta sigue igual.\n\n" +
       "Si fuiste tú, puedes iniciar sesión directamente:\n\n" +
       `${env.URL_WEB}/iniciar-sesion\n\n` +
+      "Si querías ofrecer tus servicios, no necesitas otra cuenta: inicia sesión y, " +
+      "en tu perfil, elige «Quiero ofrecer mis servicios». Tu cuenta pasa a ser de " +
+      "prestador y conserva todo lo que ya tenías.\n\n" +
       "Si no reconoces el intento y te preocupa, cambia tu contraseña." +
       FIRMA,
   };
