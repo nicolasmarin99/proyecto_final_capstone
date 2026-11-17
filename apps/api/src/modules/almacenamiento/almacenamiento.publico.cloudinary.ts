@@ -27,9 +27,21 @@ export interface ClienteCloudinaryPublico {
  * se limita a 1600 px de ancho; la miniatura se recorta a 4:3 centrada en lo
  * importante de la foto (g_auto), para que todas las tarjetas midan igual.
  */
-const TRANSFORMACIONES: Record<VarianteImagen, UrlOptions["transformation"]> = {
+export type TransformacionesImagen = Record<VarianteImagen, UrlOptions["transformation"]>;
+
+export const TRANSFORMACIONES_SERVICIO: TransformacionesImagen = {
   completa: [{ width: 1600, crop: "limit" }, { fetch_format: "auto", quality: "auto" }],
   miniatura: [{ width: 640, height: 480, crop: "fill", gravity: "auto" }, { fetch_format: "auto", quality: "auto" }],
+};
+
+/**
+ * Fotos de perfil: siempre cuadradas y centradas en la cara (g_face, que si
+ * no encuentra una cae en el centro). La completa, para el perfil; la
+ * miniatura, para el encabezado y junto a una valoración.
+ */
+export const TRANSFORMACIONES_PERFIL: TransformacionesImagen = {
+  completa: [{ width: 480, height: 480, crop: "fill", gravity: "face" }, { fetch_format: "auto", quality: "auto" }],
+  miniatura: [{ width: 128, height: 128, crop: "fill", gravity: "face" }, { fetch_format: "auto", quality: "auto" }],
 };
 
 /**
@@ -48,6 +60,7 @@ export class AlmacenamientoPublicoCloudinary implements AlmacenamientoPublico {
   constructor(
     private readonly cliente: ClienteCloudinaryPublico,
     private readonly carpeta: string,
+    private readonly transformaciones: TransformacionesImagen = TRANSFORMACIONES_SERVICIO,
   ) {}
 
   async guardar({ id, contenido, tipo }: ImagenAGuardar): Promise<void> {
@@ -67,7 +80,7 @@ export class AlmacenamientoPublicoCloudinary implements AlmacenamientoPublico {
       secure: true,
       resource_type: "image",
       type: "upload",
-      transformation: TRANSFORMACIONES[variante],
+      transformation: this.transformaciones[variante],
     });
   }
 

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
+import { clienteApi, type ClienteApi, type FotoPerfil, type Usuario } from "../api/cliente";
 import { ProveedorEstadoPrestador } from "../prestador/ContextoPrestador";
 
 interface ValorContexto {
@@ -17,6 +17,10 @@ interface ValorContexto {
   /** Cliente → prestador, con el mismo correo. La sesión sigue, con el rol nuevo. */
   convertirEnPrestador(rut: string): Promise<void>;
   cerrarSesion(): Promise<void>;
+  /** La foto de perfil vigente de la sesión, para el encabezado. null: sin foto (o todavía no se sabe). */
+  foto: FotoPerfil | null;
+  /** Tras subir, cambiar o quitar la foto: el encabezado la refleja sin recargar. */
+  actualizarFoto(foto: FotoPerfil | null): void;
 }
 
 const Contexto = createContext<ValorContexto | null>(null);
@@ -30,6 +34,8 @@ interface Props {
 export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [foto, setFoto] = useState<FotoPerfil | null>(null);
+  const idUsuario = usuario?.id ?? null;
 
   useEffect(() => {
     let cancelado = false;
@@ -63,6 +69,23 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
     };
   }, [cliente]);
 
+  // La foto se pide aparte de la sesión: no es parte del token ni de /auth/yo.
+  // Si falla, el encabezado muestra la inicial; no hay nada más que avisar.
+  useEffect(() => {
+    setFoto(null);
+    if (!idUsuario) return;
+    let cancelado = false;
+    cliente
+      .obtenerMiFoto()
+      .then((mia) => {
+        if (!cancelado) setFoto(mia.foto);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente, idUsuario]);
+
   const iniciarSesion = useCallback(
     async (correo: string, contrasena: string) => {
       setUsuario(await cliente.iniciarSesion(correo, contrasena));
@@ -88,8 +111,8 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
   }, [cliente]);
 
   const valor = useMemo(
-    () => ({ usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion }),
-    [usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion],
+    () => ({ usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, foto, actualizarFoto: setFoto }),
+    [usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, foto],
   );
 
   // El estado del prestador vive dentro: depende de quién inició sesión, y

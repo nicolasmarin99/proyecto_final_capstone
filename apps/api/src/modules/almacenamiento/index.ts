@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { env } from "../../env.js";
 import { AlmacenamientoCloudinary } from "./almacenamiento.cloudinary.js";
 import { AlmacenamientoEnMemoria } from "./almacenamiento.memoria.js";
-import { AlmacenamientoPublicoCloudinary } from "./almacenamiento.publico.cloudinary.js";
+import { AlmacenamientoPublicoCloudinary, TRANSFORMACIONES_PERFIL } from "./almacenamiento.publico.cloudinary.js";
 import { AlmacenamientoPublicoEnDisco } from "./almacenamiento.publico.disco.js";
 import { AlmacenamientoPublicoEnMemoria } from "./almacenamiento.publico.memoria.js";
 import type { AlmacenamientoPublico } from "./almacenamiento.publico.tipos.js";
@@ -92,4 +92,22 @@ export function obtenerAlmacenamientoPublico(): AlmacenamientoPublico {
   instanciaPublica ??= TRANSPORTES_PUBLICOS[transportePublico()]();
 
   return instanciaPublica;
+}
+
+let instanciaPerfiles: AlmacenamientoPublico | null = null;
+
+/**
+ * Fotos de perfil: públicas como las de los servicios, pero en Cloudinary
+ * van a su propia carpeta (CLOUDINARY_CARPETA_PERFILES) y se entregan
+ * cuadradas, centradas en la cara. En desarrollo y en las pruebas usan la
+ * misma instancia que las fotos de servicios: en disco no hay
+ * transformaciones, y así la ruta /imagenes-locales las sirve también.
+ */
+export function obtenerAlmacenamientoPerfiles(): AlmacenamientoPublico {
+  instanciaPerfiles ??=
+    transportePublico() === "produccion"
+      ? new AlmacenamientoPublicoCloudinary(configurarCloudinary(), env.CLOUDINARY_CARPETA_PERFILES, TRANSFORMACIONES_PERFIL)
+      : obtenerAlmacenamientoPublico();
+
+  return instanciaPerfiles;
 }

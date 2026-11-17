@@ -1,4 +1,11 @@
-import { MOTIVOS_OBJECION, type MotivoObjecion, type MotivoReporte, type OrdenBusqueda } from "@localcl/shared";
+import {
+  MOTIVOS_OBJECION,
+  MOTIVOS_REPORTE_FOTO,
+  type MotivoObjecion,
+  type MotivoReporte,
+  type MotivoReporteFoto,
+  type OrdenBusqueda,
+} from "@localcl/shared";
 
 export interface DetalleError {
   campo: string;
@@ -87,6 +94,35 @@ export interface ImagenPublica {
 
 export type EstadoImagen = "VISIBLE" | "OCULTA";
 
+/** Foto de perfil vigente de una cuenta. El id sirve para reportarla. */
+export type FotoPerfil = ImagenPublica;
+
+/** La foto propia y, si la última la retiró un administrador, el motivo. */
+export interface MiFoto {
+  foto: FotoPerfil | null;
+  retirada: { motivo: string | null; retiradaEn: string } | null;
+}
+
+export type RolCuenta = "CLIENTE" | "PRESTADOR" | "ADMINISTRADOR";
+
+export interface ReporteDeFoto {
+  id: string;
+  motivo: MotivoReporteFoto;
+  comentario: string | null;
+  enviadoEn: string;
+  cuentaConMasDeUnaSemana: boolean;
+}
+
+/** Una foto reportada, en el panel. De quien reportó, nada. */
+export interface FotoReportada extends FotoPerfil {
+  subidaEn: string;
+  cuenta: { nombre: string; rol: RolCuenta };
+  /** Cuántas fotos de esta cuenta se retiraron antes. */
+  retiradasAntes: number;
+  personas: number;
+  reportes: ReporteDeFoto[];
+}
+
 /** Imagen como la ve su dueño: con su posición y, si la moderación la ocultó, el motivo. */
 /**
  * Imagen como la ve su dueño (o el administrador). Si la moderación la
@@ -170,6 +206,7 @@ export interface ServicioPublico extends Precio {
   prestador: {
     id: string;
     nombre: string;
+    foto: FotoPerfil | null;
     comunas: { id: number; nombre: string; region: string }[];
     /** Tiene al menos una certificación aprobada y vigente: el sello «Prestador con certificaciones». */
     conCertificaciones: boolean;
@@ -236,6 +273,7 @@ export interface ServicioDelPrestador extends Precio {
 export interface PrestadorPublico {
   id: string;
   nombre: string;
+  foto: FotoPerfil | null;
   descripcion: string | null;
   comunas: { id: number; nombre: string; region: string }[];
   conCertificaciones: boolean;
@@ -275,7 +313,7 @@ export interface ServicioValorado {
   titulo: string;
 }
 
-/** Una valoración pública: del cliente, solo el nombre de pila. Cada una califica un servicio. */
+/** Una valoración pública: del cliente, solo el nombre de pila y su foto. Cada una califica un servicio. */
 export interface ValoracionPublica {
   id: string;
   calificacion: number;
@@ -283,7 +321,7 @@ export interface ValoracionPublica {
   creadaEn: string;
   editada: boolean;
   servicio: ServicioValorado | null;
-  cliente: { nombre: string; foto: string | null };
+  cliente: { nombre: string; foto: FotoPerfil | null };
 }
 
 /** De dónde se listan: un servicio (su página) o un prestador (su perfil, todos sus servicios). */
@@ -850,7 +888,7 @@ function leerValoracionPublica(valor: unknown): ValoracionPublica | null {
     creadaEn: valor.creadaEn,
     editada: valor.editada === true,
     servicio: leerServicioValorado(valor.servicio),
-    cliente: { nombre: valor.cliente.nombre, foto: typeof valor.cliente.foto === "string" ? valor.cliente.foto : null },
+    cliente: { nombre: valor.cliente.nombre, foto: leerImagenPublica(valor.cliente.foto) },
   };
 }
 
@@ -1025,6 +1063,52 @@ function leerImagenPublica(valor: unknown): ImagenPublica | null {
   return { id: valor.id, url: valor.url, miniatura: valor.miniatura };
 }
 
+function esMotivoFoto(valor: unknown): valor is MotivoReporteFoto {
+  return MOTIVOS_REPORTE_FOTO.some((motivo) => motivo === valor);
+}
+
+function esRol(valor: unknown): valor is RolCuenta {
+  return valor === "CLIENTE" || valor === "PRESTADOR" || valor === "ADMINISTRADOR";
+}
+
+function leerMiFoto(valor: unknown): MiFoto | null {
+  if (!esObjeto(valor)) return null;
+  const { retirada } = valor;
+  return {
+    foto: leerImagenPublica(valor.foto),
+    retirada:
+      esObjeto(retirada) && typeof retirada.retiradaEn === "string"
+        ? { motivo: typeof retirada.motivo === "string" ? retirada.motivo : null, retiradaEn: retirada.retiradaEn }
+        : null,
+  };
+}
+
+function leerReporteDeFoto(valor: unknown): ReporteDeFoto | null {
+  if (!esObjeto(valor) || typeof valor.id !== "string" || !esMotivoFoto(valor.motivo) || typeof valor.enviadoEn !== "string") return null;
+  return {
+    id: valor.id,
+    motivo: valor.motivo,
+    comentario: typeof valor.comentario === "string" ? valor.comentario : null,
+    enviadoEn: valor.enviadoEn,
+    cuentaConMasDeUnaSemana: valor.cuentaConMasDeUnaSemana === true,
+  };
+}
+
+function leerFotoReportada(valor: unknown): FotoReportada | null {
+  const foto = leerImagenPublica(valor);
+  if (!foto || !esObjeto(valor) || !esObjeto(valor.cuenta) || typeof valor.subidaEn !== "string") return null;
+  const { nombre, rol } = valor.cuenta;
+  if (typeof nombre !== "string" || !esRol(rol)) return null;
+  return {
+    ...foto,
+    subidaEn: valor.subidaEn,
+    cuenta: { nombre, rol },
+    retiradasAntes: typeof valor.retiradasAntes === "number" ? valor.retiradasAntes : 0,
+    personas: typeof valor.personas === "number" ? valor.personas : 0,
+    reportes: leerLista(valor.reportes, leerReporteDeFoto),
+  };
+}
+
 function leerImagenPropia(valor: unknown): ImagenPropia | null {
   if (!esObjeto(valor) || typeof valor.id !== "string" || typeof valor.orden !== "number") return null;
 
@@ -1138,6 +1222,7 @@ function leerServicioPublico(valor: unknown): ServicioPublico | null {
     prestador: {
       id: idPrestador,
       nombre,
+      foto: leerImagenPublica(valor.prestador.foto),
       comunas: leerLista(comunas, leerComunaPublica),
       conCertificaciones: conCertificaciones === true,
       certificaciones: leerLista(certificaciones, leerCertificacionPublica),
@@ -1203,6 +1288,7 @@ function leerPrestadorPublico(valor: unknown): PrestadorPublico | null {
   return {
     id: valor.id,
     nombre: valor.nombre,
+    foto: leerImagenPublica(valor.foto),
     descripcion: typeof valor.descripcion === "string" ? valor.descripcion : null,
     comunas: leerLista(valor.comunas, leerComunaPublica),
     conCertificaciones: valor.conCertificaciones === true,
@@ -1908,6 +1994,51 @@ export function crearClienteApi() {
       const imagen = esObjeto(cuerpo) ? leerImagenPropia(cuerpo.imagen) : null;
       if (!imagen) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
       return imagen;
+    },
+
+    /** La foto de perfil propia y, si se la retiraron, el motivo. */
+    async obtenerMiFoto(): Promise<MiFoto> {
+      const mia = leerMiFoto(await peticion("/cuenta/foto", { autenticada: true }));
+      if (!mia) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return mia;
+    },
+
+    /** Sube o cambia la foto de perfil. La API quita los metadatos y le pone nombre nuevo. */
+    async subirFotoPerfil(archivo: File): Promise<FotoPerfil> {
+      const formulario = new FormData();
+      formulario.append("imagen", archivo);
+      const cuerpo = await peticion("/cuenta/foto", { metodo: "PUT", formulario, autenticada: true });
+      const foto = esObjeto(cuerpo) ? leerImagenPublica(cuerpo.foto) : null;
+      if (!foto) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return foto;
+    },
+
+    async quitarFotoPerfil(): Promise<void> {
+      await peticion("/cuenta/foto", { metodo: "DELETE", autenticada: true });
+    },
+
+    /** Reporta la foto de perfil de otra cuenta. La API responde igual haya o no un reporte previo propio. */
+    async reportarFotoPerfil(fotoId: string, datos: { motivo: MotivoReporteFoto; comentario: string | null }): Promise<string> {
+      const cuerpo = await peticion(`/fotos-perfil/${encodeURIComponent(fotoId)}/reportes`, {
+        metodo: "POST",
+        cuerpo: datos,
+        autenticada: true,
+      });
+      return esObjeto(cuerpo) && typeof cuerpo.mensaje === "string" ? cuerpo.mensaje : "Gracias. Revisaremos esta foto.";
+    },
+
+    /** Solo las fotos reportadas que esperan una decisión. */
+    async fotosPerfilReportadas(pagina = 1): Promise<{ fotos: FotoReportada[]; total: number; pagina: number; porPagina: number }> {
+      const cuerpo = await peticion(`/admin/fotos-perfil?pagina=${pagina}`, { autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return { fotos: leerLista(cuerpo.fotos, leerFotoReportada), total: cuerpo.total, pagina: cuerpo.pagina, porPagina: cuerpo.porPagina };
+    },
+
+    /** Retira la foto o desestima sus reportes, siempre con motivo. */
+    async decidirFotoPerfil(fotoId: string, accion: "retirar" | "desestimar", motivo: string): Promise<void> {
+      await peticion(`/admin/fotos-perfil/${encodeURIComponent(fotoId)}/${accion}`, { metodo: "PATCH", cuerpo: { motivo }, autenticada: true });
     },
 
     /** Reporta un servicio. La API responde igual haya o no un reporte previo propio. */

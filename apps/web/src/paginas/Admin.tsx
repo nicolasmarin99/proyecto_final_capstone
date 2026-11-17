@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { clasesBoton } from "../componentes/Boton";
 import { ColaReportes } from "../componentes/ColaReportes";
+import { FotosReportadas } from "../componentes/FotosReportadas";
 import { ModeracionImagenes } from "../componentes/ModeracionImagenes";
 import { PendientesPorPrestador } from "../componentes/PendientesPorPrestador";
 import { clienteApi, ErrorApi, type ClienteApi, type ResumenAdmin } from "../api/cliente";
@@ -75,6 +76,8 @@ export default function PaginaAdmin({ cliente = clienteApi }: { cliente?: Client
             */}
             {/* Lo que hay que revisar, organizado por prestador. */}
             <PendientesPorPrestador cliente={cliente} />
+            {/* Fotos de perfil de cualquier cuenta: solo las reportadas. */}
+            <FotosReportadas cliente={cliente} />
 
             {/*
               Consulta: lo que ya no está pendiente. Los reportes resueltos,

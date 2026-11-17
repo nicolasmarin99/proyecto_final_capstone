@@ -1,9 +1,11 @@
 import { useEffect, useId, useState } from "react";
 import { CALIFICACION_MAXIMA } from "@localcl/shared";
 import type { ClienteApi, Estrella, PaginaValoraciones, ResumenCorto, ResumenValoraciones } from "../api/cliente";
-import { formatearPromedio, inicial, textoCantidad, textoResumen } from "../servicios/valoraciones";
+import { formatearPromedio, textoCantidad, textoResumen } from "../servicios/valoraciones";
+import { Avatar } from "./Avatar";
 import { Boton } from "./Boton";
 import { Icono } from "./iconos";
+import { ReportarFoto } from "./ReportarFoto";
 
 const fecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium" });
 const ESTRELLAS: Estrella[] = ["5", "4", "3", "2", "1"];
@@ -163,13 +165,7 @@ export function ValoracionesPublicas({
               {datos.valoraciones.map((valoracion) => (
                 <li key={valoracion.id} className="rounded-medio border border-borde bg-blanco p-4">
                   <div className="flex items-start gap-3">
-                    {valoracion.cliente.foto ? (
-                      <img src={valoracion.cliente.foto} alt="" className="size-9 shrink-0 rounded-full object-cover" />
-                    ) : (
-                      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-hielo font-bold text-primario">
-                        {inicial(valoracion.cliente.nombre)}
-                      </span>
-                    )}
+                    <Avatar nombre={valoracion.cliente.nombre} foto={valoracion.cliente.foto} />
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                         <span className="font-semibold text-noche">{valoracion.cliente.nombre}</span>
@@ -188,6 +184,12 @@ export function ValoracionesPublicas({
                       )}
                       {valoracion.comentario && (
                         <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-line text-noche">{valoracion.comentario}</p>
+                      )}
+                      {/* Solo si tiene foto: es lo único de la persona que se puede reportar aquí. */}
+                      {valoracion.cliente.foto && (
+                        <div className="-mb-2 flex justify-end">
+                          <ReportarFoto fotoId={valoracion.cliente.foto.id} nombre={valoracion.cliente.nombre} />
+                        </div>
                       )}
                     </div>
                   </div>

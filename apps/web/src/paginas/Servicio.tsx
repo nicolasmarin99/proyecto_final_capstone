@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
+import { Avatar } from "../componentes/Avatar";
 import { Boton } from "../componentes/Boton";
 import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
 import { FormularioValoracion } from "../componentes/FormularioValoracion";
@@ -127,14 +128,17 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                 <h1 className="mt-2 font-titulos text-[28px] leading-[1.15] font-bold tracking-[-0.5px] md:text-[36px]">
                   {servicio.titulo}
                 </h1>
-                <p className="mt-2 text-texto-suave">
-                  Ofrecido por{" "}
-                  <Link
-                    to={`/prestadores/${servicio.prestador.id}`}
-                    className="font-semibold text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
-                  >
-                    {servicio.prestador.nombre}
-                  </Link>
+                <p className="mt-3 flex items-center gap-2.5 text-texto-suave">
+                  <Avatar nombre={servicio.prestador.nombre} foto={servicio.prestador.foto} />
+                  <span className="min-w-0">
+                    Ofrecido por{" "}
+                    <Link
+                      to={`/prestadores/${servicio.prestador.id}`}
+                      className="font-semibold break-words text-noche underline decoration-cielo decoration-2 underline-offset-2 hover:text-primario"
+                    >
+                      {servicio.prestador.nombre}
+                    </Link>
+                  </span>
                 </p>
                 {/* Las de ESTE servicio; lleva a la lista de esta misma página. */}
                 <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">

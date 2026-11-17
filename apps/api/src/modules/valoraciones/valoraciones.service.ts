@@ -1,5 +1,6 @@
 import { DIAS_PARA_VALORAR } from "@localcl/shared";
 import { ErrorHttp } from "../../shared/errores.js";
+import { fotoPublica } from "../fotos-perfil/fotos-perfil.urls.js";
 import { contarServiciosVisiblesDe, esServicioVisible } from "../servicios/servicios.visibilidad.js";
 import {
   buscarPerfilDelUsuario,
@@ -172,7 +173,7 @@ export async function mia(clienteId: string, servicioId: string) {
 /**
  * Lista pública, paginada, solo PUBLICADAS, de un servicio (su página) o de
  * un prestador (su perfil: todos sus servicios). Del cliente sale el nombre
- * de pila y la foto (null: el modelo todavía no tiene foto de perfil). Cada
+ * de pila y su foto de perfil vigente (null si no tiene). Cada
  * una dice qué servicio valora.
  */
 async function listaPublica(alcance: { servicioId: string } | { prestadorId: string }, pagina: number, porPagina: number) {
@@ -191,7 +192,7 @@ async function listaPublica(alcance: { servicioId: string } | { prestadorId: str
       editada: valoracion.editadaEn !== null,
       editadaEn: valoracion.editadaEn,
       servicio: { id: valoracion.servicio.id, titulo: valoracion.servicio.titulo },
-      cliente: { nombre: nombreDePila(valoracion.contacto.cliente.nombre), foto: null },
+      cliente: { nombre: nombreDePila(valoracion.contacto.cliente.nombre), foto: fotoPublica(valoracion.contacto.cliente.fotosPerfil) },
     })),
     pagina,
     porPagina,

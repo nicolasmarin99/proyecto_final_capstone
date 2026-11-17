@@ -5,6 +5,7 @@ import type { UploadApiOptions, UploadApiResponse, UrlOptions } from "cloudinary
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AlmacenamientoPublicoCloudinary,
+  TRANSFORMACIONES_PERFIL,
   type ClienteCloudinaryPublico,
 } from "../../src/modules/almacenamiento/almacenamiento.publico.cloudinary.js";
 import { AlmacenamientoPublicoEnDisco } from "../../src/modules/almacenamiento/almacenamiento.publico.disco.js";
@@ -74,6 +75,21 @@ describe("AlmacenamientoPublicoCloudinary", () => {
       }),
     ]);
     expect(urls.every((url) => !("sign_url" in url.opciones))).toBe(true);
+  });
+
+  it("las fotos de perfil van a su carpeta y salen cuadradas, centradas en la cara", async () => {
+    const { cliente, subidas, urls } = clienteFalso();
+    const almacenamiento = new AlmacenamientoPublicoCloudinary(cliente, "localcl/perfiles", TRANSFORMACIONES_PERFIL);
+
+    await almacenamiento.guardar({ id: "id-perfil", contenido: Buffer.from("x"), tipo: "jpg" });
+    almacenamiento.url("id-perfil", "completa");
+    almacenamiento.url("id-perfil", "miniatura");
+
+    expect(subidas[0]?.opciones).toMatchObject({ type: "upload", asset_folder: "localcl/perfiles" });
+    expect(urls.map((url) => url.opciones.transformation)).toEqual([
+      [{ width: 480, height: 480, crop: "fill", gravity: "face" }, { fetch_format: "auto", quality: "auto" }],
+      [{ width: 128, height: 128, crop: "fill", gravity: "face" }, { fetch_format: "auto", quality: "auto" }],
+    ]);
   });
 
   it.each(["ok", "not found"])("eliminar acepta «%s» e invalida la caché", async (resultado) => {

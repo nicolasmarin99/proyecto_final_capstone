@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { clienteApi, ErrorApi, type ClienteApi, type PrestadorPublico } from "../api/cliente";
+import { Avatar } from "../componentes/Avatar";
 import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
 import { Icono } from "../componentes/iconos";
 import { Contenedor } from "../componentes/landing/Contenedor";
 import { Footer } from "../componentes/landing/Footer";
+import { ReportarFoto } from "../componentes/ReportarFoto";
 import { ResumenEnLinea, ValoracionesPublicas } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
@@ -71,13 +73,21 @@ export default function PaginaPrestador({ cliente = clienteApi }: { cliente?: Cl
 
             {prestador && (
               <article className="motion-safe:animate-aparecer rounded-grande border border-borde bg-blanco p-6 shadow-tarjeta sm:p-8">
-                <p className="text-sm font-bold tracking-[1.2px] text-primario uppercase">Prestador</p>
-                <h1 className="mt-2 font-titulos text-[28px] leading-[1.15] font-bold tracking-[-0.5px] break-words md:text-[36px]">
-                  {prestador.nombre}
-                </h1>
-                <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">
-                  <ResumenEnLinea resumen={prestador.valoraciones} />
-                </a>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+                  <div className="flex shrink-0 flex-col items-start">
+                    <Avatar nombre={prestador.nombre} foto={prestador.foto} tamano="grande" />
+                    {prestador.foto && <ReportarFoto fotoId={prestador.foto.id} nombre={prestador.nombre} />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold tracking-[1.2px] text-primario uppercase">Prestador</p>
+                    <h1 className="mt-2 font-titulos text-[28px] leading-[1.15] font-bold tracking-[-0.5px] break-words md:text-[36px]">
+                      {prestador.nombre}
+                    </h1>
+                    <a href="#valoraciones" className="mt-1.5 inline-flex rounded-chico hover:underline focus-visible:outline-2 focus-visible:outline-primario">
+                      <ResumenEnLinea resumen={prestador.valoraciones} />
+                    </a>
+                  </div>
+                </div>
                 {prestador.conCertificaciones && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <SelloCertificaciones tamano="normal" />

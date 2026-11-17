@@ -1,6 +1,7 @@
 import { COMUNAS_POR_RESULTADO } from "@localcl/shared";
 import type { EstadoServicio } from "../../generated/prisma/client.js";
 import { ErrorHttp } from "../../shared/errores.js";
+import { fotoPublica } from "../fotos-perfil/fotos-perfil.urls.js";
 import {
   actualizarServicio,
   buscarCategoriaActiva,
@@ -282,6 +283,7 @@ export async function publico(id: string) {
     prestador: {
       id: servicio.prestador.id,
       nombre: servicio.prestador.usuario.nombre,
+      foto: fotoPublica(servicio.prestador.usuario.fotosPerfil),
       comunas: servicio.prestador.comunasAtencion
         .map(({ comuna }) => ({ id: comuna.id, nombre: comuna.nombre, region: comuna.region.nombre }))
         .sort((a, b) => ordenEspanol.compare(a.nombre, b.nombre)),

@@ -4,6 +4,7 @@ import { clienteApi, type ClienteApi, type Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Boton, clasesBoton } from "../componentes/Boton";
 import { EstadoPrestador } from "../componentes/EstadoPrestador";
+import { FotoDePerfil } from "../componentes/FotoDePerfil";
 import { OfrecerServicios } from "../componentes/OfrecerServicios";
 import { Pagina } from "../componentes/Pagina";
 
@@ -69,6 +70,9 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
             </p>
           </div>
         )}
+
+        {/* Cualquier rol: cliente, prestador o administrador. */}
+        {perfil && <FotoDePerfil cliente={cliente} nombre={perfil.nombre} correoVerificado={perfil.correoVerificado !== false} />}
 
         {perfil && (
           <dl className="rounded-chico border border-borde bg-niebla p-4 text-sm">
