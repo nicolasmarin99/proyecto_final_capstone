@@ -74,15 +74,27 @@ export type DatosRegistro = z.infer<typeof esquemaRegistro>;
  *
  * Tampoco declara "rol": el servidor fija PRESTADOR igual que fija CLIENTE.
  */
-export const esquemaRegistroPrestador = camposRegistro.extend({
-  rut: z
-    .string({ error: "El RUT es obligatorio." })
-    // Se valida sobre lo que escribió la persona (esRutValido normaliza por
-    // dentro) y recién después se guarda la forma canónica, para que la base
-    // tenga una sola escritura posible de cada RUT.
-    .refine(esRutValido, "El RUT no es válido.")
-    .transform(normalizarRut),
-}).superRefine(exigirContrasenaAceptable);
+/**
+ * El RUT, igual en el registro de prestador y al convertir una cuenta de
+ * cliente: se valida sobre lo que escribió la persona (esRutValido normaliza
+ * por dentro) y recién después se guarda la forma canónica, para que la base
+ * tenga una sola escritura posible de cada RUT.
+ */
+const campoRut = z
+  .string({ error: "El RUT es obligatorio." })
+  .refine(esRutValido, "El RUT no es válido.")
+  .transform(normalizarRut);
+
+export const esquemaRegistroPrestador = camposRegistro.extend({ rut: campoRut }).superRefine(exigirContrasenaAceptable);
+
+/**
+ * POST /auth/convertir-en-prestador — { rut }.
+ *
+ * Lo único que le falta a una cuenta de cliente para ser de prestador. El
+ * nombre, el correo y la contraseña ya los tiene. Tampoco declara "rol": lo
+ * fija el servidor.
+ */
+export const esquemaConversionPrestador = z.object({ rut: campoRut });
 
 export type DatosRegistroPrestador = z.infer<typeof esquemaRegistroPrestador>;
 

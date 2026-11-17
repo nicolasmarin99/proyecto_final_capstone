@@ -72,7 +72,9 @@ export function FormularioValoracion({
   const [publicando, setPublicando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
-  const esCliente = usuario?.rol === "CLIENTE";
+  // Valora quien contrató: un cliente, o un prestador que contrató a OTRO
+  // prestador. Si el servicio es suyo, la API lo dice (motivo PROPIO).
+  const esCliente = usuario?.rol === "CLIENTE" || usuario?.rol === "PRESTADOR";
 
   useEffect(() => {
     if (!esCliente) return;
@@ -141,7 +143,7 @@ export function FormularioValoracion({
       );
     }
     if (!esCliente) {
-      return <Requisito>Solo los clientes que contactaron a este prestador por este servicio pueden valorarlo.</Requisito>;
+      return <Requisito>Las cuentas de administración no valoran servicios.</Requisito>;
     }
     if (errorCarga) return <Requisito>No fue posible revisar si puedes valorar. Recarga la página para intentarlo de nuevo.</Requisito>;
     if (!mia) return <p className="text-sm text-texto-suave">Revisando si puedes valorar…</p>;
@@ -161,6 +163,9 @@ export function FormularioValoracion({
           <ValoracionPublicada {...mia.valoracion} />
         </>
       );
+    }
+    if (mia.motivo === "PROPIO") {
+      return <Requisito>Este servicio es tuyo: las valoraciones las dejan quienes te contratan.</Requisito>;
     }
     if (!mia.puedeValorar) {
       return (

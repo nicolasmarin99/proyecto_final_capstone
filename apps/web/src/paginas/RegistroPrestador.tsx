@@ -7,6 +7,7 @@ import {
   revisarContrasena,
 } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
+import { useAuth } from "../auth/ContextoAuth";
 import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
 import { Boton } from "../componentes/Boton";
@@ -15,6 +16,7 @@ import { PaginaAuth } from "../componentes/PaginaAuth";
 
 export default function PaginaRegistroPrestador({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const navegar = useNavigate();
+  const { usuario } = useAuth();
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [rut, setRut] = useState("");
@@ -86,6 +88,25 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
       titulo="Ofrece tus servicios"
       intro="Necesitamos tu RUT para poder acreditar tus credenciales más adelante."
     >
+      {/* Con el mismo correo no se crea una segunda cuenta: la de cliente se convierte. */}
+      {usuario?.rol === "CLIENTE" ? (
+        <p className="mt-4 rounded-chico bg-niebla px-4 py-3 text-sm text-noche">
+          Ya tienes una cuenta de cliente con la sesión iniciada: no necesitas otra.{" "}
+          <Link to="/perfil" className="font-semibold text-primario underline decoration-cielo decoration-2 underline-offset-2 hover:text-noche">
+            Conviértela desde tu perfil
+          </Link>
+          .
+        </p>
+      ) : (
+        <p className="mt-4 rounded-chico bg-niebla px-4 py-3 text-sm text-noche">
+          ¿Ya tienes cuenta de cliente? No necesitas otra:{" "}
+          <Link to="/iniciar-sesion" className="font-semibold text-primario underline decoration-cielo decoration-2 underline-offset-2 hover:text-noche">
+            inicia sesión
+          </Link>{" "}
+          y, en tu perfil, elige «Quiero ofrecer mis servicios».
+        </p>
+      )}
+
       <form onSubmit={alEnviar} noValidate className="mt-6">
         {errorGeneral && (
           <p

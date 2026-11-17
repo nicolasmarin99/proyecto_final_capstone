@@ -18,11 +18,12 @@ export const rutasValoracionesServicio = Router({ mergeParams: true });
 
 // Pública: la lista y el resumen de ese servicio, sin sesión.
 rutasValoracionesServicio.get("/", listarDeServicio);
-// Solo el rol CLIENTE valora: un prestador nunca escribe (ni borra) en sus
-// propios servicios, y autorizar() además confirma en la base que la cuenta
-// sigue activa. Para escribir, además, el correo confirmado.
-rutasValoracionesServicio.get("/mia", autenticar, autorizar(Rol.CLIENTE), obtenerPropia);
-rutasValoracionesServicio.post("/", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, crear);
+// Valora quien contrató: un cliente, o un prestador que contrató a OTRO
+// prestador (un gasfíter que llamó a un electricista). Nadie se valora a sí
+// mismo: lo impide el servicio (AUTOVALORACION). autorizar() además confirma
+// en la base que la cuenta sigue activa. Para escribir, el correo confirmado.
+rutasValoracionesServicio.get("/mia", autenticar, autorizar(Rol.CLIENTE, Rol.PRESTADOR), obtenerPropia);
+rutasValoracionesServicio.post("/", autenticar, autorizar(Rol.CLIENTE, Rol.PRESTADOR), exigirCorreoVerificado, crear);
 
 // /prestadores/:id/valoraciones — pública: todas las de sus servicios, con
 // el promedio general, para su perfil. Aquí no se valora: se valora un servicio.

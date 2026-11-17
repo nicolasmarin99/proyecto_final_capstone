@@ -19,6 +19,7 @@ import {
 } from "../correo/correo.plantillas.js";
 import {
   actualizarHashContrasena,
+  convertirClienteEnPrestador,
   buscarCredencialesPorCorreo,
   buscarCredencialesPorId,
   buscarSesionPorHash,
@@ -533,4 +534,43 @@ export async function cerrarSesion(token: string | null) {
   if (token) {
     await revocarSesionPorHash(hashearTokenRefresco(token));
   }
+}
+
+/**
+ * Una persona con cuenta de cliente quiere ofrecer servicios con el MISMO
+ * correo: su cuenta pasa a ser de prestador. Una persona, una cuenta.
+ *
+ * - Conserva su historial (contactos, valoraciones que hizo) y sigue
+ *   pudiendo contratar y valorar a otros prestadores.
+ * - El RUT queda sin verificar: para publicar tiene que verificar su
+ *   identidad, como cualquier prestador nuevo.
+ * - Devuelve un token de acceso nuevo con el rol actualizado, para que la
+ *   web cambie de área sin volver a iniciar sesión. Los tokens anteriores
+ *   siguen sirviendo hasta que vencen, y no dan permisos de más: autorizar()
+ *   lee el rol desde la base, no desde el token.
+ *
+ * Quién la pide sale del token y la ruta exige el rol CLIENTE y el correo
+ * confirmado (auth.routes.ts).
+ */
+export async function convertirEnPrestador(usuarioId: string, rut: string) {
+  let usuario;
+  try {
+    usuario = await convertirClienteEnPrestador(usuarioId, rut);
+  } catch (error) {
+    if (esViolacionDeUnicidad(error) && restriccionViolada(error).includes("rut")) {
+      // A diferencia del registro, aquí hay una persona con sesión y correo
+      // confirmado esperando en pantalla: hay que decirle por qué no avanzó.
+      throw new ErrorHttp(409, "RUT_EN_USO", "Ese RUT ya está asociado a otra cuenta de LocalCL.", [
+        { campo: "rut", mensaje: "Ese RUT ya está asociado a otra cuenta. Si es tuyo, escríbenos para revisarlo." },
+      ]);
+    }
+    throw error;
+  }
+
+  if (!usuario) {
+    // Ya no era un cliente activo (otra pestaña la convirtió, por ejemplo).
+    throw new ErrorHttp(409, "CONVERSION_NO_DISPONIBLE", "Tu cuenta ya no es de cliente; vuelve a iniciar sesión.");
+  }
+
+  return { usuario, accessToken: firmarAccessToken({ sub: usuario.id, rol: usuario.rol }) };
 }

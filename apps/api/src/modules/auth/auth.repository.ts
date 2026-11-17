@@ -218,3 +218,26 @@ export async function rotarSesion(datos: {
     return nueva;
   });
 }
+
+/**
+ * Convierte una cuenta de CLIENTE en una de PRESTADOR, con su RUT.
+ *
+ * - Solo cambia una cuenta que sigue siendo de cliente y está activa: si
+ *   dos peticiones llegan a la vez, la segunda no encuentra nada que cambiar.
+ * - Conserva todo lo demás: la misma fila, el mismo id, así que sus
+ *   contactos, valoraciones y sesiones siguen siendo suyos.
+ * - El RUT queda SIN verificar, igual que en un registro de prestador nuevo:
+ *   está bien formado, pero nadie comprobó todavía que sea de esta persona.
+ *
+ * Devuelve la cuenta actualizada, o null si no había un cliente activo con
+ * ese id. Si el RUT ya pertenece a otra cuenta, lanza el error de unicidad
+ * de Prisma (lo traduce el servicio).
+ */
+export async function convertirClienteEnPrestador(usuarioId: string, rut: string) {
+  const { count } = await prisma.usuario.updateMany({
+    where: { id: usuarioId, rol: Rol.CLIENTE, activo: true },
+    data: { rol: Rol.PRESTADOR, rut, rutVerificado: false },
+  });
+  if (count === 0) return null;
+  return prisma.usuario.findUniqueOrThrow({ where: { id: usuarioId }, select: camposPublicos });
+}
