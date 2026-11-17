@@ -1,4 +1,5 @@
 import { prisma } from "../../db.js";
+import { seleccionFotoVigente } from "../fotos-perfil/fotos-perfil.repository.js";
 import { seleccionComuna } from "../territorio/territorio.repository.js";
 import type { DatosPerfilPrestador } from "./prestadores.schema.js";
 
@@ -100,7 +101,7 @@ export async function buscarPrestadorPublico(prestadorId: string) {
     select: {
       id: true,
       descripcion: true,
-      usuario: { select: { nombre: true } },
+      usuario: { select: { nombre: true, fotosPerfil: seleccionFotoVigente } },
       comunasAtencion: { select: { comuna: { select: { id: true, nombre: true, region: { select: { nombre: true } } } } } },
     },
   });

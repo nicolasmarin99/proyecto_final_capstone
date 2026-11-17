@@ -1,4 +1,5 @@
 import { ErrorHttp } from "../../shared/errores.js";
+import { fotoPublica } from "../fotos-perfil/fotos-perfil.urls.js";
 import { certificacionesPublicasDe, cursosPublicosDe } from "../certificaciones/certificaciones.publicas.js";
 import { urlMiniatura } from "../imagenes/imagenes.urls.js";
 import { resumenDe, resumenesDeServicios } from "../valoraciones/valoraciones.resumen.js";
@@ -159,6 +160,7 @@ export async function obtenerPerfilPublico(prestadorId: string) {
   return {
     id: prestador.id,
     nombre: prestador.usuario.nombre,
+    foto: fotoPublica(prestador.usuario.fotosPerfil),
     descripcion: prestador.descripcion,
     comunas: prestador.comunasAtencion
       .map(({ comuna }) => ({ id: comuna.id, nombre: comuna.nombre, region: comuna.region.nombre }))

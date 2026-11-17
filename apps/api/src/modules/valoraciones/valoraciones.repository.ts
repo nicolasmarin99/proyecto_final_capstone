@@ -1,4 +1,5 @@
 import { prisma } from "../../db.js";
+import { seleccionFotoVigente } from "../fotos-perfil/fotos-perfil.repository.js";
 import { Prisma, type MotivoDenuncia } from "../../generated/prisma/client.js";
 
 /** El perfil y su dueño: para saber si existe. */
@@ -120,7 +121,8 @@ export async function valoracionesPublicadas(
         editadaEn: true,
         servicio: { select: { id: true, titulo: true } },
         // valoraciones llega al cliente por su contacto (clave compuesta).
-        contacto: { select: { cliente: { select: { nombre: true } } } },
+        // De su foto, solo la vigente.
+        contacto: { select: { cliente: { select: { nombre: true, fotosPerfil: seleccionFotoVigente } } } },
       },
     }),
     prisma.valoracion.count({ where }),

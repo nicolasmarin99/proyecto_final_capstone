@@ -42,6 +42,7 @@ export {
   TAMANO_MAXIMO_IMAGEN,
   TIPOS_IMAGEN_PERMITIDOS,
 } from "./imagen.js";
+export { MAXIMO_FOTOS_PERFIL_POR_DIA, MOTIVOS_REPORTE_FOTO, type MotivoReporteFoto } from "./fotoPerfil.js";
 export {
   LARGO_MAXIMO_COMENTARIO_REPORTE,
   LARGO_MAXIMO_MOTIVO_DECISION,

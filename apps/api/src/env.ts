@@ -58,6 +58,9 @@ const esquema = z.object({
   // carpeta distinta de la de identidades.
   CLOUDINARY_CARPETA_SERVICIOS: z.string().default("localcl/servicios"),
 
+  // Fotos de perfil de cualquier cuenta: públicas, en su propia carpeta.
+  CLOUDINARY_CARPETA_PERFILES: z.string().default("localcl/perfiles"),
+
   // Dónde se guardan esas fotos. Si no se indica, sigue a
   // ALMACENAMIENTO_TRANSPORTE: con "produccion" van a Cloudinary; si no, a una
   // carpeta local ("disco"), para que sobrevivan a un reinicio en

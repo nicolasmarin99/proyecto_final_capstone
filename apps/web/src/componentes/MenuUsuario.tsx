@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Usuario } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
+import { Avatar } from "./Avatar";
 import { useEstadoPrestador } from "../prestador/ContextoPrestador";
 import { Icono } from "./iconos";
 
@@ -49,7 +50,7 @@ const clasesOpcion =
  */
 export function MenuUsuario({ usuario }: { usuario: Usuario }) {
   const navegar = useNavigate();
-  const { cerrarSesion } = useAuth();
+  const { cerrarSesion, foto } = useAuth();
   const estado = useEstadoPrestador();
   const [abierto, setAbierto] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
@@ -94,7 +95,6 @@ export function MenuUsuario({ usuario }: { usuario: Usuario }) {
   }
 
   const rol = NOMBRE_ROL[usuario.rol] ?? usuario.rol;
-  const inicial = usuario.nombre.trim().charAt(0).toUpperCase() || "?";
 
   return (
     <div
@@ -113,9 +113,7 @@ export function MenuUsuario({ usuario }: { usuario: Usuario }) {
         onClick={() => setAbierto((actual) => !actual)}
         className="flex min-h-11 max-w-[220px] cursor-pointer items-center gap-2.5 rounded-boton py-1 pr-2 pl-1 text-left hover:bg-niebla focus-visible:outline-2 focus-visible:outline-primario sm:max-w-[280px]"
       >
-        <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-hielo font-titulos font-bold text-primario">
-          {inicial}
-        </span>
+        <Avatar nombre={usuario.nombre} foto={foto} />
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-noche">{usuario.nombre}</span>
           <span className="block text-xs text-texto-suave">{rol}</span>

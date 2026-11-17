@@ -21,10 +21,11 @@ const MENSAJES_MULTER: Partial<Record<multer.ErrorCode, string>> = {
 
 /**
  * multer en memoria: la foto nunca toca el disco del servidor sin limpiar.
+ * También la usa la foto de perfil (fotos-perfil.routes.ts).
  * Sus errores se traducen acá, colgados del campo «imagen», para no cambiar
  * cómo el manejador central responde los del documento de identidad.
  */
-function recibirImagen(req: Request, res: Response, next: NextFunction) {
+export function recibirImagen(req: Request, res: Response, next: NextFunction) {
   leerImagen(req, res, (error: unknown) => {
     if (error instanceof multer.MulterError) {
       next(

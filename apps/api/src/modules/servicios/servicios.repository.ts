@@ -1,4 +1,5 @@
 import { prisma } from "../../db.js";
+import { seleccionFotoVigente } from "../fotos-perfil/fotos-perfil.repository.js";
 import type { EstadoServicio, UnidadPrecio } from "../../generated/prisma/client.js";
 import { seleccionImagen } from "../imagenes/imagenes.repository.js";
 
@@ -126,7 +127,7 @@ export async function buscarServicioPublico(id: string) {
       prestador: {
         select: {
           id: true,
-          usuario: { select: { nombre: true } },
+          usuario: { select: { nombre: true, fotosPerfil: seleccionFotoVigente } },
           comunasAtencion: {
             select: { comuna: { select: { id: true, nombre: true, region: { select: { nombre: true } } } } },
           },

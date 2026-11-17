@@ -16,6 +16,7 @@ import {
   rutasCertificacionesPrestador,
 } from "./modules/certificaciones/certificaciones.routes.js";
 import { rutasIdentidadAdmin, rutasIdentidadPrestador } from "./modules/identidad/identidad.routes.js";
+import { rutasFotosPerfil, rutasFotosPerfilAdmin, rutasMiFoto } from "./modules/fotos-perfil/fotos-perfil.routes.js";
 import { rutasImagenesAdmin } from "./modules/imagenes/imagenes.routes.js";
 import { rutasImagenesLocales } from "./modules/imagenes/imagenes.locales.js";
 import { rutasReportesAdmin } from "./modules/reportes/reportes.routes.js";
@@ -45,11 +46,15 @@ app.use("/auth", rutasAuth);
 // Antes que /admin y /prestadores: las rutas más específicas primero.
 app.use("/admin/identidades", rutasIdentidadAdmin);
 app.use("/admin/imagenes", rutasImagenesAdmin);
+app.use("/admin/fotos-perfil", rutasFotosPerfilAdmin);
 app.use("/admin/reportes", rutasReportesAdmin);
 app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
 app.use("/prestadores/yo/certificaciones", rutasCertificacionesPrestador);
 app.use("/prestadores/yo/valoraciones", rutasValoracionesRecibidas);
 app.use("/valoraciones", rutasValoraciones);
+// La foto de perfil propia (cualquier rol) y los reportes sobre la de otros.
+app.use("/cuenta/foto", rutasMiFoto);
+app.use("/fotos-perfil", rutasFotosPerfil);
 app.use("/admin/certificaciones", rutasCertificacionesAdmin);
 // Lo que la lectura automática leyó de un documento: solo administradores.
 app.use("/admin/extracciones", rutasExtraccionesAdmin);

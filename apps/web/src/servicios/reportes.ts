@@ -1,4 +1,4 @@
-import type { MotivoReporte } from "@localcl/shared";
+import type { MotivoReporte, MotivoReporteFoto } from "@localcl/shared";
 
 /** Cómo se muestra cada motivo, con una ayuda corta para elegir bien. */
 export const MOTIVO_REPORTE: Record<MotivoReporte, { texto: string; ayuda: string }> = {
@@ -21,3 +21,11 @@ export function textoEspera(minutos: number): string {
   const dias = Math.floor(horas / 24);
   return dias === 1 ? "hace 1 día" : `hace ${dias} días`;
 }
+
+/** Los motivos con que se reporta una foto de perfil. */
+export const MOTIVO_REPORTE_FOTO: Record<MotivoReporteFoto, { texto: string; ayuda: string }> = {
+  IMAGENES_INAPROPIADAS: { texto: "Imagen inapropiada", ayuda: "Ofensiva, violenta o de contenido sexual." },
+  SUPLANTACION_DE_IDENTIDAD: { texto: "Suplantación de identidad", ayuda: "Es la foto de otra persona o de una empresa." },
+  DATOS_PERSONALES_EXPUESTOS: { texto: "Datos personales a la vista", ayuda: "Muestra un documento, una patente o datos de terceros." },
+  OTRO: { texto: "Otro", ayuda: "Cuéntanos qué pasa en el comentario." },
+};

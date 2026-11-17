@@ -84,6 +84,7 @@ model Usuario {
   moderacionesImagen      ModeracionImagen[]
   imagenesRevisadas       ImagenServicio[]     @relation("ImagenesRevisadas")
   decisionesReporte       DecisionReporte[]
+  fotosPerfil             FotoPerfil[]
 
   @@index([rol])
   @@map("usuarios")
@@ -759,14 +760,16 @@ enum EstadoDenuncia {
   DESESTIMADA
   /// Quien reportó lo retiró antes de que se decidiera. La fila se conserva
   /// (no se borra) para que retirar y volver a reportar no esquive el
-  /// límite diario.
+  /// límite diario. También queda así el reporte de una foto de perfil que
+  /// su dueño cambió o quitó antes de la decisión: lo reportado ya no se
+  /// muestra y no queda nada que decidir.
   RETIRADA
 
   @@map("estado_denuncia")
 }
 
-/// Denuncia sobre exactamente uno de tres objetos: una valoración, un
-/// servicio o un usuario.
+/// Denuncia sobre exactamente uno de cuatro objetos: una valoración, un
+/// servicio, un usuario o una foto de perfil.
 ///
 /// Son tres columnas con su propia clave foránea, y no un par genérico
 /// (tipoObjeto, idObjeto): con el par genérico la base no puede comprobar
@@ -795,6 +798,8 @@ model Denuncia {
   servicio            Servicio?   @relation(fields: [servicioId], references: [id], onDelete: Restrict)
   usuarioDenunciadoId String?     @map("usuario_denunciado_id")
   usuarioDenunciado   Usuario?    @relation("UsuarioDenunciado", fields: [usuarioDenunciadoId], references: [id], onDelete: Restrict)
+  fotoPerfilId        String?     @map("foto_perfil_id")
+  fotoPerfil          FotoPerfil? @relation(fields: [fotoPerfilId], references: [id], onDelete: Restrict)
 
   resolucion    String?
   resueltaPorId String?   @map("resuelta_por_id")
@@ -809,6 +814,7 @@ model Denuncia {
   @@index([valoracionId])
   @@index([servicioId, estado])
   @@index([usuarioDenunciadoId])
+  @@index([fotoPerfilId, estado])
   @@map("denuncias")
 }
 
@@ -820,6 +826,8 @@ enum AccionReporte {
   OCULTAR_SERVICIO
   /// Ocultó una valoración objetada (estado OCULTA).
   OCULTAR_VALORACION
+  /// Retiró una foto de perfil reportada (estado RETIRADA, archivo borrado).
+  RETIRAR_FOTO_PERFIL
 
   @@map("accion_reporte")
 }
@@ -834,11 +842,13 @@ enum AccionReporte {
 /// decisión tiene que seguir constando aunque el servicio deje de existir.
 model DecisionReporte {
   id               String        @id @default(uuid())
-  /// Sobre qué se decidió: un servicio o una valoración, exactamente uno
-  /// (CHECK decisiones_reporte_exactamente_un_objeto).
+  /// Sobre qué se decidió: un servicio, una valoración o una foto de
+  /// perfil, exactamente uno (CHECK decisiones_reporte_exactamente_un_objeto).
   servicioId       String?       @map("servicio_id")
   valoracionId     String?       @map("valoracion_id")
   valoracion       Valoracion?   @relation(fields: [valoracionId], references: [id], onDelete: Restrict)
+  fotoPerfilId     String?       @map("foto_perfil_id")
+  fotoPerfil       FotoPerfil?   @relation(fields: [fotoPerfilId], references: [id], onDelete: Restrict)
   accion           AccionReporte
   motivo           String
   /// Cuántos reportes abiertos cerró esta decisión.
@@ -849,8 +859,49 @@ model DecisionReporte {
 
   @@index([servicioId, creadoEn])
   @@index([valoracionId, creadoEn])
+  @@index([fotoPerfilId, creadoEn])
   @@index([administradorId, creadoEn])
   @@map("decisiones_reporte")
+}
+
+/// En qué quedó una foto de perfil.
+enum EstadoFotoPerfil {
+  /// La que la cuenta muestra ahora. A lo más una por cuenta (índice único
+  /// parcial fotos_perfil_una_vigente_por_usuario).
+  VIGENTE
+  /// Su dueño la cambió por otra o la quitó.
+  ELIMINADA
+  /// Un administrador la retiró tras un reporte (motivo en decisiones_reporte).
+  RETIRADA
+
+  @@map("estado_foto_perfil")
+}
+
+/// Fotos de perfil de cualquier cuenta: cliente, prestador o administrador.
+///
+/// Se publican al subirlas, sin revisión previa: la moderación parte de un
+/// reporte (denuncias.foto_perfil_id) y solo las reportadas llegan al panel.
+///
+/// Las filas no se borran: una foto que deja de estar VIGENTE conserva su
+/// fila (los reportes y las decisiones apuntan a ella) pero su ARCHIVO se
+/// borra del proveedor en ese momento, porque su URL es pública. Por eso
+/// fin_en: cuándo dejó de mostrarse (CHECK fotos_perfil_fin_segun_estado).
+model FotoPerfil {
+  id            String           @id @default(uuid())
+  usuarioId     String           @map("usuario_id")
+  usuario       Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  /// Identificador del archivo en el proveedor. Lo genera el servidor.
+  identificador String           @unique
+  estado        EstadoFotoPerfil @default(VIGENTE)
+  creadoEn      DateTime         @default(now()) @map("creado_en")
+  finEn         DateTime?        @map("fin_en")
+
+  denuncias  Denuncia[]
+  decisiones DecisionReporte[]
+
+  /// Para el límite diario y para saber cuál fue la última de la cuenta.
+  @@index([usuarioId, creadoEn])
+  @@map("fotos_perfil")
 }
 
 /// Cada versión publicada de los términos y condiciones. No se editan:
