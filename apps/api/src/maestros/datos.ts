@@ -502,6 +502,10 @@ export const TIPOS_CREDENCIAL: {
 /**
  * Primera versión de los términos. Una versión publicada no se modifica:
  * cambiarlos es agregar otra con un identificador nuevo.
+ *
+ * REEMPLAZADA por la 2026-11 (maestros/terminos.ts), que describe lo que la
+ * plataforma hace de verdad: esta prometía contrastar credenciales con
+ * fuentes oficiales y nadie llegó a aceptarla. Se conserva como historia.
  */
 export const TERMINOS_INICIALES = {
   version: "2026-10",

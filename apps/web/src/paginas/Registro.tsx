@@ -4,6 +4,7 @@ import { mensajeDeProblema, revisarContrasena } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
 import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
+import { AceptacionTerminos, erroresAceptacion, useVersionTerminos } from "../componentes/AceptacionTerminos";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
@@ -17,6 +18,9 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [mayorDeEdad, setMayorDeEdad] = useState(false);
+  const terminos = useVersionTerminos(cliente);
 
   async function alEnviar(evento: FormEvent) {
     evento.preventDefault();
@@ -42,10 +46,18 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
       return;
     }
 
+    // Las casillas, igual que la API: sin aceptación expresa no hay cuenta.
+    const faltaAceptar = erroresAceptacion(aceptaTerminos, mayorDeEdad, terminos.version);
+    if (Object.keys(faltaAceptar).length > 0) {
+      setErrores(faltaAceptar);
+      return;
+    }
+    if (!terminos.version) return;
+
     setEnviando(true);
 
     try {
-      await cliente.registrar({ nombre, correo, contrasena });
+      await cliente.registrar({ nombre, correo, contrasena, aceptaTerminos: true, mayorDeEdad: true, versionTerminos: terminos.version });
 
       // El correo viaja en el state para poder ofrecer el reenvío del enlace
       // sin volver a pedírselo a la persona.
@@ -56,6 +68,11 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
         setErrores(
           Object.fromEntries(error.detalles.map((detalle) => [detalle.campo, detalle.mensaje])),
         );
+      } else if (error instanceof ErrorApi && error.codigo === "TERMINOS_DESACTUALIZADOS") {
+        // Cambiaron mientras llenaba el formulario: se carga la versión nueva y se vuelve a pedir la casilla.
+        setAceptaTerminos(false);
+        terminos.recargar();
+        setErrores({ aceptaTerminos: error.message });
       } else if (error instanceof ErrorApi) {
         // Incluye el 409 de correo ya registrado: el mensaje de la API es
         // deliberadamente genérico para no confirmar qué correos existen.
@@ -122,6 +139,16 @@ export default function PaginaRegistro({ cliente = clienteApi }: { cliente?: Cli
           alCambiar={setRepeticion}
           error={errores.repeticion}
           valido={confirmarRepeticion(contrasena, repeticion)}
+        />
+
+        <AceptacionTerminos
+          aceptaTerminos={aceptaTerminos}
+          alCambiarTerminos={setAceptaTerminos}
+          mayorDeEdad={mayorDeEdad}
+          alCambiarMayorDeEdad={setMayorDeEdad}
+          errores={errores}
+          version={terminos.version}
+          sinVersion={terminos.error}
         />
 
         <Boton type="submit" cargando={enviando} className="mt-7">

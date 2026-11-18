@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Rol } from "../../generated/prisma/client.js";
-import { autenticar } from "../../middlewares/autenticar.js";
+import { autenticar, autenticarSinExigirTerminos } from "../../middlewares/autenticar.js";
 import { autorizar } from "./auth.autorizar.js";
 import { exigirCorreoVerificado } from "./auth.exigirCorreoVerificado.js";
 import {
@@ -31,6 +31,7 @@ rutasAuth.post("/cambiar-contrasena", autenticar, cambiarContrasenaControlador);
 // a ser de prestador. Solo un cliente, con el correo confirmado.
 rutasAuth.post("/convertir-en-prestador", autenticar, autorizar(Rol.CLIENTE), exigirCorreoVerificado, convertirEnPrestadorControlador);
 rutasAuth.post("/login", login);
-rutasAuth.get("/yo", autenticar, yo);
+// Sin exigir los términos: la web la usa para saber si tiene que pedirlos.
+rutasAuth.get("/yo", autenticarSinExigirTerminos, yo);
 rutasAuth.post("/refrescar", refrescar);
 rutasAuth.post("/logout", logout);

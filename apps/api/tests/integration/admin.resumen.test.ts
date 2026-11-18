@@ -2,6 +2,7 @@ import { Algorithm, hash } from "@node-rs/argon2";
 import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import { Rol } from "../../src/generated/prisma/client.js";
 
@@ -10,6 +11,7 @@ const CONTRASENA = "contrasena-segura-123";
 async function crearUsuario(correo: string, rol: Rol, activo = true) {
   return prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: `Usuario ${rol}`,
       rol,
@@ -36,10 +38,12 @@ function pedirResumen(token?: string) {
 }
 
 beforeEach(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });
@@ -129,6 +133,7 @@ describe("GET /admin/resumen", () => {
     const usuario = await crearUsuario("admin@ejemplo.cl", Rol.ADMINISTRADOR);
     const token = await tokenDe("admin@ejemplo.cl");
 
+    await prisma.aceptacionTerminos.deleteMany({ where: { usuarioId: usuario.id } });
     await prisma.usuario.delete({ where: { id: usuario.id } });
 
     const respuesta = await pedirResumen(token);

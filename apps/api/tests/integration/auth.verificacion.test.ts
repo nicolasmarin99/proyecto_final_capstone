@@ -2,11 +2,13 @@ import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { prisma } from "../../src/db.js";
+import { ACEPTACION_REGISTRO, asegurarTerminosVigentes } from "../terminos.js";
 import { TipoToken } from "../../src/generated/prisma/client.js";
 import { hashearToken } from "../../src/shared/tokens.js";
 import { bandeja } from "../bandeja.js";
 
 const registroValido = {
+  ...ACEPTACION_REGISTRO,
   nombre: "Ana Pérez",
   correo: "ana.perez@ejemplo.cl",
   contrasena: "contrasena-segura-123",
@@ -36,11 +38,14 @@ async function registrarYObtenerToken(): Promise<string> {
 }
 
 beforeEach(async () => {
+  await asegurarTerminosVigentes();
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   bandeja().vaciar();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });
@@ -78,6 +83,7 @@ describe("Correo de verificación al registrarse", () => {
 
   it("el registro de prestador también envía el enlace", async () => {
     await request(app).post("/auth/registro-prestador").send({
+      ...ACEPTACION_REGISTRO,
       nombre: "Pedro Soto",
       correo: "pedro.soto@ejemplo.cl",
       contrasena: "contrasena-segura-123",

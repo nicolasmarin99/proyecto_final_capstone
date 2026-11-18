@@ -2,9 +2,11 @@ import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { prisma } from "../../src/db.js";
+import { ACEPTACION_REGISTRO, asegurarTerminosVigentes } from "../terminos.js";
 
 // 12.345.678-5 es un RUT con dígito verificador correcto.
 const registroValido = {
+  ...ACEPTACION_REGISTRO,
   nombre: "Pedro Soto",
   correo: "pedro.soto@ejemplo.cl",
   contrasena: "contrasena-segura-123",
@@ -16,10 +18,13 @@ function registrarPrestador(cuerpo: Record<string, unknown>) {
 }
 
 beforeEach(async () => {
+  await asegurarTerminosVigentes();
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });
@@ -147,6 +152,7 @@ describe("POST /auth/registro-prestador", () => {
 
   it("no permite que un prestador pise el correo de un cliente ya registrado", async () => {
     await request(app).post("/auth/registro").send({
+      ...ACEPTACION_REGISTRO,
       nombre: "Ana Cliente",
       correo: registroValido.correo,
       contrasena: "contrasena-segura-123",

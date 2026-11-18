@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAXIMO_FOTOS_PERFIL_POR_DIA, MAXIMO_REPORTES_POR_DIA } from "@localcl/shared";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -49,6 +50,7 @@ async function crearUsuario(rol: Rol, opciones: { correoVerificado?: boolean; no
   const correo = `fotos${secuencia}@ejemplo.cl`;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: opciones.nombre ?? `Persona${secuencia} Apellido`,
       rol,

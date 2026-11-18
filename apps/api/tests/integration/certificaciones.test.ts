@@ -3,6 +3,7 @@ import { MAXIMO_CERTIFICACIONES_POR_DIA } from "@localcl/shared";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -41,6 +42,7 @@ async function crearUsuario(rol: Rol, opciones: { correoVerificado?: boolean; ru
   const correo = `certificaciones${secuencia}@ejemplo.cl`;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: `Persona ${secuencia}`,
       rol,

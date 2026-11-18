@@ -2,6 +2,7 @@ import { Algorithm, hash } from "@node-rs/argon2";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { ACEPTACION_REGISTRO, TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -36,6 +37,7 @@ async function crearUsuario(rol: Rol, opciones: { correoVerificado?: boolean; ru
   const correo = `conversion${secuencia}@ejemplo.cl`;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: opciones.nombre ?? `Persona ${secuencia}`,
       rol,
@@ -240,7 +242,7 @@ describe("POST /auth/convertir-en-prestador", () => {
 describe("Registrarse otra vez con el mismo correo", () => {
   it("registrarse como prestador con el correo de un cliente no crea otra cuenta, responde igual y le explica cómo convertirla", async () => {
     const cliente = await crearUsuario("CLIENTE");
-    const nueva = { nombre: "Persona Repetida", correo: cliente.correo, contrasena: "otra-contrasena-segura-456", rut: "12.345.678-5" };
+    const nueva = { ...ACEPTACION_REGISTRO, nombre: "Persona Repetida", correo: cliente.correo, contrasena: "otra-contrasena-segura-456", rut: "12.345.678-5" };
     const desconocida = { ...nueva, correo: "nadie-registrado@ejemplo.cl", rut: "22.222.222-2" };
 
     const repetida = await request(app).post("/auth/registro-prestador").send(nueva);

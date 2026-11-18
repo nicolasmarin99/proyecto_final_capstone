@@ -466,6 +466,7 @@ describe("datos maestros", () => {
     expect(await prisma.comuna.count({ where: { regionId: 16 } })).toBe(21);
     expect(await prisma.categoria.count()).toBe(7);
     expect(await prisma.tipoCredencial.count()).toBe(8);
-    expect(await prisma.versionTerminos.count()).toBe(1);
+    // 2026-10 (reemplazada, se conserva como historia) y 2026-11 (vigente).
+    expect(await prisma.versionTerminos.count()).toBe(2);
   });
 });

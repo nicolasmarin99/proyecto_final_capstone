@@ -19,11 +19,24 @@ function json(cuerpo: unknown, status = 200): Response {
   } as Response;
 }
 
-/** Sin sesión previa: el refresco de arranque falla, como en un navegador nuevo. */
+/**
+ * Sin sesión previa: el refresco de arranque falla, como en un navegador
+ * nuevo. Los términos vigentes sí cargan (son públicos).
+ */
 function sinSesion() {
-  vi.mocked(fetch).mockResolvedValue(json({ error: { codigo: "SESION_INVALIDA" } }, 401));
+  vi.mocked(fetch).mockImplementation(async (url) =>
+    String(url) === "/api/terminos/vigente"
+      ? json({ terminos: { version: "2026-11", vigenteDesde: "2026-11-18T03:00:00.000Z", contenido: "# Términos" } })
+      : json({ error: { codigo: "SESION_INVALIDA" } }, 401),
+  );
 }
 
+/** Espera a que carguen los términos vigentes y marca las dos casillas, como haría la persona. */
+async function marcarAceptacion() {
+  await screen.findByText(/términos vigentes: versión 2026-11/i);
+  fireEvent.click(screen.getByLabelText(/leí y acepto/i));
+  fireEvent.click(screen.getByLabelText(/mayor de 18 años/i));
+}
 function renderizarApp(rutaInicial: string, cliente = crearClienteApi()) {
   return render(
     <MemoryRouter initialEntries={[rutaInicial]}>
@@ -76,6 +89,7 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/^contraseña$/i, "contrasena-segura-123");
     escribir(/^repetir contraseña$/i, "contrasena-segura-123");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument();
@@ -108,6 +122,7 @@ describe("Formulario de registro", () => {
     // a la API y se pueda comprobar que sus detalles se muestran por campo.
     escribir(/^contraseña$/i, "caballo-bateria-grapa");
     escribir(/^repetir contraseña$/i, "caballo-bateria-grapa");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument();
@@ -130,6 +145,7 @@ describe("Formulario de registro", () => {
     // función que usa la API.
     escribir(/^contraseña$/i, "ana.perez-2026-clave");
     escribir(/^repetir contraseña$/i, "ana.perez-2026-clave");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText(/no puede contener tu correo/i)).toBeInTheDocument();
@@ -152,6 +168,7 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/^contraseña$/i, "contrasena-segura-123");
     escribir(/^repetir contraseña$/i, "contrasena-segura-123");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     await waitFor(() => {
@@ -170,6 +187,7 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/^contraseña$/i, "contrasena-segura-123");
     escribir(/^repetir contraseña$/i, "contrasena-segura-124");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
@@ -187,6 +205,7 @@ describe("Formulario de registro", () => {
     escribir(/nombre/i, "Ana Pérez");
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/^contraseña$/i, "contrasena-segura-123");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     expect(await screen.findByText("Repite tu contraseña.")).toBeInTheDocument();
@@ -232,14 +251,19 @@ describe("Formulario de registro", () => {
     escribir(/correo/i, "ana@ejemplo.cl");
     escribir(/^contraseña$/i, "contrasena-segura-123");
     escribir(/^repetir contraseña$/i, "contrasena-segura-123");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     await screen.findByText(/revisa tu correo/i);
     const [, opciones] = registrosEnviados()[0]!;
+    // Sin la repetición, y con la aceptación expresa de la versión que se mostró.
     expect(JSON.parse(String(opciones?.body))).toEqual({
       nombre: "Ana Pérez",
       correo: "ana@ejemplo.cl",
       contrasena: "contrasena-segura-123",
+      aceptaTerminos: true,
+      mayorDeEdad: true,
+      versionTerminos: "2026-11",
     });
   });
 });

@@ -40,6 +40,29 @@ export interface Usuario {
    * mostrar nada a acusar de "sin verificar" a quien sí lo está.
    */
   correoVerificado?: boolean;
+  /**
+   * true: la cuenta no aceptó la versión vigente de los términos. La web la
+   * lleva a aceptarlos; la API, mientras tanto, rechaza todo lo demás.
+   */
+  terminosPendientes?: boolean;
+}
+
+/** La versión vigente de los términos y la política de privacidad. */
+export interface Terminos {
+  version: string;
+  vigenteDesde: string;
+  /** Texto con «# », «## », «### » y «- » (ver paginas/Terminos.tsx). */
+  contenido: string;
+}
+
+/**
+ * Lo que el registro envía además de los datos de la cuenta. Las casillas
+ * van como `true` literal: la API rechaza cualquier otro valor.
+ */
+export interface AceptacionRegistro {
+  aceptaTerminos: true;
+  mayorDeEdad: true;
+  versionTerminos: string;
 }
 
 interface Sesion {
@@ -708,6 +731,7 @@ function leerUsuario(valor: unknown): Usuario | null {
     rol: valor.rol,
     correoVerificado:
       typeof valor.correoVerificado === "boolean" ? valor.correoVerificado : undefined,
+    terminosPendientes: valor.terminosPendientes === true,
   };
 }
 
@@ -1599,17 +1623,34 @@ export function crearClienteApi() {
   }
 
   return {
-    async registrar(datos: { nombre: string; correo: string; contrasena: string }): Promise<void> {
+    async registrar(datos: { nombre: string; correo: string; contrasena: string } & AceptacionRegistro): Promise<void> {
       await peticion("/auth/registro", { metodo: "POST", cuerpo: datos });
     },
 
-    async registrarPrestador(datos: {
-      nombre: string;
-      correo: string;
-      contrasena: string;
-      rut: string;
-    }): Promise<void> {
+    async registrarPrestador(
+      datos: {
+        nombre: string;
+        correo: string;
+        contrasena: string;
+        rut: string;
+      } & AceptacionRegistro,
+    ): Promise<void> {
       await peticion("/auth/registro-prestador", { metodo: "POST", cuerpo: datos });
+    },
+
+    /** La versión vigente de los términos y la política de privacidad. Pública. */
+    async obtenerTerminosVigentes(): Promise<Terminos> {
+      const cuerpo = await peticion("/terminos/vigente");
+      const terminos = esObjeto(cuerpo) && esObjeto(cuerpo.terminos) ? cuerpo.terminos : null;
+      if (!terminos || typeof terminos.version !== "string" || typeof terminos.contenido !== "string" || typeof terminos.vigenteDesde !== "string") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return { version: terminos.version, vigenteDesde: terminos.vigenteDesde, contenido: terminos.contenido };
+    },
+
+    /** La cuenta con sesión acepta esa versión (la que tuvo en pantalla). */
+    async aceptarTerminos(versionTerminos: string): Promise<void> {
+      await peticion("/terminos/aceptar", { metodo: "POST", cuerpo: { aceptaTerminos: true, versionTerminos }, autenticada: true });
     },
 
     async verificarCorreo(token: string): Promise<void> {
