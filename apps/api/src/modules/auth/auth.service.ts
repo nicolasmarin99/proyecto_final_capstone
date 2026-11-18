@@ -11,6 +11,7 @@ import { ErrorHttp } from "../../shared/errores.js";
 import { firmarAccessToken } from "../../shared/jwt.js";
 import { generarToken, hashearToken } from "../../shared/tokens.js";
 import { enviarSinInterrumpir } from "../correo/index.js";
+import { terminosPendientes, versionAAceptar } from "../terminos/terminos.service.js";
 import {
   correoContrasenaCambiada,
   correoIntentoDeRegistro,
@@ -198,7 +199,16 @@ async function registrarCuenta(
   }
 }
 
+/*
+  Las casillas de aceptación y de mayoría de edad las exige el esquema
+  (z.literal(true)). Aquí se exige además que la versión aceptada sea la
+  vigente: si cambió mientras la persona llenaba el formulario, 409 y se le
+  muestra la nueva. Se revisa antes que la contraseña: no tiene sentido
+  consultar filtraciones para una cuenta que igual se rechazaría.
+*/
+
 export async function registrarCliente(datos: DatosRegistro): Promise<void> {
+  const versionTerminosId = await versionAAceptar(datos.versionTerminos);
   await exigirContrasenaUsable(datos.contrasena, datos);
 
   const hashContrasena = await hash(datos.contrasena, { algorithm: Algorithm.Argon2id });
@@ -208,11 +218,13 @@ export async function registrarCliente(datos: DatosRegistro): Promise<void> {
       nombre: datos.nombre,
       correo: datos.correo,
       hashContrasena,
+      versionTerminosId,
     }),
   );
 }
 
 export async function registrarPrestador(datos: DatosRegistroPrestador): Promise<void> {
+  const versionTerminosId = await versionAAceptar(datos.versionTerminos);
   await exigirContrasenaUsable(datos.contrasena, datos);
 
   const hashContrasena = await hash(datos.contrasena, { algorithm: Algorithm.Argon2id });
@@ -223,8 +235,14 @@ export async function registrarPrestador(datos: DatosRegistroPrestador): Promise
       correo: datos.correo,
       hashContrasena,
       rut: datos.rut,
+      versionTerminosId,
     }),
   );
+}
+
+/** La cuenta tal como la ve la web, con si le falta aceptar los términos vigentes. */
+async function conEstadoTerminos<T extends { id: string }>(usuario: T): Promise<T & { terminosPendientes: boolean }> {
+  return { ...usuario, terminosPendientes: await terminosPendientes(usuario.id) };
 }
 
 /**
@@ -337,10 +355,12 @@ export async function iniciarSesion(datos: DatosLogin, agenteUsuario: string | n
     agenteUsuario,
   });
 
+  // Iniciar sesión no exige los términos: si faltan, la web los muestra con
+  // terminosPendientes, y la API rechaza todo lo demás hasta aceptarlos.
   return {
     accessToken: firmarAccessToken({ sub: usuario.id, rol: usuario.rol }),
     tokenRefresco,
-    usuario,
+    usuario: await conEstadoTerminos(usuario),
   };
 }
 
@@ -353,7 +373,7 @@ export async function obtenerUsuarioActivo(id: string) {
     throw new ErrorHttp(401, "TOKEN_INVALIDO", "El token de acceso no es válido.");
   }
 
-  return usuario;
+  return conEstadoTerminos(usuario);
 }
 
 export async function refrescarSesion(token: string | null, agenteUsuario: string | null) {
@@ -401,7 +421,7 @@ export async function refrescarSesion(token: string | null, agenteUsuario: strin
   return {
     accessToken: firmarAccessToken({ sub: usuario.id, rol: usuario.rol }),
     tokenRefresco: nuevoToken,
-    usuario,
+    usuario: await conEstadoTerminos(usuario),
   };
 }
 
@@ -572,5 +592,5 @@ export async function convertirEnPrestador(usuarioId: string, rut: string) {
     throw new ErrorHttp(409, "CONVERSION_NO_DISPONIBLE", "Tu cuenta ya no es de cliente; vuelve a iniciar sesión.");
   }
 
-  return { usuario, accessToken: firmarAccessToken({ sub: usuario.id, rol: usuario.rol }) };
+  return { usuario: await conEstadoTerminos(usuario), accessToken: firmarAccessToken({ sub: usuario.id, rol: usuario.rol }) };
 }

@@ -7,6 +7,7 @@ import {
   revisarContrasena,
 } from "@localcl/shared";
 import { z } from "zod";
+import { camposAceptacion } from "../terminos/terminos.schema.js";
 
 /**
  * Aplica las reglas compartidas al objeto completo, que es donde hace falta:
@@ -58,6 +59,10 @@ const camposRegistro = z.object({
     .string({ error: "La contraseña es obligatoria." })
     .min(LARGO_MINIMO_CONTRASENA, mensajeDeProblema("MUY_CORTA"))
     .max(LARGO_MAXIMO_CONTRASENA, mensajeDeProblema("MUY_LARGA")),
+  // Aceptación expresa de los términos y la política de privacidad (la
+  // versión que la persona tuvo en pantalla) y declaración de mayoría de
+  // edad. Iguales para clientes y prestadores.
+  ...camposAceptacion,
 });
 
 // El refinamiento se aplica a cada esquema final y no a camposRegistro, porque

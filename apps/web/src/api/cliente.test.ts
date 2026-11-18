@@ -59,7 +59,7 @@ describe("cliente de la API", () => {
     );
 
     const error = await cliente
-      .registrar({ nombre: "Ana", correo: "ana@ejemplo.cl", contrasena: "corta" })
+      .registrar({ nombre: "Ana", correo: "ana@ejemplo.cl", contrasena: "corta", aceptaTerminos: true, mayorDeEdad: true, versionTerminos: "2026-11" })
       .catch((causa: unknown) => causa);
 
     expect(error).toBeInstanceOf(ErrorApi);

@@ -10,6 +10,7 @@ import { clienteApi, ErrorApi, type ClienteApi } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { confirmarReglas, confirmarRepeticion } from "../auth/confirmacionesContrasena";
 import { revisarRepeticion } from "../auth/repeticionContrasena";
+import { AceptacionTerminos, erroresAceptacion, useVersionTerminos } from "../componentes/AceptacionTerminos";
 import { Boton } from "../componentes/Boton";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { PaginaAuth } from "../componentes/PaginaAuth";
@@ -25,6 +26,9 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [mayorDeEdad, setMayorDeEdad] = useState(false);
+  const terminos = useVersionTerminos(cliente);
 
   // Se usa el mismo paquete que valida la API, así que la regla es una sola.
   const rutNormalizado = normalizarRut(rut);
@@ -61,10 +65,26 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
       return;
     }
 
+    // Las casillas, igual que la API: sin aceptación expresa no hay cuenta.
+    const faltaAceptar = erroresAceptacion(aceptaTerminos, mayorDeEdad, terminos.version);
+    if (Object.keys(faltaAceptar).length > 0) {
+      setErrores(faltaAceptar);
+      return;
+    }
+    if (!terminos.version) return;
+
     setEnviando(true);
 
     try {
-      await cliente.registrarPrestador({ nombre, correo, contrasena, rut: rutNormalizado });
+      await cliente.registrarPrestador({
+        nombre,
+        correo,
+        contrasena,
+        rut: rutNormalizado,
+        aceptaTerminos: true,
+        mayorDeEdad: true,
+        versionTerminos: terminos.version,
+      });
 
       navegar("/revisa-tu-correo", { replace: true, state: { correo } });
     } catch (error) {
@@ -72,6 +92,11 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
         setErrores(
           Object.fromEntries(error.detalles.map((detalle) => [detalle.campo, detalle.mensaje])),
         );
+      } else if (error instanceof ErrorApi && error.codigo === "TERMINOS_DESACTUALIZADOS") {
+        // Cambiaron mientras llenaba el formulario: se carga la versión nueva y se vuelve a pedir la casilla.
+        setAceptaTerminos(false);
+        terminos.recargar();
+        setErrores({ aceptaTerminos: error.message });
       } else if (error instanceof ErrorApi) {
         setErrorGeneral(error.message);
       } else {
@@ -184,6 +209,16 @@ export default function PaginaRegistroPrestador({ cliente = clienteApi }: { clie
           alCambiar={setRepeticion}
           error={errores.repeticion}
           valido={confirmarRepeticion(contrasena, repeticion)}
+        />
+
+        <AceptacionTerminos
+          aceptaTerminos={aceptaTerminos}
+          alCambiarTerminos={setAceptaTerminos}
+          mayorDeEdad={mayorDeEdad}
+          alCambiarMayorDeEdad={setMayorDeEdad}
+          errores={errores}
+          version={terminos.version}
+          sinVersion={terminos.error}
         />
 
         <Boton type="submit" cargando={enviando} className="mt-7">

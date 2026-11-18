@@ -16,11 +16,24 @@ function json(cuerpo: unknown, status = 200): Response {
   } as Response;
 }
 
-/** Sin sesión previa: el refresco de arranque falla, como en un navegador nuevo. */
+/**
+ * Sin sesión previa: el refresco de arranque falla, como en un navegador
+ * nuevo. Los términos vigentes sí cargan (son públicos).
+ */
 function sinSesion() {
-  vi.mocked(fetch).mockResolvedValue(json({ error: { codigo: "SESION_INVALIDA" } }, 401));
+  vi.mocked(fetch).mockImplementation(async (url) =>
+    String(url) === "/api/terminos/vigente"
+      ? json({ terminos: { version: "2026-11", vigenteDesde: "2026-11-18T03:00:00.000Z", contenido: "# Términos" } })
+      : json({ error: { codigo: "SESION_INVALIDA" } }, 401),
+  );
 }
 
+/** Espera a que carguen los términos vigentes y marca las dos casillas, como haría la persona. */
+async function marcarAceptacion() {
+  await screen.findByText(/términos vigentes: versión 2026-11/i);
+  fireEvent.click(screen.getByLabelText(/leí y acepto/i));
+  fireEvent.click(screen.getByLabelText(/mayor de 18 años/i));
+}
 function renderizar(cliente = crearClienteApi()) {
   return render(
     <MemoryRouter initialEntries={["/registro-prestador"]}>
@@ -65,6 +78,7 @@ describe("Registro de prestador", () => {
 
     completarFormulario(RUT_VALIDO);
     escribir(/^repetir contraseña$/i, "otra-contrasena-distinta");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     expect(await screen.findByText("Las contraseñas no coinciden.")).toBeInTheDocument();
@@ -82,6 +96,7 @@ describe("Registro de prestador", () => {
     vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo." }, 202));
 
     completarFormulario(RUT_VALIDO);
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument();
@@ -95,6 +110,7 @@ describe("Registro de prestador", () => {
     vi.mocked(fetch).mockResolvedValue(json({ mensaje: "Si el correo no estaba registrado, te enviamos un enlace para confirmarlo." }, 202));
 
     completarFormulario("12.345.678-5");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     await waitFor(() => {
@@ -132,6 +148,7 @@ describe("Registro de prestador", () => {
 
     // Dígito verificador incorrecto: el 5 es el correcto para este cuerpo.
     completarFormulario("12.345.678-9");
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     expect(await screen.findByText(/el rut no es válido/i)).toBeInTheDocument();
@@ -165,6 +182,7 @@ describe("Registro de prestador", () => {
     );
 
     completarFormulario(RUT_VALIDO);
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     expect(await screen.findByText(/el rut no es válido/i)).toBeInTheDocument();
@@ -188,6 +206,7 @@ describe("Registro de prestador", () => {
     );
 
     completarFormulario(RUT_VALIDO);
+    await marcarAceptacion();
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta de prestador/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/no fue posible completar/i);

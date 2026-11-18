@@ -2,6 +2,7 @@ import { Algorithm, hash } from "@node-rs/argon2";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -36,6 +37,7 @@ async function crearUsuario(rol: Rol, correoVerificado = true) {
   const correo = `persona${secuencia}@ejemplo.cl`;
   await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: `Persona ${secuencia}`,
       rol,

@@ -6,6 +6,7 @@ import { fechaDeHoyEnChile } from "@localcl/shared";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -33,6 +34,7 @@ async function crearUsuario(rol: Rol, nombre?: string) {
   const correo = `historial${secuencia}@ejemplo.cl`;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: nombre ?? `Persona${secuencia} Apellido Segundo`,
       rol,
@@ -518,6 +520,8 @@ describe("El historial sobrevive a la publicación y a la cuenta del prestador",
     // Hoy la plataforma no borra cuentas con contactos (RESTRICT); se simula
     // el borrado futuro quitando primero ese historial.
     await prisma.contacto.deleteMany({ where: { prestadorId: prestador.perfilId } });
+    // La aceptación de términos también es RESTRICT (evidencia de consentimiento).
+    await prisma.aceptacionTerminos.deleteMany({ where: { usuarioId: prestador.id } });
     await prisma.usuario.delete({ where: { id: prestador.id } });
 
     const respuesta = await listar(cliente.token);
@@ -545,6 +549,7 @@ describe("El historial sobrevive a la publicación y a la cuenta del prestador",
     expect((await registrar(otro.token, { servicioId: prestador.servicioId, fechaContratacion: dia(-1) })).status).toBe(201);
     // Igual que arriba: el contacto es RESTRICT, se quita antes de borrar la cuenta.
     await prisma.contacto.deleteMany({ where: { clienteId: cliente.id } });
+    await prisma.aceptacionTerminos.deleteMany({ where: { usuarioId: cliente.id } });
 
     await prisma.usuario.delete({ where: { id: cliente.id } });
 

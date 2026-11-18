@@ -1,5 +1,9 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { CATEGORIAS, COMUNAS, REGIONES, TERMINOS_INICIALES, TIPOS_CREDENCIAL } from "./datos.js";
+import { TERMINOS_2026_11 } from "./terminos.js";
+
+/** Todas las versiones publicadas, de la más antigua a la vigente. Rige la de vigenteDesde más reciente ya alcanzada. */
+const VERSIONES_TERMINOS = [TERMINOS_INICIALES, TERMINOS_2026_11];
 
 export interface ResumenMaestros {
   regiones: number;
@@ -44,18 +48,16 @@ export async function cargarMaestros(prisma: PrismaClient): Promise<ResumenMaest
       await tx.tipoCredencial.upsert({ where: { codigo }, create: { codigo, ...resto }, update: resto });
     }
 
-    await tx.versionTerminos.upsert({
-      where: { version: TERMINOS_INICIALES.version },
-      create: TERMINOS_INICIALES,
-      update: {},
-    });
+    for (const version of VERSIONES_TERMINOS) {
+      await tx.versionTerminos.upsert({ where: { version: version.version }, create: version, update: {} });
+    }
 
     return {
       regiones: REGIONES.length,
       comunas: COMUNAS.length,
       categorias: CATEGORIAS.length,
       tiposCredencial: TIPOS_CREDENCIAL.length,
-      versionesTerminos: 1,
+      versionesTerminos: VERSIONES_TERMINOS.length,
     };
   }, { timeout: 120_000, maxWait: 10_000 });
 }

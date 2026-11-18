@@ -17,6 +17,8 @@ interface ValorContexto {
   /** Cliente → prestador, con el mismo correo. La sesión sigue, con el rol nuevo. */
   convertirEnPrestador(rut: string): Promise<void>;
   cerrarSesion(): Promise<void>;
+  /** Acepta esa versión de los términos; la sesión deja de tenerlos pendientes. */
+  aceptarTerminos(version: string): Promise<void>;
   /** La foto de perfil vigente de la sesión, para el encabezado. null: sin foto (o todavía no se sabe). */
   foto: FotoPerfil | null;
   /** Tras subir, cambiar o quitar la foto: el encabezado la refleja sin recargar. */
@@ -71,9 +73,11 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
 
   // La foto se pide aparte de la sesión: no es parte del token ni de /auth/yo.
   // Si falla, el encabezado muestra la inicial; no hay nada más que avisar.
+  // Con los términos pendientes la API rechaza la foto (403): se pide después de aceptarlos.
+  const terminosPendientes = usuario?.terminosPendientes === true;
   useEffect(() => {
     setFoto(null);
-    if (!idUsuario) return;
+    if (!idUsuario || terminosPendientes) return;
     let cancelado = false;
     cliente
       .obtenerMiFoto()
@@ -84,7 +88,7 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
     return () => {
       cancelado = true;
     };
-  }, [cliente, idUsuario]);
+  }, [cliente, idUsuario, terminosPendientes]);
 
   const iniciarSesion = useCallback(
     async (correo: string, contrasena: string) => {
@@ -110,9 +114,17 @@ export function ProveedorAuth({ children, cliente = clienteApi }: Props) {
     }
   }, [cliente]);
 
+  const aceptarTerminos = useCallback(
+    async (version: string) => {
+      await cliente.aceptarTerminos(version);
+      setUsuario((actual) => (actual ? { ...actual, terminosPendientes: false } : actual));
+    },
+    [cliente],
+  );
+
   const valor = useMemo(
-    () => ({ usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, foto, actualizarFoto: setFoto }),
-    [usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, foto],
+    () => ({ usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, aceptarTerminos, foto, actualizarFoto: setFoto }),
+    [usuario, cliente, cargando, iniciarSesion, convertirEnPrestador, cerrarSesion, aceptarTerminos, foto],
   );
 
   // El estado del prestador vive dentro: depende de quién inició sesión, y

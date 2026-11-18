@@ -2,8 +2,10 @@ import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { prisma } from "../../src/db.js";
+import { ACEPTACION_REGISTRO, asegurarTerminosVigentes } from "../terminos.js";
 
 const registroValido = {
+  ...ACEPTACION_REGISTRO,
   nombre: "Ana Pérez",
   correo: "ana.perez@ejemplo.cl",
   contrasena: "contrasena-segura-123",
@@ -12,10 +14,13 @@ const registroValido = {
 // Cada prueba parte de una base limpia, así ninguna depende del orden
 // en que Vitest las ejecute ni de lo que haya dejado la anterior.
 beforeEach(async () => {
+  await asegurarTerminosVigentes();
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });

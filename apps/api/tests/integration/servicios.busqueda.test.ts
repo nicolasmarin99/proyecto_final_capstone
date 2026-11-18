@@ -1,6 +1,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { EstadoServicio } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -31,6 +32,7 @@ async function crearPrestador(opciones: { identidad?: boolean; comunas?: number[
   secuencia += 1;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo: `prestador${secuencia}@ejemplo.cl`,
       nombre: opciones.nombre ?? `Prestador ${secuencia}`,
       rol: "PRESTADOR",
@@ -354,7 +356,7 @@ describe("GET /servicios: contenido de cada resultado", () => {
     // Una verificación debe ser trazable (CHECK credenciales_verificacion_trazable):
     // cuándo se consultó y, si fue manual, qué administrador la revisó.
     const administrador = await prisma.usuario.create({
-      data: { correo: "admin.busqueda@ejemplo.cl", nombre: "Admin", rol: "ADMINISTRADOR", correoVerificado: true },
+      data: { ...TERMINOS_ACEPTADOS, correo: "admin.busqueda@ejemplo.cl", nombre: "Admin", rol: "ADMINISTRADOR", correoVerificado: true },
     });
     const fechaConsulta = new Date("2026-10-01T12:00:00Z");
     const manual = { estado: "VERIFICADA", metodo: "MANUAL", fechaConsulta, verificadoPorId: administrador.id } as const;

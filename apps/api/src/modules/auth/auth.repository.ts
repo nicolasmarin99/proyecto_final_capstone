@@ -18,28 +18,46 @@ const camposPublicos = {
   creadoEn: true,
 } as const;
 
+/**
+ * La aceptación de los términos se crea en la MISMA escritura que la cuenta
+ * (create anidado: una sola transacción). No puede existir una cuenta sin la
+ * prueba de que aceptó, ni una aceptación sin su cuenta.
+ */
+function conAceptacion(versionTerminosId: string) {
+  return { aceptacionesTerminos: { create: { versionId: versionTerminosId } } };
+}
+
 /** Única capa que habla con Prisma. El rol lo fija el servidor, no el cliente. */
-export async function crearCliente(datos: {
+export async function crearCliente({
+  versionTerminosId,
+  ...datos
+}: {
   nombre: string;
   correo: string;
   hashContrasena: string;
+  versionTerminosId: string;
 }) {
   return prisma.usuario.create({
-    data: { ...datos, rol: Rol.CLIENTE },
+    data: { ...datos, rol: Rol.CLIENTE, ...conAceptacion(versionTerminosId) },
     select: camposPublicos,
   });
 }
 
 /** El rol y el estado del RUT los fija el servidor, nunca el cliente. */
-export async function crearPrestador(datos: {
+export async function crearPrestador({
+  versionTerminosId,
+  ...datos
+}: {
   nombre: string;
   correo: string;
   hashContrasena: string;
   rut: string;
+  versionTerminosId: string;
 }) {
   return prisma.usuario.create({
     data: {
       ...datos,
+      ...conAceptacion(versionTerminosId),
       rol: Rol.PRESTADOR,
       // Se guarda explícitamente en false aunque ese sea el valor por defecto
       // del esquema, porque aquí la distinción importa: el RUT está bien

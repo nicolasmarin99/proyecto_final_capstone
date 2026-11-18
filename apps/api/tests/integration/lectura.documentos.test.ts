@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../../src/app.js";
+import { TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import type { Rol } from "../../src/generated/prisma/client.js";
 import { cargarMaestros } from "../../src/maestros/cargarMaestros.js";
@@ -72,6 +73,7 @@ async function crearUsuario(rol: Rol, opciones: { nombre?: string; rut?: string 
   const correo = `lectura${secuencia}@ejemplo.cl`;
   const usuario = await prisma.usuario.create({
     data: {
+      ...TERMINOS_ACEPTADOS,
       correo,
       nombre: opciones.nombre ?? `Persona ${secuencia}`,
       rol,

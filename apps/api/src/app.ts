@@ -24,6 +24,7 @@ import { rutasReportesAdmin } from "./modules/reportes/reportes.routes.js";
 import { rutasPrestadores } from "./modules/prestadores/prestadores.routes.js";
 import { rutasCategorias, rutasServicios } from "./modules/servicios/servicios.routes.js";
 import { rutasComunas } from "./modules/territorio/territorio.routes.js";
+import { rutasTerminos } from "./modules/terminos/terminos.routes.js";
 import { rutasValoraciones, rutasValoracionesRecibidas } from "./modules/valoraciones/valoraciones.routes.js";
 import { ErrorHttp } from "./shared/errores.js";
 
@@ -44,6 +45,8 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/auth", rutasAuth);
+// Términos y política de privacidad: leer la vigente (público) y aceptarla.
+app.use("/terminos", rutasTerminos);
 // Antes que /admin y /prestadores: las rutas más específicas primero.
 app.use("/admin/identidades", rutasIdentidadAdmin);
 app.use("/admin/imagenes", rutasImagenesAdmin);

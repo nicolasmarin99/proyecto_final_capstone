@@ -2,6 +2,7 @@ import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { prisma } from "../../src/db.js";
+import { ACEPTACION_REGISTRO, asegurarTerminosVigentes } from "../terminos.js";
 import { TipoToken } from "../../src/generated/prisma/client.js";
 import { hashearToken } from "../../src/shared/tokens.js";
 import { bandeja } from "../bandeja.js";
@@ -10,6 +11,7 @@ const CONTRASENA = "contrasena-segura-123";
 const NUEVA = "contrasena-nueva-456789";
 
 const registro = {
+  ...ACEPTACION_REGISTRO,
   nombre: "Ana Pérez",
   correo: "ana.perez@ejemplo.cl",
   contrasena: CONTRASENA,
@@ -71,11 +73,14 @@ async function pedirEnlaceDeRecuperacion(): Promise<string> {
 }
 
 beforeEach(async () => {
+  await asegurarTerminosVigentes();
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   bandeja().vaciar();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });

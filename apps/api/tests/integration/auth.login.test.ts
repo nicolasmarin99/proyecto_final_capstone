@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
+import { ACEPTACION_REGISTRO, asegurarTerminosVigentes, TERMINOS_ACEPTADOS } from "../terminos.js";
 import { prisma } from "../../src/db.js";
 import { env } from "../../src/env.js";
 
@@ -13,7 +14,7 @@ const credenciales = {
   contrasena: "contrasena-segura-123",
 };
 
-const registroValido = { nombre: "Ana Pérez", ...credenciales };
+const registroValido = { nombre: "Ana Pérez", ...credenciales, ...ACEPTACION_REGISTRO };
 
 /** set-cookie llega como arreglo; se normaliza sin recurrir a any. */
 function cookiesDe(respuesta: request.Response): string[] {
@@ -49,11 +50,14 @@ async function registrarYAutenticar() {
 }
 
 beforeEach(async () => {
+  await asegurarTerminosVigentes();
   // Las sesiones caen por cascada al borrar el usuario.
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
 });
 
 afterAll(async () => {
+  await prisma.aceptacionTerminos.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.$disconnect();
 });
@@ -120,6 +124,7 @@ describe("POST /auth/login", () => {
     // Caso real: una cuenta creada solo con un proveedor externo.
     await prisma.usuario.create({
       data: {
+        ...TERMINOS_ACEPTADOS,
         correo: "solo.google@ejemplo.cl",
         nombre: "Cuenta Externa",
         hashContrasena: null,
