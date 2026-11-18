@@ -15,6 +15,9 @@ interface Props {
   valido?: string;
   /** Teclado en pantalla del móvil: "numeric" para números, "tel" para teléfonos. */
   inputMode?: "numeric" | "tel";
+  /** Límites del selector de fecha («AAAA-MM-DD»). Ayudan a elegir; la API es la que valida. */
+  min?: string;
+  max?: string;
 }
 
 /**
@@ -39,6 +42,8 @@ export function CampoTexto({
   ayuda,
   valido,
   inputMode,
+  min,
+  max,
 }: Props) {
   const [visible, setVisible] = useState(false);
   const esContrasena = tipo === "password";
@@ -58,6 +63,8 @@ export function CampoTexto({
           type={esContrasena && visible ? "text" : tipo}
           autoComplete={autoComplete}
           inputMode={inputMode}
+          min={min}
+          max={max}
           value={valor}
           onChange={(evento) => alCambiar(evento.target.value)}
           aria-invalid={error ? true : undefined}

@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MAXIMO_IMAGENES_SERVICIO } from "@localcl/shared";
+import { MAXIMO_IMAGENES_SERVICIO, fechaDeHoyEnChile } from "@localcl/shared";
 import { hash } from "@node-rs/argon2";
 import { prisma } from "../src/db.js";
 import type { MotivoDenuncia, UnidadPrecio } from "../src/generated/prisma/client.js";
@@ -669,6 +669,111 @@ async function sembrarCursoRevisado(
   });
 }
 
+interface ContratacionDemo {
+  prestador: string;
+  servicio: string;
+  /** Índice en CLIENTES_DEMO. Debe tener un contacto con ese prestador (lo siembra sembrarValoraciones). */
+  cliente: number;
+  haceDias: number;
+  notas: string | null;
+}
+
+/**
+ * Historial privado de Camila (demo.cliente1), para mostrar cada caso:
+ * - el calefont de Pedro DOS veces (es una mantención que se repite);
+ * - el tablero de Carolina, sin notas;
+ * - un servicio que Pedro borró después (ver sembrarContrataciones).
+ */
+const CONTRATACIONES_DEMO: ContratacionDemo[] = [
+  { prestador: "demo.pedro@localcl.cl", servicio: "Mantención e instalación de calefont", cliente: 0, haceDias: 39, notas: "Cobró $45.000 con repuestos. La próxima mantención, en un año." },
+  { prestador: "demo.pedro@localcl.cl", servicio: "Mantención e instalación de calefont", cliente: 0, haceDias: 110, notas: "Primera vez: cambió el termopar." },
+  { prestador: "demo.carolina@localcl.cl", servicio: "Tableros eléctricos y certificación TE1", cliente: 0, haceDias: 24, notas: null },
+];
+
+/** Una publicación que el prestador borra DESPUÉS de que Camila la registró. */
+const SERVICIO_BORRADO_DEMO = {
+  prestador: "demo.pedro@localcl.cl",
+  titulo: "Instalación de lavaplatos y llaves",
+  cliente: 0,
+  haceDias: 70,
+  notas: "Instaló la llave nueva de la cocina.",
+};
+
+/** «AAAA-MM-DD» de hace `dias` días, en hora de Chile, como DATE. */
+function diaChileno(dias: number): Date {
+  const hoy = new Date(`${fechaDeHoyEnChile()}T00:00:00Z`);
+  return new Date(hoy.getTime() - dias * 24 * HORA);
+}
+
+/**
+ * Siembra el historial de servicios contratados. Se REHACE en cada corrida:
+ * son registros privados de las cuentas de demostración y nada cuelga de
+ * ellos. El caso del servicio borrado se arma como pasaría de verdad: se
+ * crea la publicación, Camila la registra y el prestador la borra; la base
+ * pone servicio_id en NULL (SET NULL) y el título queda copiado.
+ */
+async function sembrarContrataciones(): Promise<number> {
+  const correos = [...new Set([...CONTRATACIONES_DEMO.map((c) => c.cliente), SERVICIO_BORRADO_DEMO.cliente])].flatMap((i) => {
+    const cliente = CLIENTES_DEMO[i];
+    return cliente ? [cliente.correo] : [];
+  });
+  await prisma.contratacion.deleteMany({ where: { cliente: { correo: { in: correos } } } });
+
+  let creadas = 0;
+  for (const demo of CONTRATACIONES_DEMO) {
+    const cliente = await prisma.usuario.findUnique({ where: { correo: CLIENTES_DEMO[demo.cliente]?.correo ?? "" }, select: { id: true } });
+    const servicio = await prisma.servicio.findFirst({
+      where: { titulo: demo.servicio, prestador: { usuario: { correo: demo.prestador } } },
+      select: { id: true, titulo: true, prestadorId: true, prestador: { select: { usuario: { select: { nombre: true } } } } },
+    });
+    if (!cliente || !servicio) continue;
+    await prisma.contratacion.create({
+      data: {
+        clienteId: cliente.id,
+        servicioId: servicio.id,
+        prestadorId: servicio.prestadorId,
+        fechaContratacion: diaChileno(demo.haceDias),
+        tituloServicio: servicio.titulo,
+        nombrePrestador: servicio.prestador.usuario.nombre,
+        notas: demo.notas,
+      },
+    });
+    creadas += 1;
+  }
+
+  const cliente = await prisma.usuario.findUnique({ where: { correo: CLIENTES_DEMO[SERVICIO_BORRADO_DEMO.cliente]?.correo ?? "" }, select: { id: true } });
+  const perfil = await prisma.perfilPrestador.findFirst({
+    where: { usuario: { correo: SERVICIO_BORRADO_DEMO.prestador } },
+    select: { id: true, usuario: { select: { nombre: true } } },
+  });
+  if (cliente && perfil) {
+    const temporal = await prisma.servicio.create({
+      data: {
+        prestadorId: perfil.id,
+        categoriaId: await idCategoria("gasfiteria"),
+        titulo: SERVICIO_BORRADO_DEMO.titulo,
+        descripcion: "Instalación de lavaplatos, llaves y sifones. Publicación de demostración que se borra al sembrar.",
+        estado: "PAUSADO",
+      },
+    });
+    await prisma.contratacion.create({
+      data: {
+        clienteId: cliente.id,
+        servicioId: temporal.id,
+        prestadorId: perfil.id,
+        fechaContratacion: diaChileno(SERVICIO_BORRADO_DEMO.haceDias),
+        tituloServicio: temporal.titulo,
+        nombrePrestador: perfil.usuario.nombre,
+        notas: SERVICIO_BORRADO_DEMO.notas,
+      },
+    });
+    // Sin contactos ni reportes: el borrado procede, y el registro queda con servicio_id en NULL.
+    await prisma.servicio.delete({ where: { id: temporal.id } });
+    creadas += 1;
+  }
+  return creadas;
+}
+
 async function main() {
   const hashContrasena = await hash(CONTRASENA);
   let servicios = 0;
@@ -777,6 +882,8 @@ async function main() {
 
   const reportes = await sembrarReportes(idsPorTitulo, hashContrasena);
   const valoraciones = await sembrarValoraciones(hashContrasena);
+  // Después de las valoraciones: necesita los contactos que ellas siembran.
+  const contrataciones = await sembrarContrataciones();
 
   // Se vectorizan, en lotes, los servicios nuevos o cuyo texto cambió (los
   // demás conservan su vector), con el proveedor de EMBEDDINGS_PROVEEDOR. Si
@@ -789,7 +896,7 @@ async function main() {
   );
 
   console.log(
-    `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos, ${reportes} reportes y ${valoraciones} valoraciones nuevas de demostración listos`,
+    `${PRESTADORES.length} prestadores, ${servicios} servicios, ${fotos} fotos, ${reportes} reportes, ${valoraciones} valoraciones nuevas y ${contrataciones} servicios contratados de demostración listos`,
   );
   if (fotos === 0) {
     console.log(`Sin fotos: copia archivos JPG, PNG o WEBP en ${CARPETA_FOTOS} (ver su README.md) y vuelve a correr el seed.`);

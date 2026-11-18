@@ -10,6 +10,7 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { rutasAdmin } from "./modules/admin/admin.routes.js";
 import { rutasAuth } from "./modules/auth/auth.routes.js";
+import { rutasContrataciones } from "./modules/contrataciones/contrataciones.routes.js";
 import {
   rutasCatalogoCertificaciones,
   rutasCertificacionesAdmin,
@@ -52,6 +53,8 @@ app.use("/prestadores/yo/identidad", rutasIdentidadPrestador);
 app.use("/prestadores/yo/certificaciones", rutasCertificacionesPrestador);
 app.use("/prestadores/yo/valoraciones", rutasValoracionesRecibidas);
 app.use("/valoraciones", rutasValoraciones);
+// El historial privado de servicios contratados: solo las filas propias.
+app.use("/contrataciones", rutasContrataciones);
 // La foto de perfil propia (cualquier rol) y los reportes sobre la de otros.
 app.use("/cuenta/foto", rutasMiFoto);
 app.use("/fotos-perfil", rutasFotosPerfil);

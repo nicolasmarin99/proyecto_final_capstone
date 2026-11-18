@@ -85,6 +85,7 @@ model Usuario {
   imagenesRevisadas       ImagenServicio[]     @relation("ImagenesRevisadas")
   decisionesReporte       DecisionReporte[]
   fotosPerfil             FotoPerfil[]
+  contrataciones          Contratacion[]
 
   @@index([rol])
   @@map("usuarios")
@@ -148,6 +149,7 @@ model PerfilPrestador {
   credenciales    Credencial[]
   contactos       Contacto[]
   comunasAtencion PrestadorComuna[]
+  contrataciones  Contratacion[]
 
   @@index([comunaId])
   @@index([ubicacion], type: Gist)
@@ -259,6 +261,10 @@ model Servicio {
   denuncias    Denuncia[]
   imagenes     ImagenServicio[]
   valoraciones Valoracion[]
+  /// Registros privados de clientes. No cuentan como historial al borrar el
+  /// servicio (SET NULL): si bloquearan el borrado, el prestador deduciría
+  /// que alguien lo marcó como contratado.
+  contrataciones Contratacion[]
 
   /// Destino de la clave compuesta de contactos (servicio del mismo prestador).
   @@unique([id, prestadorId])
@@ -729,6 +735,53 @@ model RespuestaValoracion {
   actualizadoEn DateTime   @updatedAt @map("actualizado_en")
 
   @@map("respuestas_valoracion")
+}
+
+/// Registro PRIVADO de un servicio que el cliente dice haber contratado.
+/// Es un historial personal, no una transacción: el prestador no lo
+/// confirma, no lo ve y no se entera. Solo el módulo contrataciones lo lee,
+/// y siempre filtrado por el cliente dueño.
+///
+/// tituloServicio y nombrePrestador son COPIAS deliberadas, tomadas al
+/// registrar: si la publicación o la cuenta del prestador se borran, las
+/// claves quedan en nulo (SET NULL) y el historial sigue legible. No rompen
+/// la 3FN en la práctica: no dependen del servicio actual, sino del momento
+/// del registro (son un hecho histórico, como el precio en una boleta).
+///
+/// servicioId y prestadorId son dos claves independientes y no una
+/// compuesta: con una compuesta, SET NULL anularía también prestadorId al
+/// borrarse solo el servicio. Que el servicio sea de ese prestador lo fija
+/// la API, que copia el prestador desde el servicio, nunca desde el cliente.
+///
+/// CHECK en la base: la fecha no es futura (en hora de Chile) ni anterior a
+/// 2000, las notas tienen a lo más 500 caracteres y las copias no son vacías.
+model Contratacion {
+  id                String           @id @default(uuid())
+  clienteId         String           @map("cliente_id")
+  /// CASCADE: si la cuenta del cliente se borra, su historial personal también.
+  cliente           Usuario          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  servicioId        String?          @map("servicio_id")
+  servicio          Servicio?        @relation(fields: [servicioId], references: [id], onDelete: SetNull)
+  prestadorId       String?          @map("prestador_id")
+  prestador         PerfilPrestador? @relation(fields: [prestadorId], references: [id], onDelete: SetNull)
+  /// El día en que se contrató, que el cliente indica y puede corregir. No
+  /// es la fecha del registro (creadoEn).
+  fechaContratacion DateTime         @map("fecha_contratacion") @db.Date
+  tituloServicio    String           @map("titulo_servicio")
+  nombrePrestador   String           @map("nombre_prestador")
+  notas             String?
+  creadoEn          DateTime         @default(now()) @map("creado_en")
+  actualizadoEn     DateTime         @updatedAt @map("actualizado_en")
+
+  /// Un servicio recurrente se registra varias veces, en fechas distintas;
+  /// la misma fecha dos veces es un doble envío. Con el servicio ya borrado
+  /// (nulo) no aplica: PostgreSQL no compara nulos en un UNIQUE.
+  @@unique([clienteId, servicioId, fechaContratacion])
+  /// La lista del cliente: por fecha, la más reciente primero.
+  @@index([clienteId, fechaContratacion(sort: Desc)])
+  @@index([servicioId])
+  @@index([prestadorId])
+  @@map("contrataciones")
 }
 
 // ─── Cumplimiento ────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { EstadoPrestador } from "../componentes/EstadoPrestador";
 import { FotoDePerfil } from "../componentes/FotoDePerfil";
 import { OfrecerServicios } from "../componentes/OfrecerServicios";
 import { Pagina } from "../componentes/Pagina";
+import { ServiciosContratados } from "../componentes/ServiciosContratados";
 
 export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: ClienteApi }) {
   const navegar = useNavigate();
@@ -90,6 +91,9 @@ export default function PaginaPerfil({ cliente = clienteApi }: { cliente?: Clien
             </div>
           </dl>
         )}
+
+        {/* Historial privado: de quien contrata (un cliente, o un prestador que contrató a otro). */}
+        {(perfil?.rol === "CLIENTE" || perfil?.rol === "PRESTADOR") && <ServiciosContratados cliente={cliente} />}
 
         {perfil?.rol === "PRESTADOR" && <EstadoPrestador cliente={cliente} />}
         {/* Un cliente que quiere ofrecer servicios: la misma cuenta, no otra. */}
