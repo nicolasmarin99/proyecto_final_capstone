@@ -1,4 +1,5 @@
-import { DIAS_PARA_VALORAR } from "@localcl/shared";
+// El mismo recorte que el mensaje de WhatsApp: lo único del cliente que se publica.
+import { DIAS_PARA_VALORAR, nombreDePila } from "@localcl/shared";
 import { ErrorHttp } from "../../shared/errores.js";
 import { fotoPublica } from "../fotos-perfil/fotos-perfil.urls.js";
 import { contarServiciosVisiblesDe, esServicioVisible } from "../servicios/servicios.visibilidad.js";
@@ -65,11 +66,6 @@ async function servicioVisible(servicioId: string) {
   const servicio = await buscarServicio(servicioId);
   if (!servicio || !(await esServicioVisible(servicioId))) throw servicioNoEncontrado();
   return servicio;
-}
-
-/** «Juan Pérez Soto» → «Juan». Lo único del cliente que se publica. */
-export function nombreDePila(nombre: string): string {
-  return nombre.trim().split(/\s+/)[0] ?? "";
 }
 
 type Elegibilidad =

@@ -357,6 +357,36 @@ export interface MiValoracion {
   plazoHasta: string | null;
 }
 
+/**
+ * Un servicio que el cliente registró como contratado. PRIVADO: solo lo ve
+ * él. El título y el nombre son los del momento del registro; si la
+ * publicación ya no existe, `servicio.id` es null y `disponible` false.
+ */
+export interface Contratacion {
+  id: string;
+  /** «AAAA-MM-DD», el día que indicó el cliente. */
+  fechaContratacion: string;
+  notas: string | null;
+  servicio: { id: string | null; titulo: string; disponible: boolean };
+  prestador: { nombre: string };
+  /** Su valoración de ese servicio, si ya lo valoró. */
+  valoracion: { id: string } | null;
+}
+
+export interface PaginaContrataciones {
+  contrataciones: Contratacion[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+}
+
+/** Para la página de un servicio: si puede registrarlo y lo que ya registró de él. */
+export interface ContratacionesEnServicio {
+  puedeRegistrar: boolean;
+  motivo: "PROPIO" | "SIN_CONTACTO" | null;
+  contrataciones: Contratacion[];
+}
+
 /** Una valoración que recibió el prestador, con su objeción y, si se ocultó, el motivo. */
 export interface ValoracionRecibida {
   id: string;
@@ -894,6 +924,30 @@ function leerValoracionPublica(valor: unknown): ValoracionPublica | null {
 
 function leerServicioValorado(valor: unknown): ServicioValorado | null {
   return esObjeto(valor) && typeof valor.id === "string" && typeof valor.titulo === "string" ? { id: valor.id, titulo: valor.titulo } : null;
+}
+
+function leerContratacion(valor: unknown): Contratacion | null {
+  if (
+    !esObjeto(valor) ||
+    typeof valor.id !== "string" ||
+    typeof valor.fechaContratacion !== "string" ||
+    !esObjeto(valor.servicio) ||
+    typeof valor.servicio.titulo !== "string" ||
+    !esObjeto(valor.prestador) ||
+    typeof valor.prestador.nombre !== "string"
+  ) {
+    return null;
+  }
+  const servicioId = typeof valor.servicio.id === "string" ? valor.servicio.id : null;
+  return {
+    id: valor.id,
+    fechaContratacion: valor.fechaContratacion,
+    notas: typeof valor.notas === "string" ? valor.notas : null,
+    // Sin id no hay página a la que llevar, diga lo que diga «disponible».
+    servicio: { id: servicioId, titulo: valor.servicio.titulo, disponible: servicioId !== null && valor.servicio.disponible === true },
+    prestador: { nombre: valor.prestador.nombre },
+    valoracion: esObjeto(valor.valoracion) && typeof valor.valoracion.id === "string" ? { id: valor.valoracion.id } : null,
+  };
 }
 
 function leerValoracionPropia(valor: unknown): ValoracionPropia | null {
@@ -2184,6 +2238,50 @@ export function crearClienteApi() {
         incluyeRelacionados: cuerpo.incluyeRelacionados === true,
         sugerencias: leerLista(cuerpo.sugerencias, leerCategoria),
       };
+    },
+
+    /** Los servicios que la cuenta registró como contratados: solo los propios. */
+    async listarContrataciones(pagina = 1): Promise<PaginaContrataciones> {
+      const cuerpo = await peticion(`/contrataciones?pagina=${pagina}`, { autenticada: true });
+      if (!esObjeto(cuerpo) || typeof cuerpo.total !== "number" || typeof cuerpo.pagina !== "number" || typeof cuerpo.porPagina !== "number") {
+        throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      }
+      return {
+        contrataciones: leerLista(cuerpo.contrataciones, leerContratacion),
+        pagina: cuerpo.pagina,
+        porPagina: cuerpo.porPagina,
+        total: cuerpo.total,
+      };
+    },
+
+    /** Si puede registrar ese servicio como contratado, y lo que ya registró de él. */
+    async contratacionesEnServicio(servicioId: string): Promise<ContratacionesEnServicio> {
+      const cuerpo = await peticion(`/contrataciones/servicio/${encodeURIComponent(servicioId)}`, { autenticada: true });
+      if (!esObjeto(cuerpo)) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return {
+        puedeRegistrar: cuerpo.puedeRegistrar === true,
+        motivo: cuerpo.motivo === "PROPIO" || cuerpo.motivo === "SIN_CONTACTO" ? cuerpo.motivo : null,
+        contrataciones: leerLista(cuerpo.contrataciones, leerContratacion),
+      };
+    },
+
+    /** El prestador y las copias del título y del nombre los fija el servidor. */
+    async registrarContratacion(datos: { servicioId: string; fechaContratacion: string; notas?: string | null }): Promise<Contratacion> {
+      const cuerpo = await peticion("/contrataciones", { metodo: "POST", cuerpo: datos, autenticada: true });
+      const contratacion = esObjeto(cuerpo) ? leerContratacion(cuerpo.contratacion) : null;
+      if (!contratacion) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return contratacion;
+    },
+
+    async editarContratacion(id: string, datos: { fechaContratacion?: string; notas?: string | null }): Promise<Contratacion> {
+      const cuerpo = await peticion(`/contrataciones/${encodeURIComponent(id)}`, { metodo: "PATCH", cuerpo: datos, autenticada: true });
+      const contratacion = esObjeto(cuerpo) ? leerContratacion(cuerpo.contratacion) : null;
+      if (!contratacion) throw new ErrorApi(500, "RESPUESTA_INESPERADA", MENSAJE_GENERICO, []);
+      return contratacion;
+    },
+
+    async eliminarContratacion(id: string): Promise<void> {
+      await peticion(`/contrataciones/${encodeURIComponent(id)}`, { metodo: "DELETE", autenticada: true });
     },
 
     /** Registra el contacto en la API y devuelve el teléfono. Exige sesión. */

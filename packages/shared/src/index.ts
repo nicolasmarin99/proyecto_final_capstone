@@ -8,6 +8,15 @@ export {
   type ProblemaContrasena,
 } from "./contrasena.js";
 export { formatearTelefono, normalizarTelefono } from "./telefono.js";
+export { mensajeContactoWhatsApp, nombreDePila, type DatosMensajeContacto } from "./contacto.js";
+export {
+  CONTRATACIONES_POR_PAGINA,
+  FECHA_MINIMA_CONTRATACION,
+  LARGO_MAXIMO_NOTAS_CONTRATACION,
+  ZONA_HORARIA_CONTRATACION,
+  esFechaCalendario,
+  fechaDeHoyEnChile,
+} from "./contrataciones.js";
 export {
   LARGO_MAXIMO_DESCRIPCION,
   LARGO_MINIMO_DESCRIPCION,

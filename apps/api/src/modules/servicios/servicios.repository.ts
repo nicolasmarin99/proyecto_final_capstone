@@ -75,6 +75,10 @@ export async function actualizarServicio(id: string, campos: CamposServicio) {
  * Contactos y denuncias apuntan al servicio con RESTRICT: son historia de la
  * plataforma (de un contacto cuelga después la valoración). Si hay alguno,
  * el servicio no se puede borrar.
+ *
+ * Las contrataciones NO cuentan, a propósito: son el historial privado de un
+ * cliente (SET NULL, sobreviven con el título copiado). Si bloquearan el
+ * borrado, el prestador deduciría que alguien marcó su servicio.
  */
 export async function contarReferencias(id: string) {
   const [contactos, denuncias] = await Promise.all([

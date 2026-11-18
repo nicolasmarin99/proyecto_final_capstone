@@ -294,6 +294,123 @@ describe("Página pública del servicio", () => {
     expect(ventana.opener).toBeNull();
   });
 
+  it("el mensaje de WhatsApp incluye el nombre de pila del cliente con sesión, y la vista previa es exactamente lo que se envía", async () => {
+    // La API podría enviar más datos de la cuenta: nada de eso llega al mensaje.
+    const conDatos = { ...cliente, nombre: "Ana María Fuentes Rojas", correo: "ana.fuentes@ejemplo.cl", rut: "12345678-5" };
+    simularApi({ usuario: conDatos as typeof cliente });
+    const ventana = { location: { href: "" }, opener: {}, close: vi.fn() };
+    vi.spyOn(window, "open").mockReturnValue(ventana as unknown as Window);
+    renderizar("/servicios/s1");
+
+    const boton = await screen.findByRole("button", { name: /contactar por whatsapp/i });
+    const esperado = "Hola Pedro Soto, soy Ana y te escribo desde LocalCL por tu servicio «Gasfitería a domicilio».";
+    // Antes de pulsar, el cliente ve el mensaje exacto bajo el botón.
+    expect(screen.getByText(/se enviará este mensaje a tu nombre/i)).toBeInTheDocument();
+    expect(screen.getByText(esperado)).toBeInTheDocument();
+    expect(boton).toHaveAccessibleDescription(esperado);
+
+    fireEvent.click(boton);
+    await waitFor(() => expect(ventana.location.href).toMatch(/^https:\/\/wa\.me\//));
+
+    const enviado = new URL(ventana.location.href).searchParams.get("text");
+    expect(enviado).toBe(esperado);
+    // NUNCA el nombre completo, el correo ni el RUT.
+    for (const dato of ["María", "Fuentes", "Rojas", "ana.fuentes@ejemplo.cl", "12345678", "12.345.678", "@"]) {
+      expect(enviado).not.toContain(dato);
+      expect(screen.getByText(esperado).textContent).not.toContain(dato);
+    }
+  });
+
+  it("sin sesión el mensaje no lleva nombre y el contacto sigue pidiendo iniciar sesión, como antes", async () => {
+    simularApi({ usuario: null });
+    renderizar("/servicios/s1");
+
+    await screen.findByRole("heading", { level: 1 });
+    // Sin sesión no hay botón ni vista previa: el teléfono del prestador se protege con la sesión.
+    expect(screen.queryByText(/se enviará este mensaje/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/soy .* y te escribo/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /contrataste este servicio/i })).not.toBeInTheDocument();
+  });
+
+  it("tras contactar por WhatsApp aparece «Contraté este servicio», y registra solo el servicio y la fecha", async () => {
+    simularApi({ usuario: cliente });
+    const ventana = { location: { href: "" }, opener: {}, close: vi.fn() };
+    vi.spyOn(window, "open").mockReturnValue(ventana as unknown as Window);
+    let contactado = false;
+    const original = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (entrada, opciones) => {
+      const url = String(entrada);
+      if (/\/contacto\?/.test(url)) contactado = true;
+      if (url === "/api/contrataciones/servicio/s1") {
+        return json({ puedeRegistrar: contactado, motivo: contactado ? null : "SIN_CONTACTO", contrataciones: [] });
+      }
+      if (url === "/api/contrataciones" && opciones?.method === "POST") {
+        const { fechaContratacion } = JSON.parse(String(opciones.body)) as { fechaContratacion: string };
+        return json(
+          {
+            contratacion: {
+              id: "k1",
+              fechaContratacion,
+              notas: null,
+              servicio: { id: "s1", titulo: "Gasfitería a domicilio", disponible: true },
+              prestador: { nombre: "Pedro Soto" },
+              valoracion: null,
+            },
+          },
+          201,
+        );
+      }
+      return original?.(entrada, opciones) ?? json({}, 500);
+    });
+    renderizar("/servicios/s1");
+
+    // Sin contacto todavía: no se ofrece.
+    fireEvent.click(await screen.findByRole("button", { name: /contactar por whatsapp/i }));
+    const seccion = await screen.findByRole("region", { name: /contrataste este servicio/i });
+    expect(within(seccion).getByText(/solo tú lo ves: pedro soto no lo ve ni recibe ningún aviso/i)).toBeInTheDocument();
+
+    fireEvent.change(within(seccion).getByLabelText(/fecha en que lo contrataste/i), { target: { value: "2026-10-05" } });
+    fireEvent.click(within(seccion).getByRole("button", { name: /contraté este servicio/i }));
+
+    expect(await within(seccion).findByText(/lo registraste como contratado el 5 de octubre de 2026/i)).toBeInTheDocument();
+    expect(within(seccion).getByRole("link", { name: /servicios contratados/i })).toHaveAttribute("href", "/perfil#servicios-contratados");
+    // Solo servicio y fecha: el prestador y las copias los pone el servidor.
+    expect(cuerpoDe("POST", /\/api\/contrataciones$/)).toEqual({ servicioId: "s1", fechaContratacion: "2026-10-05" });
+  });
+
+  it("«Contraté este servicio» no acepta una fecha futura", async () => {
+    simularApi({ usuario: cliente });
+    const original = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (entrada, opciones) =>
+      String(entrada) === "/api/contrataciones/servicio/s1"
+        ? json({ puedeRegistrar: true, motivo: null, contrataciones: [] })
+        : (original?.(entrada, opciones) ?? json({}, 500)),
+    );
+    renderizar("/servicios/s1");
+
+    const seccion = await screen.findByRole("region", { name: /contrataste este servicio/i });
+    fireEvent.change(within(seccion).getByLabelText(/fecha en que lo contrataste/i), { target: { value: "2999-01-01" } });
+    fireEvent.click(within(seccion).getByRole("button", { name: /contraté este servicio/i }));
+
+    expect(await within(seccion).findByText("La fecha no puede ser futura.")).toBeInTheDocument();
+    expect(llamadas("POST", /\/api\/contrataciones$/)).toHaveLength(0);
+  });
+
+  it("en un servicio propio no se ofrece «Contraté este servicio»", async () => {
+    simularApi({ usuario: prestador });
+    const original = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (entrada, opciones) =>
+      String(entrada) === "/api/contrataciones/servicio/s1"
+        ? json({ puedeRegistrar: false, motivo: "PROPIO", contrataciones: [] })
+        : (original?.(entrada, opciones) ?? json({}, 500)),
+    );
+    renderizar("/servicios/s1");
+
+    await screen.findByRole("button", { name: /contactar por whatsapp/i });
+    await waitFor(() => expect(llamadas("GET", /\/api\/contrataciones\/servicio\/s1$/)).toHaveLength(1));
+    expect(screen.queryByRole("region", { name: /contrataste este servicio/i })).not.toBeInTheDocument();
+  });
+
   it("si la API rechaza el contacto, cierra la pestaña y explica por qué", async () => {
     simularApi({ usuario: prestador });
     const ventana = { location: { href: "" }, opener: {}, close: vi.fn() };

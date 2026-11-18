@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router";
+import { mensajeContactoWhatsApp } from "@localcl/shared";
 import { clienteApi, ErrorApi, type ClienteApi, type ServicioPublico } from "../api/cliente";
 import { useAuth } from "../auth/ContextoAuth";
 import { Avatar } from "../componentes/Avatar";
 import { Boton } from "../componentes/Boton";
 import { ListaCertificaciones, ListaCursos, SelloCertificaciones } from "../componentes/Certificaciones";
+import { ContratacionServicio } from "../componentes/ContratacionServicio";
 import { FormularioValoracion } from "../componentes/FormularioValoracion";
 import { GaleriaServicio } from "../componentes/GaleriaServicio";
 import { ReportarServicio } from "../componentes/ReportarServicio";
@@ -13,13 +15,14 @@ import { Footer } from "../componentes/landing/Footer";
 import { ResumenEnLinea, ValoracionesPublicas } from "../componentes/Valoraciones";
 import { nombreCategoria, textoPrecio } from "../servicios/formato";
 
-/** Mensaje inicial de WhatsApp: dice desde dónde y por qué servicio escribe. */
-function mensajeInicial(servicio: ServicioPublico): string {
-  return `Hola ${servicio.prestador.nombre}, te escribo desde LocalCL por tu servicio «${servicio.titulo}».`;
-}
-
 /**
  * Contacto por WhatsApp, solo con sesión.
+ *
+ * El mensaje sale de mensajeContactoWhatsApp (@localcl/shared), el único
+ * lugar donde se compone: el enlace y la vista previa usan el mismo texto,
+ * así lo que el cliente lee bajo el botón es exactamente lo que se envía.
+ * Lleva solo su nombre de pila; la función recibe el nombre y nada más, así
+ * que el correo y el RUT no pueden terminar en el mensaje.
  *
  * El orden importa:
  * 1. Se abre la pestaña nueva en el mismo clic. Si se abriera después de
@@ -27,10 +30,25 @@ function mensajeInicial(servicio: ServicioPublico): string {
  * 2. Se le quita `opener`: la página de destino no puede tocar la de LocalCL.
  * 3. Recién cuando la API registró el contacto y entregó el teléfono, la
  *    pestaña va a wa.me. Si la API rechaza, se cierra sin ir a ningún lado.
+ *
+ * `alContactar` avisa que el contacto quedó registrado (habilita «Contraté
+ * este servicio» sin recargar).
  */
-function BotonWhatsApp({ servicio, cliente }: { servicio: ServicioPublico; cliente: ClienteApi }) {
+function BotonWhatsApp({
+  servicio,
+  cliente,
+  nombreCliente,
+  alContactar,
+}: {
+  servicio: ServicioPublico;
+  cliente: ClienteApi;
+  nombreCliente: string | null;
+  alContactar(): void;
+}) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const idVistaPrevia = useId();
+  const mensaje = mensajeContactoWhatsApp({ nombrePrestador: servicio.prestador.nombre, tituloServicio: servicio.titulo, nombreCliente });
 
   async function contactar() {
     setError(null);
@@ -41,7 +59,7 @@ function BotonWhatsApp({ servicio, cliente }: { servicio: ServicioPublico; clien
     try {
       const telefono = await cliente.obtenerContacto(servicio.prestador.id, servicio.id);
       // wa.me espera el número sin "+" ni espacios: 56912345678.
-      const destino = `https://wa.me/${telefono.replace(/\D/g, "")}?text=${encodeURIComponent(mensajeInicial(servicio))}`;
+      const destino = `https://wa.me/${telefono.replace(/\D/g, "")}?text=${encodeURIComponent(mensaje)}`;
 
       if (ventana) {
         ventana.location.href = destino;
@@ -49,6 +67,7 @@ function BotonWhatsApp({ servicio, cliente }: { servicio: ServicioPublico; clien
         // El navegador bloqueó la pestaña: se va en la misma.
         window.location.assign(destino);
       }
+      alContactar();
     } catch (causa) {
       ventana?.close();
       setError(causa instanceof ErrorApi ? causa.message : "No fue posible obtener el contacto. Intenta de nuevo.");
@@ -59,7 +78,7 @@ function BotonWhatsApp({ servicio, cliente }: { servicio: ServicioPublico; clien
 
   return (
     <div>
-      <Boton type="button" cargando={enviando} onClick={contactar}>
+      <Boton type="button" cargando={enviando} onClick={contactar} aria-describedby={idVistaPrevia}>
         {enviando ? "Abriendo WhatsApp…" : "Contactar por WhatsApp"}
       </Boton>
       {error && (
@@ -67,8 +86,14 @@ function BotonWhatsApp({ servicio, cliente }: { servicio: ServicioPublico; clien
           {error}
         </p>
       )}
+      <figure className="mt-3 rounded-chico border border-borde bg-niebla px-4 py-3">
+        <figcaption className="text-xs font-bold text-texto-suave">Se enviará este mensaje a tu nombre</figcaption>
+        <blockquote id={idVistaPrevia} className="mt-1 text-sm break-words text-noche">
+          {mensaje}
+        </blockquote>
+      </figure>
       <p className="mt-2 text-xs text-texto-suave">
-        Al contactarlo queda registrado en tu cuenta: así después podrás dejarle una valoración.
+        Solo va tu nombre de pila. Al contactarlo queda registrado en tu cuenta: así después podrás dejarle una valoración.
       </p>
     </div>
   );
@@ -80,6 +105,8 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
   const [servicio, setServicio] = useState<ServicioPublico | null>(null);
   // Sube cada vez que el cliente valora, edita o retira: la lista se recarga.
   const [versionValoraciones, setVersionValoraciones] = useState(0);
+  // Sube cuando el cliente acaba de contactar: «Contraté este servicio» se vuelve a consultar.
+  const [versionContacto, setVersionContacto] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -213,7 +240,12 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                   </h2>
                   <div className="mt-3">
                     {usuario ? (
-                      <BotonWhatsApp servicio={servicio} cliente={cliente} />
+                      <BotonWhatsApp
+                        servicio={servicio}
+                        cliente={cliente}
+                        nombreCliente={usuario.nombre}
+                        alContactar={() => setVersionContacto((version) => version + 1)}
+                      />
                     ) : (
                       <p className="rounded-chico bg-niebla px-4 py-3 text-sm text-noche">
                         Para ver cómo contactarlo,{" "}
@@ -228,6 +260,14 @@ export default function PaginaServicio({ cliente = clienteApi }: { cliente?: Cli
                       </p>
                     )}
                   </div>
+                  {usuario && (
+                    <ContratacionServicio
+                      servicioId={servicio.id}
+                      nombrePrestador={servicio.prestador.nombre}
+                      cliente={cliente}
+                      version={versionContacto}
+                    />
+                  )}
                 </section>
 
                 {/* Discreto a propósito: está para quien lo necesite, no para invitar a reportar. */}
